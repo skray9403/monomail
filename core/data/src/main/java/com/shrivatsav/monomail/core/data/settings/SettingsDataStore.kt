@@ -81,7 +81,7 @@ data class AppSettings(
     val defaultReply: DefaultReply = DefaultReply.REPLY,
     val notificationQuickActions: Set<String> = setOf("reply", "archive", "delete", "snooze"),
     val disabledNotificationAccounts: Set<String> = emptySet(),
-    val syncFrequency: SyncFrequency = SyncFrequency.MIN_15,
+    val syncFrequency: SyncFrequency = SyncFrequency.MANUAL,
     val unifiedInboxEnabled: Boolean = false,
     val hasSeenWelcomePrompt: Boolean = false,
     val smartGroupingEnabled: Boolean = true,
@@ -164,7 +164,7 @@ class SettingsDataStore(private val context: Context) {
             notificationQuickActions = prefs[Keys.NOTIFICATION_QUICK_ACTIONS]
                 ?: setOf("reply", "archive", "delete", "snooze"),
             disabledNotificationAccounts = prefs[Keys.DISABLED_NOTIF_ACCOUNTS] ?: emptySet(),
-            syncFrequency = prefs[Keys.SYNC_FREQUENCY]?.let { SyncFrequency.valueOf(it) } ?: SyncFrequency.MIN_15,
+            syncFrequency = prefs[Keys.SYNC_FREQUENCY]?.let { SyncFrequency.valueOf(it) } ?: SyncFrequency.MANUAL,
             unifiedInboxEnabled = prefs[Keys.UNIFIED_INBOX_ENABLED] ?: false,
             hasSeenWelcomePrompt = prefs[Keys.HAS_SEEN_WELCOME_PROMPT] ?: false,
             smartGroupingEnabled = prefs[Keys.SMART_GROUPING_ENABLED] ?: true,

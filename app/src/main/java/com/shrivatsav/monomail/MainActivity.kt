@@ -78,6 +78,11 @@ class MainActivity : ComponentActivity() {
             // Keep splash visible until content is ready
             !isContentReady
         }
+        if (settingsDataStore.settingsFlow.value.syncFrequency == SyncFrequency.MANUAL) {
+            val workManager = WorkManager.getInstance(this)
+            workManager.cancelUniqueWork("EmailSyncWork")
+            workManager.cancelUniqueWork("adaptive_email_sync")
+        }
         enableEdgeToEdge()
         setContent {
             val settings by settingsDataStore.settingsFlow.collectAsState()
@@ -129,7 +134,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        scheduleAdaptiveSync()
+        if (settingsDataStore.settingsFlow.value.syncFrequency != SyncFrequency.MANUAL) {
+            scheduleAdaptiveSync()
+        }
     }
 
     private fun scheduleAdaptiveSync() {
@@ -152,16 +159,17 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun scheduleBackgroundSync(frequency: SyncFrequency) {
+        val workManager = WorkManager.getInstance(this)
+        if (frequency == SyncFrequency.MANUAL) {
+            workManager.cancelUniqueWork("EmailSyncWork")
+            workManager.cancelUniqueWork("adaptive_email_sync")
+            return
+        }
         val intervalMinutes = when (frequency) {
             SyncFrequency.MIN_15 -> 15L
             SyncFrequency.MIN_30 -> 30L
             SyncFrequency.HOUR_1 -> 60L
-            SyncFrequency.MANUAL -> {
-                // Manual: no frequent background checks, but keep a quiet 6h
-                // safety-net sync so accounts never go fully stale (GitHub builds
-                // have no push to fall back on).
-                6 * 60L
-            }
+            SyncFrequency.MANUAL -> return
         }
         val workRequest = PeriodicWorkRequestBuilder<EmailSyncWorker>(
             intervalMinutes, TimeUnit.MINUTES
@@ -172,7 +180,7 @@ class MainActivity : ComponentActivity() {
                     .build()
             )
             .build()
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+        workManager.enqueueUniquePeriodicWork(
             "EmailSyncWork",
             ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
             workRequest

@@ -30,18 +30,16 @@ internal fun NotificationSettingsScreen(
     val isPlayStoreBuild = !BuildConfig.IS_GITHUB_BUILD
 
     ScrollableSettingsScaffold(title = "Notifications", onBack = onBack) {
-        if (!isPlayStoreBuild) {
-            SettingsCard {
-                BottomSheetPickerRow(
-                    icon = Icons.Rounded.Sync,
-                    title = "Sync Frequency",
-                    currentValue = settings.syncFrequency.displayName(),
-                    options = SyncFrequency.entries.map { it.displayName() },
-                    onSelected = { idx -> viewModel.setSyncFrequency(SyncFrequency.entries[idx]) }
-                )
-            }
-            Spacer(Modifier.height(16.dp))
+        SettingsCard {
+            BottomSheetPickerRow(
+                icon = Icons.Rounded.Sync,
+                title = "Sync Frequency",
+                currentValue = settings.syncFrequency.displayName(),
+                options = SyncFrequency.entries.map { it.displayName() },
+                onSelected = { idx -> viewModel.setSyncFrequency(SyncFrequency.entries[idx]) }
+            )
         }
+        Spacer(Modifier.height(16.dp))
 
         if (accounts.isNotEmpty()) {
             GroupLabel(text = "Accounts", modifier = Modifier.padding(horizontal = 16.dp))

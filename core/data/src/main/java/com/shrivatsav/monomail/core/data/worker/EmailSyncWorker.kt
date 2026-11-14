@@ -10,6 +10,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.shrivatsav.monomail.core.data.auth.AccountManager
 import com.shrivatsav.monomail.core.data.repository.EmailRepository
+import com.shrivatsav.monomail.core.data.settings.SyncFrequency
 import com.shrivatsav.monomail.model.InboxTab
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -57,7 +58,10 @@ class EmailSyncWorker @AssistedInject constructor(
             }.awaitAll()
         }
         if (inputData.getBoolean(KEY_CONTINUE_ADAPTIVE_SYNC, false)) {
-            scheduleNextAdaptiveSync(applicationContext, accountManager)
+            val syncFreq = settingsDataStore.settingsFlow.value.syncFrequency
+            if (syncFreq != SyncFrequency.MANUAL) {
+                scheduleNextAdaptiveSync(applicationContext, accountManager)
+            }
         }
         val overallHasFailure = results.any { it.first }
         val overallHasAuthFailure = results.any { it.second }
@@ -135,6 +139,11 @@ class EmailSyncWorker @AssistedInject constructor(
     }
 
     private suspend fun scheduleNextAdaptiveSync(context: Context, accountManager: AccountManager) {
+        val syncFreq = settingsDataStore.settingsFlow.value.syncFrequency
+        if (syncFreq == SyncFrequency.MANUAL) {
+            WorkManager.getInstance(context).cancelUniqueWork(ADAPTIVE_SYNC_WORK_NAME)
+            return
+        }
         val lastActive = accountManager.getLastActiveTime()
         val now = System.currentTimeMillis()
         val isRecentlyActive = lastActive > 0 && (now - lastActive) < TimeUnit.MINUTES.toMillis(ADAPTIVE_ACTIVITY_WINDOW_MINUTES)

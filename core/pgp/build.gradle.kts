@@ -27,7 +27,9 @@ android {
             dimension = "distribution"
             val secretsFile = rootProject.file("secrets.properties")
             val googleClientId = if (secretsFile.exists()) {
-                secretsFile.readLines().firstOrNull { it.startsWith("GOOGLE_CLIENT_ID=") }?.substringAfter("=") ?: ""
+                val props = java.util.Properties()
+                secretsFile.inputStream().use(props::load)
+                props.getProperty("GOOGLE_CLIENT_ID")?.trim()?.removeSurrounding("\"") ?: ""
             } else ""
             buildConfigField("String", "GOOGLE_CLIENT_ID", "\"$googleClientId\"")
         }

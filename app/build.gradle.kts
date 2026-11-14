@@ -77,8 +77,8 @@ val secrets = Properties()
 if (secretsFile.exists()) {
     secrets.load(FileInputStream(secretsFile))
 }
-val googleClientId = secrets.getProperty("GOOGLE_CLIENT_ID") ?: ""
-val pushBackendUrl = secrets.getProperty("PUSH_BACKEND_URL") ?: "https://monomail-push.yourdomain.workers.dev"
+val googleClientId = secrets.getProperty("GOOGLE_CLIENT_ID")?.trim()?.removeSurrounding("\"") ?: ""
+val pushBackendUrl = secrets.getProperty("PUSH_BACKEND_URL")?.trim()?.removeSurrounding("\"") ?: "https://monomail-push.yourdomain.workers.dev"
 
 val keystoreFile = rootProject.file("keystore.properties")
 val keystoreProps = Properties()
@@ -120,6 +120,23 @@ android {
     }
 
     signingConfigs {
+        getByName("debug") {
+            val debugKeystoreInRoot = rootProject.file("debug.keystore")
+            val customDebugStoreFile = keystoreProps.getProperty("debugStoreFile")
+                ?.takeIf { it.isNotBlank() }
+                ?.let(rootProject::file)
+            val chosenDebugStore = when {
+                customDebugStoreFile?.isFile == true -> customDebugStoreFile
+                debugKeystoreInRoot.isFile -> debugKeystoreInRoot
+                else -> null
+            }
+            if (chosenDebugStore != null) {
+                storeFile = chosenDebugStore
+                storePassword = keystoreProps.getProperty("debugStorePassword", "android")
+                keyAlias = keystoreProps.getProperty("debugKeyAlias", "androiddebugkey")
+                keyPassword = keystoreProps.getProperty("debugKeyPassword", "android")
+            }
+        }
         create("release") {
             storeFile = releaseKeystoreFile
             storePassword = keystoreProps.getProperty("storePassword", "")
@@ -129,6 +146,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
