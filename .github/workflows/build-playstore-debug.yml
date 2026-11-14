@@ -1,0 +1,51 @@
+name: Build Playstore Debug
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Inject secrets.properties
+        run: |
+          cat << 'EOF' > secrets.properties
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          EOF
+
+      - name: Restore persistent debug keystore
+        run: |
+          mkdir -p ~/.android
+          printf "%s" "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | tr -d '[:space:]' | base64 -d > ~/.android/debug.keystore
+
+      - name: Build playstoreDebug APK
+        run: ./gradlew assemblePlaystoreDebug
+
+      - name: Print APK package name and SHA-1
+        run: |
+          APK="app/build/outputs/apk/playstore/debug/app-playstore-debug.apk"
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -V | tail -n 1)
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
+          echo "### Built APK Metadata" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          "$AAPT2" dump badging "$APK" \vert{} head -n 1 >> "$GITHUB_STEP_SUMMARY"
+          "$APKSIGNER" verify --print-certs "$APK" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: monomail-playstore-debug
+          path: app/build/outputs/apk/playstore/debug/app-playstore-debug.apk
