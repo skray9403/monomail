@@ -28,7 +28,9 @@ jobs:
       - name: Restore persistent debug keystore
         run: |
           mkdir -p ~/.android
-          printf "%s" "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | tr -d '[:space:]' | base64 -d > ~/.android/debug.keystore
+          printf "%s" "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" > b64.txt
+          tr -d '[:space:]' < b64.txt > clean.txt
+          base64 -d clean.txt > ~/.android/debug.keystore
 
       - name: Build playstoreDebug APK
         run: ./gradlew assemblePlaystoreDebug
@@ -36,16 +38,19 @@ jobs:
       - name: Print APK package name and SHA-1
         run: |
           APK="app/build/outputs/apk/playstore/debug/app-playstore-debug.apk"
-          AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -V | tail -n 1)
-          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
+          find "$ANDROID_HOME/build-tools" -name aapt2 > aapt2.txt
+          AAPT2=$(tail -n 1 aapt2.txt)
+          find "$ANDROID_HOME/build-tools" -name apksigner > apksigner.txt
+          APKSIGNER=$(tail -n 1 apksigner.txt)
           echo "### Built APK Metadata" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          "$AAPT2" dump badging "$APK" \vert{} head -n 1 >> "$GITHUB_STEP_SUMMARY"
+          "$AAPT2" dump badging "$APK" > badging.txt
+          grep -m 1 "^package:" badging.txt >> "$GITHUB_STEP_SUMMARY"
           "$APKSIGNER" verify --print-certs "$APK" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APK artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: monomail-playstore-debug
           path: app/build/outputs/apk/playstore/debug/app-playstore-debug.apk
+          
