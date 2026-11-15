@@ -35,12 +35,13 @@ jobs:
 
       - name: Print APK package name and SHA-1
         run: |
+          set -euo pipefail
           APK="app/build/outputs/apk/playstore/debug/app-playstore-debug.apk"
           AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -V | tail -n 1)
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
           echo "### Built APK Metadata" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          "$AAPT2" dump badging "$APK" \vert{} head -n 1 >> "$GITHUB_STEP_SUMMARY"
+          "$AAPT2" dump badging "$APK" | sed -n '1p' >> "$GITHUB_STEP_SUMMARY"
           "$APKSIGNER" verify --print-certs "$APK" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
