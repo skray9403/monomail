@@ -5,10 +5,13 @@ import android.content.Context
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetCredentialResponse
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.gms.auth.GoogleAuthUtil
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import java.security.SecureRandom
 
@@ -28,35 +31,93 @@ object GoogleAuthHelperImpl : GoogleAuthHelper {
     }
 
     override suspend fun signIn(context: Context, clientId: String): GoogleSignInData {
-        try {
-            val nonce = ByteArray(16).apply { SecureRandom().nextBytes(this) }
+        if (clientId.isBlank()) {
+            throw GoogleAuthException(
+                "Google Web OAuth Client ID is not configured. Check the GOOGLE_CLIENT_ID build secret."
+            )
+        }
+
+        val credentialManager = CredentialManager.create(context)
+
+        fun generateNonce(): String =
+            ByteArray(32)
+                .apply { SecureRandom().nextBytes(this) }
                 .joinToString("") { "%02x".format(it) }
+
+        fun parseGoogleCredential(result: GetCredentialResponse): GoogleSignInData {
+            val credential = GoogleIdTokenCredential.createFrom(result.credential.data)
+            return GoogleSignInData(
+                email = credential.id,
+                displayName = credential.displayName ?: "User",
+                photoUrl = credential.profilePictureUri?.toString()
+            )
+        }
+
+        try {
+            // Preferred flow: Credential Manager's standard Google account picker.
             val googleIdOption = GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
                 .setServerClientId(clientId)
                 .setAutoSelectEnabled(false)
-                .setNonce(nonce)
+                .setNonce(generateNonce())
                 .build()
+
             val request = GetCredentialRequest.Builder()
                 .addCredentialOption(googleIdOption)
                 .build()
-            val credentialManager = CredentialManager.create(context)
-            val result = credentialManager.getCredential(
-                request = request,
-                context = context
+
+            return parseGoogleCredential(
+                credentialManager.getCredential(request = request, context = context)
             )
-            val googleIdTokenCredential = GoogleIdTokenCredential
-                .createFrom(result.credential.data)
-            return GoogleSignInData(
-                email = googleIdTokenCredential.id,
-                displayName = googleIdTokenCredential.displayName ?: "User",
-                photoUrl = googleIdTokenCredential.profilePictureUri?.toString()
+        } catch (e: NoCredentialException) {
+            // Fallback recommended for cases where the standard picker has no eligible
+            // credentials: show the explicit Sign in with Google flow.
+            android.util.Log.w(
+                "GoogleAuth",
+                "No credentials from GetGoogleIdOption; trying explicit Google sign-in.",
+                e
             )
+
+            try {
+                val signInOption = GetSignInWithGoogleOption.Builder(clientId)
+                    .setNonce(generateNonce())
+                    .build()
+
+                val fallbackRequest = GetCredentialRequest.Builder()
+                    .addCredentialOption(signInOption)
+                    .build()
+
+                return parseGoogleCredential(
+                    credentialManager.getCredential(
+                        request = fallbackRequest,
+                        context = context
+                    )
+                )
+            } catch (fallbackError: GetCredentialException) {
+                android.util.Log.e(
+                    "GoogleAuth",
+                    "Explicit Sign in with Google failed: ${fallbackError.type}",
+                    fallbackError
+                )
+                throw GoogleAuthException(
+                    "Google sign-in failed: ${fallbackError.message ?: fallbackError.type}"
+                )
+            } catch (fallbackError: Exception) {
+                android.util.Log.e(
+                    "GoogleAuth",
+                    "Unexpected error in explicit Google sign-in.",
+                    fallbackError
+                )
+                throw GoogleAuthException(
+                    "Google sign-in failed: ${fallbackError.message ?: "Unknown error"}"
+                )
+            }
         } catch (e: GetCredentialException) {
-            throw GoogleAuthException(
-                "Google sign-in failed: ${e.message ?: e.type}. " +
-                "Make sure a Google account is added in Settings > Accounts."
-            )
+            android.util.Log.e("GoogleAuth", "Credential Manager failed: ${e.type}", e)
+            throw GoogleAuthException("Google sign-in failed: ${e.message ?: e.type}")
+        } catch (e: Exception) {
+            android.util.Log.e("GoogleAuth", "Unexpected Google sign-in error.", e)
+            throw GoogleAuthException("Google sign-in failed: ${e.message ?: "Unknown error"}")
         }
     }
 
