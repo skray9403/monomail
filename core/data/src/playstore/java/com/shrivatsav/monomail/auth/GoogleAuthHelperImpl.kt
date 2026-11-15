@@ -99,6 +99,17 @@ object GoogleAuthHelperImpl : GoogleAuthHelper {
                     "Explicit Sign in with Google failed: ${fallbackError.type}",
                     fallbackError
                 )
+                // Clear a possibly stale provider session after a failed reauth attempt.
+                // This is particularly important for AccountReauth failures on Android 17.
+                try {
+                    credentialManager.clearCredentialState(ClearCredentialStateRequest())
+                } catch (clearError: Exception) {
+                    android.util.Log.w(
+                        "GoogleAuth",
+                        "Could not clear Credential Manager state after failed sign-in.",
+                        clearError
+                    )
+                }
                 throw GoogleAuthException(
                     "Google sign-in failed: ${fallbackError.message ?: fallbackError.type}"
                 )
@@ -108,6 +119,15 @@ object GoogleAuthHelperImpl : GoogleAuthHelper {
                     "Unexpected error in explicit Google sign-in.",
                     fallbackError
                 )
+                try {
+                    credentialManager.clearCredentialState(ClearCredentialStateRequest())
+                } catch (clearError: Exception) {
+                    android.util.Log.w(
+                        "GoogleAuth",
+                        "Could not clear Credential Manager state after failed sign-in.",
+                        clearError
+                    )
+                }
                 throw GoogleAuthException(
                     "Google sign-in failed: ${fallbackError.message ?: "Unknown error"}"
                 )
