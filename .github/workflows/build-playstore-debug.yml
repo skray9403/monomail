@@ -2,6 +2,9 @@ name: Build Playstore Debug
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - skray9403-patch-1
 
 jobs:
   build:
