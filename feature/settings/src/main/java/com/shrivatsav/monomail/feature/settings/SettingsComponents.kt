@@ -55,15 +55,14 @@ internal fun SettingsDetailTopBar(title: String, onNavigateBack: () -> Unit) {
 
 @Composable
 internal fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        shape = cornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        tonalElevation = 0.dp,
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(
-                animationSpec = MonoSpring.bouncy()
-            )
+            .animateContentSize(animationSpec = MonoSpring.gentle()),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(content = content)
     }
@@ -112,52 +111,31 @@ internal fun SettingsToggleRow(
     indented: Boolean = false,
     enabled: Boolean = true
 ) {
-    val alpha = if (enabled) 1f else MonoOpacity.disabled
-    Row(
+    ListItem(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (enabled) Modifier.clickable { onCheckedChange(!checked) } else Modifier)
-            .padding(
-                start = if (indented) 32.dp else 16.dp,
-                end = 16.dp,
-                top = 14.dp,
-                bottom = 14.dp
-            ),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+            .padding(start = if (indented) 16.dp else 0.dp),
+        leadingContent = {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (subtitle.isNotEmpty()) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Switch(
-            checked = checked,
-            onCheckedChange = if (enabled) onCheckedChange else null,
-            colors = SwitchDefaults.colors(
-                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                checkedThumbColor = MaterialTheme.colorScheme.onPrimary
-            ),
-            enabled = enabled
-        )
-    }
+        },
+        headlineContent = { Text(title) },
+        supportingContent = {
+            if (subtitle.isNotEmpty()) Text(subtitle)
+        },
+        trailingContent = {
+            Switch(
+                checked = checked,
+                onCheckedChange = if (enabled) onCheckedChange else null,
+                enabled = enabled,
+            )
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
 }
 
 @Composable
@@ -168,43 +146,31 @@ internal fun SettingsActionRow(
     onClick: () -> Unit,
     enabled: Boolean = true
 ) {
-    Row(
+    ListItem(
         modifier = Modifier
             .fillMaxWidth()
-            .let { if (enabled) it.clickable(onClick = onClick) else it }
-            .alpha(if (enabled) 1f else MonoOpacity.disabled)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
+            .clickable(enabled = enabled, onClick = onClick)
+            .alpha(if (enabled) 1f else MonoOpacity.disabled),
+        leadingContent = {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        headlineContent = { Text(title) },
+        supportingContent = { Text(subtitle) },
+        trailingContent = {
+            Icon(
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Icon(
-            imageVector = Icons.Rounded.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-            modifier = Modifier.size(22.dp)
-        )
-    }
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
 }
+
 @Composable
 internal fun ThemeSelectorRow(
     currentTheme: ThemeMode,
@@ -292,21 +258,13 @@ private fun SelectorRow(
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(cornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            entries.forEach { entry ->
-                SelectorItem(
-                    modifier = Modifier.weight(1f),
-                    label = entry.label,
-                    isSelected = entry.isSelected,
-                    labelPrefix = labelPrefix,
-                    onClick = entry.onClick
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            entries.forEachIndexed { index, entry ->
+                SegmentedButton(
+                    selected = entry.isSelected,
+                    onClick = entry.onClick,
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = entries.size),
+                    label = { Text(entry.label, maxLines = 1) },
                 )
             }
         }
@@ -318,50 +276,6 @@ private fun SelectorRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-    }
-}
-
-@Composable
-private fun SelectorItem(
-    modifier: Modifier = Modifier,
-    label: String,
-    isSelected: Boolean,
-    labelPrefix: String,
-    onClick: () -> Unit
-) {
-    val bgColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.onSurface
-        else MaterialTheme.colorScheme.surfaceContainerHigh,
-        animationSpec = tween(250), label = "${labelPrefix}Bg"
-    )
-    val textColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.surface
-        else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = tween(250), label = "${labelPrefix}Text"
-    )
-    val scaleAnim by animateFloatAsState(
-        targetValue = if (isSelected) 1.04f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "${labelPrefix}Scale"
-    )
-    Box(
-        modifier = modifier
-            .graphicsLayer(scaleX = scaleAnim, scaleY = scaleAnim)
-            .clip(cornerShape(10.dp))
-            .background(bgColor)
-            .clickable { onClick() }
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            color = textColor
-        )
     }
 }
 
