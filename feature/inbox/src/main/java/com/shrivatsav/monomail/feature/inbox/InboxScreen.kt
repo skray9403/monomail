@@ -1609,41 +1609,15 @@ private fun TopAlertBanner(
             .padding(horizontal = 16.dp)
             .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp)
     ) {
-        if (toastState != null) {
-            Surface(
-                shape = cornerShape(16.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer,
+        toastState?.let { state ->
+            Snackbar(
+                action = {
+                    TextButton(onClick = onUndo) { Text("Undo") }
+                },
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                shadowElevation = 8.dp,
-                modifier = Modifier.fillMaxWidth()
             ) {
-                val icon = when (toastState.actionType) {
-                    InboxViewModel.ActionType.ARCHIVE -> Icons.Rounded.Archive
-                    InboxViewModel.ActionType.DELETE -> Icons.Rounded.Delete
-                    InboxViewModel.ActionType.EMPTY_TRASH -> Icons.Rounded.Delete
-                    InboxViewModel.ActionType.SEND -> Icons.Rounded.Send
-                    InboxViewModel.ActionType.SNOOZE -> Icons.Rounded.Schedule
-                    InboxViewModel.ActionType.UNARCHIVE -> Icons.Rounded.Unarchive
-                    InboxViewModel.ActionType.RESTORE -> Icons.Rounded.Restore
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(icon, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        toastState.message, modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis
-                    )
-                    TextButton(
-                        onClick = onUndo,
-                        shape = cornerShape(24.dp),
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                        contentPadding = PaddingValues(horizontal = 12.dp)
-                    ) { Text("Undo", fontWeight = FontWeight.Bold) }
-                }
+                Text(state.message, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }
