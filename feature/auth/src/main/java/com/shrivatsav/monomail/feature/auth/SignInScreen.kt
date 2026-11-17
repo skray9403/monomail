@@ -120,7 +120,7 @@ fun SignInScreen(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            viewModel.onConsentResult(context)
+            viewModel.onConsentResult(context.findActivity() ?: context)
         }
     }
 
@@ -206,7 +206,7 @@ fun SignInScreen(
                 onDismiss = { if (state !is SignInState.Loading) showProviderSheet = false },
                 onGoogleSignIn = {
                     if (!BuildConfig.IS_GITHUB_BUILD) {
-                        viewModel.signIn(context)
+                        viewModel.signIn(context.findActivity() ?: context)
                     } else {
                         showProviderSheet = false
                         onNavigateToImapSetup(null, "Gmail")
@@ -411,7 +411,7 @@ fun ProviderSelectionDialog(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            viewModel.onConsentResult(context)
+            viewModel.onConsentResult(context.findActivity() ?: context)
         }
     }
     // Reset any stale state from a previous sign-in (e.g. leftover Success)
@@ -463,7 +463,7 @@ fun ProviderSelectionDialog(
                 state = state,
                 onGoogleSignIn = {
                     if (!BuildConfig.IS_GITHUB_BUILD) {
-                        viewModel.signIn(context)
+                        viewModel.signIn(context.findActivity() ?: context)
                     } else {
                         onNavigateToImapSetup(null, "Gmail")
                     }

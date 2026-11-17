@@ -118,8 +118,8 @@ object GoogleAuthHelperImpl : GoogleAuthHelper {
                 android.util.Log.i(TAG, "[GetSignInWithGoogleOption] Credential received successfully.")
                 return parseGoogleCredential(result, "GetSignInWithGoogleOption")
             } catch (fallbackError: GetCredentialCancellationException) {
-                android.util.Log.i(TAG, "[GetSignInWithGoogleOption] User cancelled explicit sign-in.")
-                throw GoogleAuthException("Google sign-in cancelled by user.", null, fallbackError)
+                android.util.Log.i(TAG, "[GetSignInWithGoogleOption] Sign-in cancelled or dismissed: ${fallbackError.message}")
+                throw GoogleAuthException("Google sign-in cancelled: ${fallbackError.message ?: "User cancelled"} (GetSignInWithGoogleOption)", null, fallbackError)
             } catch (fallbackError: GetCredentialException) {
                 android.util.Log.e(
                     TAG,
@@ -154,8 +154,8 @@ object GoogleAuthHelperImpl : GoogleAuthHelper {
                 )
             }
         } catch (e: GetCredentialCancellationException) {
-            android.util.Log.i(TAG, "[GetGoogleIdOption] User cancelled account selection.")
-            throw GoogleAuthException("Google sign-in cancelled by user.", null, e)
+            android.util.Log.i(TAG, "[GetGoogleIdOption] Account selection cancelled or dismissed: ${e.message}")
+            throw GoogleAuthException("Google sign-in cancelled: ${e.message ?: "User cancelled"} (GetGoogleIdOption)", null, e)
         } catch (e: GetCredentialCustomException) {
             android.util.Log.e(TAG, "[GetGoogleIdOption] GetCredentialCustomException: type=${e.type}, message=${e.message}", e)
             throw GoogleAuthException(
