@@ -175,6 +175,10 @@ class InboxViewModel @Inject constructor(
         _scrollPositions.value = _scrollPositions.value + (tab to (index to offset))
     }
 
+    /** Read once when a tab's LazyColumn is created; do not observe scroll updates. */
+    fun getSavedScrollPosition(tab: InboxTab): Pair<Int, Int> =
+        _scrollPositions.value[tab] ?: (0 to 0)
+
     init {
         viewModelScope.launch {
             combine(_currentTab, _activeAccountId, _unifiedInboxEnabled, _organizeByThread) { tab, accountId, unifiedEnabled, organize ->
@@ -306,15 +310,8 @@ class InboxViewModel @Inject constructor(
             }
         }
         refresh()
-        viewModelScope.launch {
-            InboxTab.values().forEach { tab ->
-                if (tab != _currentTab.value && tab != InboxTab.UNIFIED) {
-                    try { repository.refreshInbox(tab) } catch (e: Exception) {
-                        android.util.Log.e(TAG, "Background refresh failed for tab $tab", e)
-                    }
-                }
-            }
-        }
+        // Other folders refresh on demand in switchTab(). Avoid serial network
+        // requests for every folder while the inbox is opening.
         startForegroundPolling()
         observeSentEvents()
         recoverPendingSends()
