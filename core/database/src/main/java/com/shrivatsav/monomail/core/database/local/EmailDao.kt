@@ -22,9 +22,9 @@ interface EmailDao {
     @Query("""
         SELECT id, isRead, labels, attachmentsJson, body, bodyIsHtml, snippet
         FROM emails
-        WHERE accountId = :accountId AND threadId IN (:threadIds)
+        WHERE accountId = :accountId AND id IN (:messageIds)
     """)
-    suspend fun getSyncStateForThreads(threadIds: List<String>, accountId: String): List<EmailSyncStateProjection>
+    suspend fun getSyncStateForMessageIds(messageIds: List<String>, accountId: String): List<EmailSyncStateProjection>
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEmails(emails: List<EmailEntity>)
     @Query("UPDATE emails SET isStarred = :isStarred WHERE threadId = :threadId AND accountId = :accountId")
