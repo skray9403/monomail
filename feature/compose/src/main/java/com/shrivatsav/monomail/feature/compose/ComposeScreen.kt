@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.material.icons.rounded.Drafts
+import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Person
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.lazy.LazyColumn
@@ -860,7 +861,7 @@ private fun SuggestionsDropdown(
                 ListItem(
                     leadingContent = {
                         Icon(
-                            imageVector = Icons.Rounded.Person,
+                            imageVector = Icons.Rounded.Email,
                             contentDescription = null,
                         )
                     },
