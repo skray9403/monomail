@@ -119,6 +119,12 @@ object SecurityUtil {
         val prefs = getSecurePrefs(context)
         val customId = prefs.getString("custom_google_client_id", null)
         val raw = if (!customId.isNullOrBlank()) customId else BuildConfig.GOOGLE_CLIENT_ID
-        return raw.trim().removeSurrounding("\"").removeSurrounding("'").trim()
+        return raw.trim()
+            .removeSurrounding("\"")
+            .removeSurrounding("'")
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .removeSuffix("/")
+            .trim()
     }
 }

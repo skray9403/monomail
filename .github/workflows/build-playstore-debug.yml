@@ -23,7 +23,7 @@ jobs:
         env:
           RAW_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
         run: |
-          CLEAN_CLIENT_ID=$(printf '%s' "$RAW_CLIENT_ID" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+          CLEAN_CLIENT_ID=$(printf '%s' "$RAW_CLIENT_ID" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" -e 's#^https://##' -e 's#^http://##' -e 's#/$##')
           printf 'GOOGLE_CLIENT_ID=%s\n' "$CLEAN_CLIENT_ID" > secrets.properties
 
       - name: Restore persistent debug keystore

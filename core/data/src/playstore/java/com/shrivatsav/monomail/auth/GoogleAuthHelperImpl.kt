@@ -63,7 +63,13 @@ object GoogleAuthHelperImpl : GoogleAuthHelper {
     }
 
     override suspend fun signIn(context: Context, clientId: String): GoogleSignInData {
-        val cleanClientId = clientId.trim().removeSurrounding("\"").removeSurrounding("'").trim()
+        val cleanClientId = clientId.trim()
+            .removeSurrounding("\"")
+            .removeSurrounding("'")
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .removeSuffix("/")
+            .trim()
         if (cleanClientId.isBlank()) {
             throw GoogleAuthException(
                 "Google Web OAuth Client ID is not configured. Check the GOOGLE_CLIENT_ID build secret."
