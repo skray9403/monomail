@@ -17,6 +17,14 @@ interface EmailDao {
     suspend fun searchContacts(query: String, accountId: String): List<ContactResult>
     @Query("SELECT * FROM emails WHERE id = :id AND accountId = :accountId LIMIT 1")
     suspend fun getEmailById(id: String, accountId: String): EmailEntity?
+
+    /** Load stored body/labels/flags only for threads in the page being synced. */
+    @Query("""
+        SELECT id, isRead, labels, attachmentsJson, body, bodyIsHtml, snippet
+        FROM emails
+        WHERE accountId = :accountId AND threadId IN (:threadIds)
+    """)
+    suspend fun getSyncStateForThreads(threadIds: List<String>, accountId: String): List<EmailSyncStateProjection>
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEmails(emails: List<EmailEntity>)
     @Query("UPDATE emails SET isStarred = :isStarred WHERE threadId = :threadId AND accountId = :accountId")
@@ -193,4 +201,15 @@ data class EmailBodySlimProjection(
 data class EmailLabelsProjection(
     val id: String,
     val labels: List<String>
+)
+
+
+data class EmailSyncStateProjection(
+    val id: String,
+    val isRead: Boolean,
+    val labels: List<String>,
+    val attachmentsJson: String,
+    val body: String,
+    val bodyIsHtml: Boolean,
+    val snippet: String
 )
