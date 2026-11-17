@@ -106,6 +106,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalConfiguration
 import com.shrivatsav.monomail.data.model.EmailAttachmentInfo
@@ -868,57 +869,77 @@ private fun MessageBodyContent(
     }
     var showRemoteImages by remember { mutableStateOf(false) }
     RemoteImagesBanner(config.loadRemoteImages, showRemoteImages, bodyIsHtml) { showRemoteImages = true }
-    val textColor = String.format("#%06X", 0xFFFFFF and MaterialTheme.colorScheme.onBackground.toArgb())
-    val linkColor = String.format("#%06X", 0xFFFFFF and MaterialTheme.colorScheme.primary.toArgb())
-    val useOverviewScaling = remember(safeBodyText, bodyIsHtml) {
-        bodyIsHtml && looksFixedWidthTemplate(safeBodyText) && !looksMobileFriendly(safeBodyText) && !looksDataTableEmail(
-            safeBodyText
+    if (bodyIsHtml) {
+        // HTML newsletters and formatted messages need a browser renderer.
+        // Plain-text mail takes the native Compose path below and avoids the
+        // memory/startup cost of creating a WebView for simple text.
+        val textColor = String.format("#%06X", 0xFFFFFF and MaterialTheme.colorScheme.onBackground.toArgb())
+        val linkColor = String.format("#%06X", 0xFFFFFF and MaterialTheme.colorScheme.primary.toArgb())
+        val useOverviewScaling = remember(safeBodyText) {
+            looksFixedWidthTemplate(safeBodyText) &&
+                !looksMobileFriendly(safeBodyText) &&
+                !looksDataTableEmail(safeBodyText)
+        }
+        val emailZoomFactor = if (useOverviewScaling) {
+            val screenWidthDp = LocalConfiguration.current.screenWidthDp
+            ((screenWidthDp - 56).toFloat() / 600f).coerceIn(0.3f, 1.0f)
+        } else 1.0f
+        var htmlContent by remember(email.id) { mutableStateOf("") }
+        LaunchedEffect(
+            email.id,
+            safeBodyText,
+            config.fontScaleMultiplier,
+            showQuotedText,
+            config.showInlineImages,
+            config.loadRemoteImages,
+            showRemoteImages,
+            config.emailTheme,
+            useOverviewScaling,
+            emailZoomFactor
+        ) {
+            htmlContent = ""
+            htmlContent = withContext(Dispatchers.Default) {
+                buildEmailHtml(
+                    email,
+                    safeBodyText,
+                    bodyIsHtml,
+                    config.fontScaleMultiplier,
+                    HtmlBuildParams(
+                        showQuotedText,
+                        config.showInlineImages,
+                        config.loadRemoteImages,
+                        showRemoteImages,
+                        useOverviewScaling,
+                        emailZoomFactor,
+                        textColor,
+                        linkColor
+                    )
+                )
+            }
+        }
+        EmailWebViewCard(
+            email.id,
+            htmlContent,
+            config.emailTheme,
+            useOverviewScaling,
+            allowRemoteImages = config.loadRemoteImages || showRemoteImages
         )
-    }
-    val emailZoomFactor = if (useOverviewScaling) {
-        val screenWidthDp = LocalConfiguration.current.screenWidthDp
-        ((screenWidthDp - 56).toFloat() / 600f).coerceIn(0.3f, 1.0f)
-    } else 1.0f
-    var htmlContent by remember(email.id) { mutableStateOf("") }
-    LaunchedEffect(
-        email.id,
-        safeBodyText,
-        config.fontScaleMultiplier,
-        showQuotedText,
-        config.showInlineImages,
-        config.loadRemoteImages,
-        showRemoteImages,
-        config.emailTheme,
-        useOverviewScaling,
-        emailZoomFactor
-    ) {
-        htmlContent = ""
-        htmlContent = withContext(Dispatchers.Default) {
-            buildEmailHtml(
-                email,
-                safeBodyText,
-                bodyIsHtml,
-                config.fontScaleMultiplier,
-                HtmlBuildParams(
-                    showQuotedText,
-                    config.showInlineImages,
-                    config.loadRemoteImages,
-                    showRemoteImages,
-                    useOverviewScaling,
-                    emailZoomFactor,
-                    textColor,
-                    linkColor
+    } else {
+        val nativeTextSize = (15f * config.fontScaleMultiplier).coerceIn(10f, 28f).sp
+        SelectionContainer {
+            Text(
+                text = safeBodyText,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(4.dp),
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = nativeTextSize,
+                    lineHeight = (nativeTextSize.value * 1.65f).sp
                 )
             )
         }
     }
-    EmailWebViewCard(
-        email.id,
-        htmlContent,
-        config.emailTheme,
-        useOverviewScaling,
-        allowRemoteImages = config.loadRemoteImages || showRemoteImages
-    )
     if (hasQuotedText) {
         QuotedTextToggle(showQuotedText) { showQuotedText = !showQuotedText }
     }
