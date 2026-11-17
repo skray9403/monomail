@@ -1,6 +1,7 @@
 package com.shrivatsav.monomail.feature.inbox.components
 
 import com.shrivatsav.monomail.ui.components.AvatarCircle
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -77,9 +78,10 @@ internal fun ProfileCard(
                         )
                     }
                 },
-                modifier = Modifier.fillMaxWidth().then(
-                    if (accounts.size > 1) Modifier.padding(end = 4.dp) else Modifier
-                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = accounts.size > 1, onClick = callbacks.onShowSwitchAccount)
+                    .padding(end = 4.dp),
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             )
             if (accounts.size > 1) {
