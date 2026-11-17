@@ -1255,147 +1255,17 @@ private fun SlideToSendControl(
     onSend: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val density = LocalDensity.current
-    val haptic = LocalHapticFeedback.current
-    val scope = rememberCoroutineScope()
-
-    val thumbSize = 48.dp
-    val thumbPadding = 0.dp
-
-    var trackWidthPx by remember { mutableStateOf(0f) }
-    val maxOffset by remember(trackWidthPx) {
-        derivedStateOf {
-            with(density) { (trackWidthPx - thumbSize.toPx() - thumbPadding.toPx() * 2).coerceAtLeast(0f) }
-        }
-    }
-
-    val thumbOffset = remember { Animatable(0f) }
-    var isDragging by remember { mutableStateOf(false) }
-    var hasTriggeredHaptic by remember { mutableStateOf(false) }
-    var completing by remember { mutableStateOf(false) }
-
-    val progress = if (maxOffset > 0f) (thumbOffset.value / maxOffset).coerceIn(0f, 1f) else 0f
-    val sendThreshold = 0.82f
-    val morphed = progress >= 0.6f
-
-    val infiniteTransition = rememberInfiniteTransition(label = "slideHint")
-    val hintOffset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1100, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "hintOffset"
-    )
-
-    Box(
-        modifier = modifier
-            .height(48.dp)
-            .onGloballyPositioned { trackWidthPx = it.size.width.toFloat() }
-            .clip(cornerShape(24.dp))
-            .background(
-                if (canSend) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.surfaceContainerHigh
-            )
-            .border(
-                width = 1.dp,
-                color = if (canSend)
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-                else
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                shape = cornerShape(24.dp)
-            )
+    FilledTonalButton(
+        onClick = onSend,
+        enabled = canSend,
+        modifier = modifier.fillMaxWidth().height(52.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(with(density) { (thumbOffset.value + thumbSize.toPx() + thumbPadding.toPx()).toDp() })
-                .clip(cornerShape(24.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f + 0.18f * progress))
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.Send,
+            contentDescription = null,
         )
-
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = thumbSize + thumbPadding * 2)
-                .alpha((1f - progress * 1.6f).coerceIn(0f, 1f)),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = if (canSend) "Slide to send" else "Add a recipient",
-                style = MaterialTheme.typography.labelMedium,
-                color = if (canSend)
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                maxLines = 1
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .padding(thumbPadding)
-                .offset { IntOffset(x = thumbOffset.value.toInt(), y = 0) }
-                .size(thumbSize)
-                .scale(if (isDragging) 1.1f else 1f)
-                .clip(CircleShape)
-                .background(
-                    if (canSend) MaterialTheme.colorScheme.tertiaryContainer
-                    else MaterialTheme.colorScheme.surfaceContainerHighest
-                )
-                .border(
-                    width = if (canSend) 0.dp else 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                    shape = CircleShape
-                )
-                .pointerInput(canSend, maxOffset) {
-                    if (!canSend) return@pointerInput
-                    detectHorizontalDragGestures(
-                        onDragStart = { isDragging = true; hasTriggeredHaptic = false },
-                        onDragEnd = {
-                            isDragging = false
-                            val reached = maxOffset > 0f && thumbOffset.value / maxOffset >= sendThreshold
-                            scope.launch {
-                                if (reached && !completing) {
-                                    completing = true
-                                    thumbOffset.animateTo(maxOffset, spring(dampingRatio = 0.7f, stiffness = 400f))
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onSend()
-                                } else {
-                                    thumbOffset.animateTo(0f, spring(dampingRatio = 0.55f, stiffness = 300f))
-                                }
-                            }
-                        },
-                        onDragCancel = {
-                            isDragging = false
-                            scope.launch { thumbOffset.animateTo(0f, spring(dampingRatio = 0.55f, stiffness = 300f)) }
-                        },
-                        onHorizontalDrag = { change, dragAmount ->
-                            change.consume()
-                            scope.launch {
-                                thumbOffset.snapTo((thumbOffset.value + dragAmount).coerceIn(0f, maxOffset))
-                            }
-                            if (!hasTriggeredHaptic && maxOffset > 0f && thumbOffset.value / maxOffset >= sendThreshold) {
-                                hasTriggeredHaptic = true
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            }
-                        }
-                    )
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = if (morphed) Icons.Rounded.CheckCircle else Icons.AutoMirrored.Rounded.Send,
-                contentDescription = null,
-                tint = if (canSend) MaterialTheme.colorScheme.onTertiaryContainer
-                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier
-                    .size(20.dp)
-                    .offset(x = if (canSend && !isDragging && progress < 0.05f) (hintOffset * 3).dp else 0.dp)
-            )
-        }
+        Spacer(Modifier.width(8.dp))
+        Text(if (canSend) "Send" else "Add a recipient")
     }
 }
 
