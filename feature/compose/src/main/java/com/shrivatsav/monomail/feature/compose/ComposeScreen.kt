@@ -46,7 +46,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.TextButton
 import android.webkit.WebView
@@ -75,6 +74,9 @@ import androidx.compose.material.icons.rounded.FormatUnderlined
 import androidx.compose.material.icons.automirrored.rounded.FormatListBulleted
 import androidx.compose.material.icons.rounded.FormatListNumbered
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -89,6 +91,10 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -106,7 +112,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -691,32 +696,27 @@ private fun ComposeTextField(
     singleLine: Boolean = true,
     minHeight: Int = 0
 ) {
-    BasicTextField(
+    TextField(
         value = value,
         onValueChange = onValueChange,
         enabled = enabled,
-        textStyle = textStyle,
         singleLine = singleLine,
-        cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
+        textStyle = textStyle,
+        placeholder = { Text(label) },
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (minHeight > 0) Modifier.height(minHeight.dp)
-                else Modifier
-            )
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        decorationBox = { innerTextField ->
-            if (value.isEmpty()) {
-                Text(
-                    text = label,
-                    style = textStyle.copy(
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                        fontWeight = FontWeight.Normal
-                    )
-                )
-            }
-            innerTextField()
-        }
+            .then(if (minHeight > 0) Modifier.heightIn(min = minHeight.dp) else Modifier)
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+            unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+            disabledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+            errorContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+            focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+            unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+            disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+            errorIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+        ),
     )
 }
 @Composable
@@ -846,58 +846,35 @@ private fun SuggestionsDropdown(
     suggestions: List<EmailContact>,
     onSelectContact: (EmailContact) -> Unit
 ) {
-    AnimatedVisibility(
-        visible = suggestions.isNotEmpty(),
-        enter = fadeIn() + expandVertically(),
-        exit = fadeOut() + shrinkVertically()
-    ) {
-        Column(
+    if (suggestions.isNotEmpty()) {
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ),
         ) {
-            suggestions.forEach { contact ->
-                Row(
+            suggestions.forEachIndexed { index, contact ->
+                ListItem(
+                    leadingContent = {
+                        Icon(
+                            imageVector = Icons.Rounded.AccountCircle,
+                            contentDescription = null,
+                        )
+                    },
+                    headlineContent = { Text(contact.name) },
+                    supportingContent = {
+                        if (contact.email != contact.name) Text(contact.email)
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onSelectContact(contact) }
-                        .padding(horizontal = 4.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = contact.name.first().uppercase(),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = contact.name,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        if (contact.email != contact.name) {
-                            Text(
-                                text = contact.email,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            )
-                        }
-                    }
-                }
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                        .clickable { onSelectContact(contact) },
+                    colors = ListItemDefaults.colors(
+                        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    ),
                 )
+                if (index < suggestions.lastIndex) HorizontalDivider()
             }
         }
     }
@@ -1190,58 +1167,38 @@ private fun ComposeBottomBar(
     onDraftsClick: () -> Unit,
     onSend: () -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .padding(top = 8.dp, bottom = 28.dp)
+    BottomAppBar(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 3.dp,
+        contentPadding = PaddingValues(horizontal = 8.dp),
     ) {
-        Surface(
-            shape = cornerShape(28.dp),
-            tonalElevation = 6.dp,
-            shadowElevation = 8.dp,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 4.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+        IconButton(onClick = onDraftsClick, enabled = !isSending && !isSent) {
+            Icon(
+                imageVector = Icons.Rounded.Drafts,
+                contentDescription = "Drafts",
+            )
+        }
+        IconButton(onClick = onAttach, enabled = !isSending && !isSent) {
+            Icon(
+                imageVector = Icons.Rounded.AttachFile,
+                contentDescription = "Attach",
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        when {
+            isSending -> LoadingIndicator(
+                modifier = Modifier.size(36.dp),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            !isSent -> IconButton(
+                onClick = onSend,
+                enabled = canSend,
             ) {
-                IconButton(onClick = onDraftsClick, enabled = !isSending && !isSent) {
-                    Icon(
-                        imageVector = Icons.Rounded.Drafts,
-                        contentDescription = "Drafts",
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                IconButton(onClick = onAttach, enabled = !isSending && !isSent) {
-                    Icon(
-                        imageVector = Icons.Rounded.AttachFile,
-                        contentDescription = "Attach",
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
-                Spacer(Modifier.width(4.dp))
-                Spacer(Modifier.weight(1f))
-                when {
-                    isSending -> LoadingIndicator(
-                        modifier = Modifier.size(36.dp),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    !isSent -> IconButton(
-                        onClick = onSend,
-                        enabled = canSend
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.Send,
-                            contentDescription = "Send",
-                            tint = if (canSend) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                        )
-                    }
-                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.Send,
+                    contentDescription = "Send",
+                )
             }
         }
     }
