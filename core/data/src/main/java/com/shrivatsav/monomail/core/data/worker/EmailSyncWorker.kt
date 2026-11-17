@@ -4,9 +4,6 @@ import android.content.Context
 import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.shrivatsav.monomail.core.data.auth.AccountManager
 import com.shrivatsav.monomail.core.data.repository.EmailRepository
@@ -18,7 +15,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
-import java.util.concurrent.TimeUnit
 
 @HiltWorker
 class EmailSyncWorker @AssistedInject constructor(
@@ -30,12 +26,7 @@ class EmailSyncWorker @AssistedInject constructor(
 ) : CoroutineWorker(appContext, workerParams) {
     companion object {
         const val KEY_ACCOUNT_ID = "account_id"
-        const val KEY_CONTINUE_ADAPTIVE_SYNC = "continue_adaptive_sync"
         private const val TAG = "EmailSyncWorker"
-        private const val ADAPTIVE_INTERVAL_MINUTES = 2L
-        private const val ADAPTIVE_ACTIVITY_WINDOW_MINUTES = 5L
-        private const val FALLBACK_INTERVAL_MINUTES = 15L
-        private const val ADAPTIVE_SYNC_WORK_NAME = "adaptive_email_sync"
 
     }
 
@@ -55,9 +46,6 @@ class EmailSyncWorker @AssistedInject constructor(
             accounts.map { account ->
                 async(Dispatchers.IO) { syncAccount(account) }
             }.awaitAll()
-        }
-        if (inputData.getBoolean(KEY_CONTINUE_ADAPTIVE_SYNC, false)) {
-            scheduleNextAdaptiveSync(applicationContext, accountManager)
         }
         val overallHasFailure = results.any { it.first }
         val overallHasAuthFailure = results.any { it.second }
@@ -132,23 +120,6 @@ class EmailSyncWorker @AssistedInject constructor(
             Log.e("EmailSyncWorker", "refreshInbox failed for account $accountId", error)
             Pair(true, false)
         }
-    }
-
-    private suspend fun scheduleNextAdaptiveSync(context: Context, accountManager: AccountManager) {
-        val lastActive = accountManager.getLastActiveTime()
-        val now = System.currentTimeMillis()
-        val isRecentlyActive = lastActive > 0 && (now - lastActive) < TimeUnit.MINUTES.toMillis(ADAPTIVE_ACTIVITY_WINDOW_MINUTES)
-
-        val delayMinutes = if (isRecentlyActive) ADAPTIVE_INTERVAL_MINUTES else FALLBACK_INTERVAL_MINUTES
-        val workRequest = OneTimeWorkRequestBuilder<EmailSyncWorker>()
-            .setInitialDelay(delayMinutes, TimeUnit.MINUTES)
-            .setInputData(
-                androidx.work.workDataOf(KEY_CONTINUE_ADAPTIVE_SYNC to true)
-            )
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            ADAPTIVE_SYNC_WORK_NAME, ExistingWorkPolicy.REPLACE, workRequest
-        )
     }
 
     private suspend fun showNotification(
