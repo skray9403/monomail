@@ -1238,8 +1238,8 @@ private fun BottomFabArea(
                 }
             ) { state ->
                 when (state) {
-                    "spam" -> MoveToTrashFab(appSettings) { onMoveSpamToTrash() }
-                    else -> ComposeFab(appSettings, navActions.onCompose)
+                    "spam" -> MoveToTrashFab { onMoveSpamToTrash() }
+                    else -> ComposeFab(navActions.onCompose)
                 }
             }
         }
@@ -1247,39 +1247,22 @@ private fun BottomFabArea(
 }
 
 @Composable
-private fun MoveToTrashFab(appSettings: com.shrivatsav.monomail.core.data.settings.AppSettings, onClick: () -> Unit) {
-    FloatingActionButton(
+private fun MoveToTrashFab(onClick: () -> Unit) {
+    ExtendedFloatingActionButton(
         onClick = onClick,
+        icon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+        text = { Text("Trash") },
         containerColor = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = CircleShape,
-        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp),
-        modifier = Modifier.height((42 * appSettings.navScale).dp)
-    ) {
-        Row(modifier = Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Icon(Icons.Rounded.Delete, contentDescription = "Move all to trash", modifier = Modifier.size((22 * appSettings.navScale).dp))
-            Text("Trash", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onErrorContainer)
-        }
-    }
+    )
 }
 
 @Composable
-private fun ComposeFab(appSettings: com.shrivatsav.monomail.core.data.settings.AppSettings, onClick: () -> Unit) {
-    val fabInteractionSource = remember { MutableInteractionSource() }
-    val isFabPressed by fabInteractionSource.collectIsPressedAsState()
-    val fabScale by animateFloatAsState(
-        targetValue = if (isFabPressed) 0.92f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "fabScale"
-    )
+private fun ComposeFab(onClick: () -> Unit) {
     FloatingActionButton(
         onClick = onClick,
-        interactionSource = fabInteractionSource,
         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
         contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-        shape = CircleShape,
-        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp),
-        modifier = Modifier.size((52 * appSettings.navScale).dp).graphicsLayer(scaleX = fabScale, scaleY = fabScale)
     ) {
         Icon(Icons.Rounded.Edit, contentDescription = "Compose")
     }
