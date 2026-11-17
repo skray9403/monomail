@@ -16,9 +16,7 @@ import androidx.compose.ui.platform.LocalDensity as LocalDensityComposable
 import androidx.compose.ui.unit.Density
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.shrivatsav.monomail.core.data.auth.AccountManager
@@ -126,30 +124,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-
-    override fun onStop() {
-        super.onStop()
-        scheduleAdaptiveSync()
-    }
-
-    private fun scheduleAdaptiveSync() {
-        val workRequest = OneTimeWorkRequestBuilder<EmailSyncWorker>()
-            .setInitialDelay(1, TimeUnit.MINUTES)
-            .setInputData(
-                androidx.work.workDataOf(EmailSyncWorker.KEY_CONTINUE_ADAPTIVE_SYNC to true)
-            )
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build()
-            )
-            .build()
-        WorkManager.getInstance(this).enqueueUniqueWork(
-            "adaptive_email_sync",
-            ExistingWorkPolicy.REPLACE,
-            workRequest
-        )
-    }
 
     private fun scheduleBackgroundSync(frequency: SyncFrequency) {
         val intervalMinutes = when (frequency) {
