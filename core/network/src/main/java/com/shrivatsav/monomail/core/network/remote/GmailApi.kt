@@ -53,7 +53,8 @@ interface GmailApi {
     @GET("users/me/threads/{id}")
     suspend fun getThread(
         @Path("id") id: String,
-        @Query("format") format: String = "full"
+        @Query("format") format: String = "full",
+        @Query("metadataHeaders") metadataHeaders: List<String>? = null
     ): GmailThread
     @POST("users/me/threads/{id}/modify")
     suspend fun modifyThread(
