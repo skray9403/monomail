@@ -85,8 +85,8 @@ class EmailSyncWorker @AssistedInject constructor(
         val isLatestDraft = latestEmail?.inDrafts == true
         val isSelfSent = latestEmail?.fromEmail?.equals(account.email, ignoreCase = true) == true
 
-        // Claim before posting so overlapping push, periodic, and adaptive
-        // workers cannot all notify for the same message.
+        // Claim before posting so overlapping sync paths cannot all notify
+        // for the same message.
         val timestampAdvance = accountManager.advanceLastKnownEmailTimestamp(accountId, newTimestamp)
         val isTrulyNew = timestampAdvance.advanced && timestampAdvance.previousTimestamp != null
         val isUnread = !newestThread.isRead
