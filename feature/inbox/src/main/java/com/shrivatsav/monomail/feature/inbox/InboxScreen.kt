@@ -1459,29 +1459,17 @@ private fun SupportCard(
     onClick: () -> Unit,
     icon: @Composable () -> Unit
 ) {
-    Surface(
-        modifier = modifier
-            .clip(cornerShape(18.dp))
-            .clickable(onClick = onClick),
-        shape = cornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        contentColor = MaterialTheme.colorScheme.onSurface
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 56.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 18.dp, horizontal = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             icon()
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Center,
-                maxLines = 1
-            )
+            Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 2)
         }
     }
 }
@@ -1493,29 +1481,23 @@ private fun LongPressAction(
     tint: Color,
     onClick: () -> Unit,
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clip(cornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+    FilledTonalButton(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+        colors = ButtonDefaults.filledTonalButtonColors(
+            contentColor = tint,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
-            contentAlignment = Alignment.Center
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(22.dp))
+            Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
         }
-        Spacer(Modifier.height(4.dp))
-        Text(label, style = MaterialTheme.typography.labelSmall, color = tint)
     }
 }
-
-
-
-
 
 @Composable
 private fun GroupHeaderItem(
@@ -1526,332 +1508,51 @@ private fun GroupHeaderItem(
     isExpanded: Boolean,
     onClick: () -> Unit
 ) {
-    Row(
+    ListItem(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        AvatarCircle(
-            photoUrl = null,
-            displayName = groupName,
-            size = 40.dp,
-            textStyle = MaterialTheme.typography.titleMedium
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
+            .clickable(onClick = onClick),
+        leadingContent = {
+            AvatarCircle(
+                photoUrl = null,
+                displayName = groupName,
+                size = 40.dp,
+                textStyle = MaterialTheme.typography.titleMedium,
+            )
+        },
+        headlineContent = {
             Text(
                 text = groupName,
-                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (unreadCount > 0) FontWeight.Bold else FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
             )
-            Text(
-                text = "$count emails",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-            )
-        }
-        if (unreadCount > 0) {
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .background(MaterialTheme.colorScheme.onSurface, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (unreadCount > 99) "99+" else unreadCount.toString(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.background,
-                    fontWeight = FontWeight.Bold
+        },
+        supportingContent = { Text("$count emails") },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (unreadCount > 0) {
+                    Badge { Text(if (unreadCount > 99) "99+" else unreadCount.toString()) }
+                    Spacer(Modifier.width(8.dp))
+                }
+                Icon(
+                    imageVector = if (isExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
                 )
             }
-            Spacer(modifier = Modifier.width(12.dp))
-        }
-        val rotation by animateFloatAsState(
-            targetValue = if (isExpanded) 180f else 0f,
-            animationSpec = tween(250),
-            label = "chevron"
-        )
-        Icon(
-            imageVector = Icons.Rounded.ExpandMore,
-            contentDescription = if (isExpanded) "Collapse" else "Expand",
-            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-            modifier = Modifier.rotate(rotation)
-        )
-    }
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
 }
 
-
-
-
-
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ShimmerEmailItem() {
-    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "shimmerAlpha"
-    )
-    val color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Box(
+        modifier = Modifier.fillMaxWidth().height(72.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(color)
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.5f)
-                    .height(14.dp)
-                    .clip(cornerShape(4.dp))
-                    .background(color)
-            )
-            Spacer(Modifier.height(6.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.85f)
-                    .height(12.dp)
-                    .clip(cornerShape(4.dp))
-                    .background(color.copy(alpha = 0.5f))
-            )
-            Spacer(Modifier.height(4.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.6f)
-                    .height(10.dp)
-                    .clip(cornerShape(4.dp))
-                    .background(color.copy(alpha = 0.3f))
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Box(
-            modifier = Modifier
-                .width(40.dp)
-                .height(12.dp)
-                .clip(cornerShape(4.dp))
-                .background(color.copy(alpha = 0.3f))
-        )
+        LoadingIndicator()
     }
 }
-
-@Composable
-private fun WelcomeActionButton(
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    icon: @Composable (Modifier) -> Unit
-) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(52.dp),
-        shape = cornerShape(14.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = MaterialTheme.colorScheme.onSurface
-        )
-    ) {
-        icon(Modifier.size(22.dp))
-        Spacer(Modifier.width(12.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-@Composable
-private fun rememberConnectivityState(): Boolean {
-    val cm = androidx.compose.ui.platform.LocalContext.current
-        .getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    val currentOnline = remember {
-        val activeNetwork = cm.activeNetwork
-        val caps = activeNetwork?.let { cm.getNetworkCapabilities(it) }
-        caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
-    }
-    var isOnline by remember { mutableStateOf(currentOnline) }
-    DisposableEffect(Unit) {
-        val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) { isOnline = true }
-            override fun onLost(network: Network) { isOnline = false }
-            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                isOnline = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            }
-        }
-        cm.registerDefaultNetworkCallback(callback)
-        onDispose { cm.unregisterNetworkCallback(callback) }
-    }
-    return isOnline
-}
-
-@Composable
-private fun OfflineBanner() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.errorContainer)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            Icons.Rounded.CloudOff,
-            contentDescription = null,
-            modifier = Modifier.size(16.dp),
-            tint = MaterialTheme.colorScheme.onErrorContainer
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            "You are offline",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onErrorContainer
-        )
-    }
-}
-@Composable
-private fun BackfillProgressBanner(progress: BodyBackfillState?, onClick: () -> Unit = {}) {
-    val total = progress?.total ?: 0
-    val completed = progress?.completed ?: 0
-    val pct = if (total > 0) (completed.toFloat() / total * 100).toInt() else 0
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            .background(
-                color = MaterialTheme.colorScheme.tertiaryContainer,
-                shape = com.shrivatsav.monomail.ui.theme.cornerShape(16.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f)
-        ) {
-            Icon(
-                Icons.Rounded.CloudDownload,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onTertiaryContainer
-            )
-            Spacer(Modifier.width(10.dp))
-            Column {
-                Text(
-                    if (progress?.folder != null) "Downloading ${progress.folder} content" else "Downloading email content",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer
-                )
-                Text(
-                    "$completed of $total emails · $pct%",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-                )
-            }
-        }
-        Spacer(Modifier.width(12.dp))
-        CircularProgressIndicator(
-            progress = { if (total > 0) completed.toFloat() / total else 0f },
-            modifier = Modifier.size(28.dp),
-            color = MaterialTheme.colorScheme.tertiary,
-            trackColor = MaterialTheme.colorScheme.tertiaryContainer,
-            strokeWidth = 3.dp
-        )
-    }
-}
-
-/** Modal opened by tapping the download banner: live progress + Cancel. */
-@Composable
-private fun BackfillProgressDialog(
-    progress: BodyBackfillState,
-    onCancel: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val pct = if (progress.total > 0) (progress.completed.toFloat() / progress.total * 100).toInt() else 0
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { androidx.compose.material3.Text("Downloading email content") },
-        confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onCancel) {
-                androidx.compose.material3.Text("Cancel download")
-            }
-        },
-        dismissButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                androidx.compose.material3.Text("Close")
-            }
-        },
-        text = {
-            androidx.compose.foundation.layout.Column {
-                androidx.compose.material3.Text(
-                    if (progress.folder != null) "Downloading ${progress.folder} content" else "Downloading email content",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-                LinearProgressIndicator(
-                    progress = { progress.progress },
-                    modifier = Modifier.fillMaxWidth().height(8.dp),
-                    color = MaterialTheme.colorScheme.tertiary,
-                    trackColor = MaterialTheme.colorScheme.tertiaryContainer,
-                )
-                Spacer(Modifier.height(12.dp))
-                androidx.compose.material3.Text(
-                    "${progress.completed} of ${progress.total} emails · $pct%",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                )
-            }
-        }
-    )
-}
-
-
-@Composable
-private fun BackfillErrorBanner(errorMessage: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.errorContainer)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            Icons.Rounded.CloudOff,
-            contentDescription = null,
-            modifier = Modifier.size(16.dp),
-            tint = MaterialTheme.colorScheme.onErrorContainer
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            errorMessage,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-// ── Release notes data ──────────────────────────────────────────────────
 
 private data class ReleaseNotes(
     val version: String,
