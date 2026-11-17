@@ -420,14 +420,15 @@ class EmailRepository(
             val pendingThreadIds = pendingActionDao.getPendingForAccount(resolvedAccountId).map { it.threadId }.toSet()
             val pageThreads = listResponse.threads.filter { it.threadId !in pendingThreadIds }
             val pageThreadIds = pageThreads.map { it.threadId }.distinct()
+            val pageMessageIds = pageThreads.flatMap { thread -> thread.messages }.map { it.id }.distinct()
             val existingSnippets = if (provider.providerName == "imap" && pageThreadIds.isNotEmpty()) {
                 threadDao.getSnippetsForThreads(pageThreadIds, resolvedAccountId).associateBy { it.threadId }
             } else emptyMap()
             val existingThreadStates = if (pageThreadIds.isNotEmpty()) {
                 threadDao.getSyncStatesForThreads(pageThreadIds, resolvedAccountId).associateBy { it.threadId }
             } else emptyMap()
-            val existingEmailStates = if (pageThreadIds.isNotEmpty()) {
-                emailDao.getSyncStateForThreads(pageThreadIds, resolvedAccountId).associateBy { it.id }
+            val existingEmailStates = if (pageMessageIds.isNotEmpty()) {
+                emailDao.getSyncStateForMessageIds(pageMessageIds, resolvedAccountId).associateBy { it.id }
             } else emptyMap()
 
             val entities = pageThreads.map { pt ->
@@ -543,14 +544,15 @@ class EmailRepository(
             val pendingThreadIds = pendingActionDao.getPendingForAccount(accountId).map { it.threadId }.toSet()
             val pageThreads = listResponse.threads.filter { it.threadId !in pendingThreadIds }
             val pageThreadIds = pageThreads.map { it.threadId }.distinct()
+            val pageMessageIds = pageThreads.flatMap { thread -> thread.messages }.map { it.id }.distinct()
             val existingSnippets = if (provider.providerName == "imap" && pageThreadIds.isNotEmpty()) {
                 threadDao.getSnippetsForThreads(pageThreadIds, accountId).associateBy { it.threadId }
             } else emptyMap()
             val existingThreadStates = if (pageThreadIds.isNotEmpty()) {
                 threadDao.getSyncStatesForThreads(pageThreadIds, accountId).associateBy { it.threadId }
             } else emptyMap()
-            val existingEmailStates = if (pageThreadIds.isNotEmpty()) {
-                emailDao.getSyncStateForThreads(pageThreadIds, accountId).associateBy { it.id }
+            val existingEmailStates = if (pageMessageIds.isNotEmpty()) {
+                emailDao.getSyncStateForMessageIds(pageMessageIds, accountId).associateBy { it.id }
             } else emptyMap()
 
             val entities = pageThreads.map { pt ->
