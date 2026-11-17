@@ -107,7 +107,7 @@ internal fun ProfileCard(
                 leadingContent = { Icon(Icons.Rounded.Settings, contentDescription = null) },
                 headlineContent = { Text("Settings") },
                 trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                modifier = Modifier.fillMaxWidth().clickable(onClick = callbacks.onSettings).padding(horizontal = 4.dp),
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             )
             HorizontalDivider()
