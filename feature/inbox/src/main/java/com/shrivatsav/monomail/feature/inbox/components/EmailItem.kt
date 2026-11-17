@@ -210,7 +210,7 @@ private fun SenderAvatar(
     }
 }
 
-private val displayNameRegex = Regex("""^"?([^"<]+?)"?\\s*<""")
+private val displayNameRegex = Regex("""^"?([^"<]+?)"?\s*<""")
 private fun displayName(from: String): String =
     displayNameRegex.find(from)?.groupValues?.get(1)?.trim() ?: from.trim()
 
