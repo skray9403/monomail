@@ -1,34 +1,33 @@
 package com.shrivatsav.monomail.feature.inbox.components
 
-import com.shrivatsav.monomail.feature.inbox.*
-
 import com.shrivatsav.monomail.ui.components.AvatarCircle
-
-import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import com.shrivatsav.monomail.ui.theme.cornerShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Inbox
+import androidx.compose.material.icons.rounded.Logout
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.shrivatsav.monomail.core.data.auth.UserProfile
 
@@ -48,318 +47,82 @@ internal fun ProfileCard(
     callbacks: ProfileCardCallbacks,
     unifiedInboxEnabled: Boolean = false,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(0.88f),
-        shape = cornerShape(28.dp),
-        color = MaterialTheme.colorScheme.background,
-        shadowElevation = 32.dp,
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 28.dp, bottom = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                ProfileAvatarSection(userProfile, accounts, callbacks, unifiedInboxEnabled)
-                if (accounts.size > 1 && !unifiedInboxEnabled) {
-                    AccountSwitcherButton(accounts, callbacks)
-                }
-            }
-
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.07f),
-                thickness = 0.5.dp
-            )
-
-            if (accounts.size > 1) {
-                UnifiedInboxToggle(unifiedInboxEnabled, callbacks)
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
-            ) {
-                ProfileMenuItem(Icons.Rounded.Settings, "Settings", callbacks.onSettings)
-            }
-
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.07f),
-                thickness = 0.5.dp
-            )
-
-            ProfileCardButtons(callbacks)
-        }
-    }
-}
-
-@Composable
-private fun ProfileAvatarSection(
-    userProfile: UserProfile,
-    accounts: List<UserProfile>,
-    callbacks: ProfileCardCallbacks,
-    unifiedInboxEnabled: Boolean
-) {
-    AnimatedContent(
-        targetState = userProfile.id,
-        transitionSpec = {
-            (fadeIn(tween(220)) + scaleIn(tween(220), initialScale = 0.9f)) togetherWith
-            (fadeOut(tween(150)) + scaleOut(tween(150), targetScale = 0.9f))
-        },
-        label = "profileContent"
-    ) { profileId ->
-        val activeProfile = accounts.firstOrNull { it.id == profileId } ?: userProfile
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            DraggableAvatarBox(activeProfile, accounts, callbacks, unifiedInboxEnabled)
-
-            Spacer(Modifier.height(14.dp))
-            Text(
-                text = activeProfile.displayName,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = activeProfile.email,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 24.dp)
-            )
-        }
-    }
-}
-
-private fun Modifier.cycleAccountDrag(
-    accounts: List<UserProfile>,
-    userProfile: UserProfile,
-    unifiedInboxEnabled: Boolean,
-    onCycleAccount: (String) -> Unit
-): Modifier = this.pointerInput(accounts, unifiedInboxEnabled) {
-    if (accounts.size > 1 && !unifiedInboxEnabled) {
-        var totalDrag = 0f
-        detectHorizontalDragGestures(
-            onDragStart = { totalDrag = 0f },
-            onHorizontalDrag = { change, dragAmount ->
-                change.consume()
-                totalDrag += dragAmount
-                if (kotlin.math.abs(totalDrag) > 60f) {
-                    val nextId = nextAccountId(accounts, userProfile.id, totalDrag > 0)
-                    if (nextId != null) onCycleAccount(nextId)
-                    totalDrag = 0f
-                }
-            }
-        )
-    }
-}
-
-private fun nextAccountId(accounts: List<UserProfile>, currentId: String, goForward: Boolean): String? {
-    val idx = accounts.indexOfFirst { it.id == currentId }
-    if (idx == -1) return null
-    val nextIdx = if (goForward) (idx + 1) % accounts.size else (idx - 1 + accounts.size) % accounts.size
-    return accounts[nextIdx].id
-}
-
-@Composable
-private fun DraggableAvatarBox(
-    userProfile: UserProfile,
-    accounts: List<UserProfile>,
-    callbacks: ProfileCardCallbacks,
-    unifiedInboxEnabled: Boolean
-) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier.cycleAccountDrag(accounts, userProfile, unifiedInboxEnabled, callbacks.onCycleAccount)
-    ) {
-        if (accounts.size > 1) {
-            StackedAvatars(userProfile, accounts)
-        }
-        Box(modifier = Modifier.border(3.dp, MaterialTheme.colorScheme.background, CircleShape)) {
-            AvatarCircle(
-                photoUrl = userProfile.photoUrl,
-                displayName = userProfile.displayName,
-                size = 72.dp,
-                textStyle = MaterialTheme.typography.headlineSmall
-            )
-        }
-    }
-}
-
-@Composable
-private fun StackedAvatars(userProfile: UserProfile, accounts: List<UserProfile>) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy((-16).dp),
-        modifier = Modifier.offset(x = 28.dp)
-    ) {
-        accounts.filter { it.id != userProfile.id }.take(2).forEach { acc ->
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
-                    .clip(CircleShape)
-                    .alpha(0.45f)
-            ) {
-                AvatarCircle(acc.photoUrl, acc.displayName, 44.dp, MaterialTheme.typography.titleSmall)
-            }
-        }
-    }
-}
-
-@Composable
-private fun AccountSwitcherButton(accounts: List<UserProfile>, callbacks: ProfileCardCallbacks) {
-    Spacer(Modifier.height(12.dp))
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.07f),
-        modifier = Modifier.clickable { callbacks.onShowSwitchAccount() }
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = "${accounts.size} accounts",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-            )
-            Icon(
-                Icons.Rounded.KeyboardArrowDown,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
-                modifier = Modifier.size(14.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun UnifiedInboxToggle(unifiedInboxEnabled: Boolean, callbacks: ProfileCardCallbacks) {
-    Row(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Icon(
-            Icons.Rounded.Inbox,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
-            modifier = Modifier
-                .padding(horizontal = 14.dp)
-                .size(21.dp)
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                "Unified Inbox",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onBackground
+        Column {
+            ListItem(
+                leadingContent = {
+                    AvatarCircle(
+                        photoUrl = userProfile.photoUrl,
+                        displayName = userProfile.displayName,
+                        size = 48.dp,
+                        textStyle = MaterialTheme.typography.titleMedium,
+                    )
+                },
+                headlineContent = { Text(userProfile.displayName, maxLines = 1) },
+                supportingContent = { Text(userProfile.email, maxLines = 1) },
+                trailingContent = {
+                    if (accounts.size > 1) {
+                        Icon(
+                            Icons.Rounded.ChevronRight,
+                            contentDescription = "Switch account",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().then(
+                    if (accounts.size > 1) Modifier.padding(end = 4.dp) else Modifier
+                ),
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             )
-            if (unifiedInboxEnabled) {
-                Text(
-                    "All accounts combined",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+            if (accounts.size > 1) {
+                ListItem(
+                    leadingContent = {
+                        Icon(Icons.Rounded.Inbox, contentDescription = null)
+                    },
+                    headlineContent = { Text("Unified inbox") },
+                    supportingContent = {
+                        Text(if (unifiedInboxEnabled) "All accounts combined" else "Show one account at a time")
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = unifiedInboxEnabled,
+                            onCheckedChange = callbacks.onToggleUnified,
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                 )
             }
-        }
-        Switch(
-            checked = unifiedInboxEnabled,
-            onCheckedChange = callbacks.onToggleUnified,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.onBackground,
-                checkedTrackColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.25f),
-                uncheckedThumbColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                uncheckedTrackColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)
-            ),
-            modifier = Modifier.padding(end = 8.dp)
-        )
-    }
-}
-
-@Composable
-private fun ProfileCardButtons(callbacks: ProfileCardCallbacks) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        OutlinedButton(
-            onClick = callbacks.onSignOut,
-            modifier = Modifier.weight(1f),
-            shape = cornerShape(14.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = MaterialTheme.colorScheme.onBackground
-            ),
-            border = BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f)
-            ),
-            contentPadding = PaddingValues(vertical = 12.dp)
-        ) {
-            Text(
-                "Sign out",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold
+            HorizontalDivider()
+            ListItem(
+                leadingContent = { Icon(Icons.Rounded.Settings, contentDescription = null) },
+                headlineContent = { Text("Settings") },
+                trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             )
+            HorizontalDivider()
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                TextButton(onClick = callbacks.onSignOut, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Rounded.Logout, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Sign out")
+                }
+                FilledTonalButton(onClick = callbacks.onAddAccount, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Rounded.Add, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Add account")
+                }
+            }
         }
-        Button(
-            onClick = callbacks.onAddAccount,
-            modifier = Modifier.weight(1f),
-            shape = cornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.onBackground,
-                contentColor = MaterialTheme.colorScheme.background
-            ),
-            contentPadding = PaddingValues(vertical = 12.dp)
-        ) {
-            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(
-                "Add account",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-    }
-}
-
-@Composable
-private fun ProfileMenuItem(
-    icon: ImageVector,
-    label: String,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(cornerShape(14.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 13.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
-            modifier = Modifier.size(21.dp)
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
     }
 }
