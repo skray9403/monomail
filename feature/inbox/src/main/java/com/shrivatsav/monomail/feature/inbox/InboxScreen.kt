@@ -288,7 +288,7 @@ fun InboxScreen(
                                 modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                repeat(8) { ShimmerEmailItem() }
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
                             }
                         }
 
@@ -751,18 +751,7 @@ fun InboxScreen(
             }
 
             
-            var displayedThread by remember { mutableStateOf<EmailThread?>(null) }
-            LaunchedEffect(longPressedThread) {
-                if (longPressedThread != null) displayedThread = longPressedThread
-            }
-
-            AnimatedVisibility(
-                visible = longPressedThread != null,
-                enter = fadeIn(tween(200)),
-                exit = fadeOut(tween(200))
-            ) {
-                val thread = displayedThread ?: return@AnimatedVisibility
-                BackHandler { longPressedThread = null }
+            longPressedThread?.let { thread ->
                 LongPressMenu(
                     thread = thread,
                     state = state,
@@ -788,7 +777,6 @@ fun InboxScreen(
                 )
             }
 
-            
             ModalOverlay(
                 activeModal = activeModal,
                 userProfile = userProfile,
@@ -828,7 +816,7 @@ fun InboxScreen(
 
     // ── Welcome to Monomail modal ────────────────────────────────────
 
-    com.shrivatsav.monomail.ui.components.BlurredModalOverlay(
+    com.shrivatsav.monomail.ui.components.MaterialDialog(
         visible = showWelcomePrompt,
         onDismiss = { viewModel.dismissWelcomePrompt() }
     ) {
@@ -1137,7 +1125,7 @@ fun InboxScreen(
     }
 
 
-    com.shrivatsav.monomail.ui.components.BlurredModalOverlay(
+    com.shrivatsav.monomail.ui.components.MaterialDialog(
         visible = threadToDelete != null,
         onDismiss = { threadToDelete = null }
     ) {
@@ -1279,6 +1267,13 @@ private data class LongPressMenuActions(
     val onUnsnooze: () -> Unit
 )
 
+private data class LongPressMenuEntry(
+    val icon: ImageVector,
+    val label: String,
+    val destructive: Boolean = false,
+    val onClick: () -> Unit,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LongPressMenu(
@@ -1289,75 +1284,117 @@ private fun LongPressMenu(
     actions: LongPressMenuActions
 ) {
     val tabForMenu = (state as? InboxState.Success)?.currentTab ?: InboxTab.INBOX
-    BackHandler { onDismiss() }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.5f))
-            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { onDismiss() }
-    )
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            modifier = Modifier.fillMaxWidth(0.85f),
-            horizontalAlignment = Alignment.CenterHorizontally
+    val entries = buildList {
+        if (tabForMenu == InboxTab.SNOOZED) {
+            add(LongPressMenuEntry(Icons.Rounded.Restore, "Unsnooze") {
+                actions.onUnsnooze()
+                onDismiss()
+            })
+        } else {
+            add(LongPressMenuEntry(
+                if (thread.isStarred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                if (thread.isStarred) "Remove star" else "Add star",
+            ) {
+                actions.onStar()
+                onDismiss()
+            })
+        }
+
+        add(LongPressMenuEntry(
+            icon = if (tabForMenu == InboxTab.ARCHIVED) Icons.Rounded.Inbox else Icons.Rounded.Archive,
+            label = when (tabForMenu) {
+                InboxTab.ARCHIVED -> "Move to Inbox"
+                InboxTab.SPAM -> "Move to Trash"
+                else -> "Archive"
+            },
         ) {
-            Surface(shape = cornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 0.dp, shadowElevation = 8.dp) {
-                EmailItem(thread = thread, onClick = { onDismiss(); actions.onEmailClick() }, onLongClick = {}, use24HourTime = use24HourTime, modifier = Modifier)
-            }
-            Spacer(Modifier.height(8.dp))
-            Surface(shape = cornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 0.dp, shadowElevation = 8.dp) {
-                LongPressActionRow(thread, tabForMenu, actions) { onDismiss() }
-            }
-        }
-    }
-}
+            actions.onArchive(tabForMenu)
+            onDismiss()
+        })
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun LongPressActionRow(thread: EmailThread, tabForMenu: InboxTab, actions: LongPressMenuActions, onDismiss: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Bottom) {
-        StarOrUnsnoozeAction(thread, tabForMenu, actions, onDismiss)
-        ArchiveOrRestoreAction(tabForMenu, actions, onDismiss)
-        ReadUnreadAction(thread, actions, onDismiss)
+        add(LongPressMenuEntry(
+            icon = if (thread.isRead) Icons.Rounded.MarkEmailUnread else Icons.Rounded.MarkEmailRead,
+            label = if (thread.isRead) "Mark as unread" else "Mark as read",
+        ) {
+            actions.onToggleRead()
+            onDismiss()
+        })
+
         if (tabForMenu != InboxTab.TRASH && tabForMenu != InboxTab.SNOOZED && tabForMenu != InboxTab.SPAM) {
-            LongPressAction(icon = Icons.Rounded.Schedule, label = "Snooze", tint = MaterialTheme.colorScheme.onSurface, onClick = { onDismiss(); actions.onSnooze() })
+            add(LongPressMenuEntry(Icons.Rounded.Schedule, "Snooze") {
+                actions.onSnooze()
+                onDismiss()
+            })
         }
-        DeleteOrRestoreAction(tabForMenu, actions, onDismiss)
+
+        add(LongPressMenuEntry(
+            icon = if (tabForMenu == InboxTab.TRASH) Icons.Rounded.Restore else Icons.Rounded.Delete,
+            label = if (tabForMenu == InboxTab.TRASH) "Restore" else "Move to Trash",
+            destructive = tabForMenu != InboxTab.TRASH,
+        ) {
+            if (tabForMenu == InboxTab.TRASH) actions.onRestore() else actions.onDelete()
+            onDismiss()
+        })
     }
-}
 
-@Composable
-private fun StarOrUnsnoozeAction(thread: EmailThread, tabForMenu: InboxTab, actions: LongPressMenuActions, onDismiss: () -> Unit) {
-    if (tabForMenu == InboxTab.SNOOZED) {
-        LongPressAction(icon = Icons.Rounded.Restore, label = "Unsnooze", tint = MaterialTheme.colorScheme.onSurface, onClick = { actions.onUnsnooze(); onDismiss() })
-    } else {
-        LongPressAction(icon = if (thread.isStarred) Icons.Rounded.Star else Icons.Rounded.StarBorder, label = if (thread.isStarred) "Unstar" else "Star", tint = MaterialTheme.colorScheme.onSurface, onClick = { actions.onStar(); onDismiss() })
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .clickable {
+                        onDismiss()
+                        actions.onEmailClick()
+                    },
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                ),
+            ) {
+                EmailItem(
+                    thread = thread,
+                    onClick = {
+                        onDismiss()
+                        actions.onEmailClick()
+                    },
+                    onLongClick = {},
+                    use24HourTime = use24HourTime,
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider()
+
+            entries.forEach { entry ->
+                val tint = if (entry.destructive) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                }
+                ListItem(
+                    leadingContent = {
+                        Icon(
+                            imageVector = entry.icon,
+                            contentDescription = null,
+                            tint = tint,
+                        )
+                    },
+                    headlineContent = { Text(entry.label, color = tint) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = entry.onClick),
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                )
+            }
+        }
     }
-}
-
-@Composable
-private fun ArchiveOrRestoreAction(tabForMenu: InboxTab, actions: LongPressMenuActions, onDismiss: () -> Unit) {
-    LongPressAction(
-        icon = if (tabForMenu == InboxTab.ARCHIVED) Icons.Rounded.Inbox else Icons.Rounded.Archive,
-        label = when (tabForMenu) { InboxTab.ARCHIVED -> "Unarchive"; InboxTab.SPAM -> "Trash"; else -> "Archive" },
-        tint = MaterialTheme.colorScheme.onSurface,
-        onClick = { actions.onArchive(tabForMenu); onDismiss() }
-    )
-}
-
-@Composable
-private fun ReadUnreadAction(thread: EmailThread, actions: LongPressMenuActions, onDismiss: () -> Unit) {
-    LongPressAction(icon = if (thread.isRead) Icons.Rounded.MarkEmailUnread else Icons.Rounded.CheckCircle, label = if (thread.isRead) "Unread" else "Read", tint = MaterialTheme.colorScheme.onSurface, onClick = { actions.onToggleRead(); onDismiss() })
-}
-
-@Composable
-private fun DeleteOrRestoreAction(tabForMenu: InboxTab, actions: LongPressMenuActions, onDismiss: () -> Unit) {
-    LongPressAction(
-        icon = if (tabForMenu == InboxTab.TRASH) Icons.Rounded.Restore else Icons.Rounded.Delete,
-        label = if (tabForMenu == InboxTab.TRASH) "Restore" else "Delete",
-        tint = if (tabForMenu == InboxTab.TRASH) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
-        onClick = { if (tabForMenu == InboxTab.TRASH) { actions.onRestore() } else { actions.onDelete() }; onDismiss() }
-    )
 }
 
 @Composable
@@ -1413,7 +1450,7 @@ private fun SnoozePickerDialog(
         }
     }
 
-    com.shrivatsav.monomail.ui.components.BlurredModalOverlay(
+    com.shrivatsav.monomail.ui.components.MaterialDialog(
         visible = true,
         onDismiss = onDismiss
     ) {
@@ -1475,31 +1512,6 @@ private fun SupportCard(
 }
 
 @Composable
-private fun LongPressAction(
-    icon: ImageVector,
-    label: String,
-    tint: Color,
-    onClick: () -> Unit,
-) {
-    FilledTonalButton(
-        onClick = onClick,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-        colors = ButtonDefaults.filledTonalButtonColors(
-            contentColor = tint,
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
-            Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-        }
-    }
-}
-
-@Composable
 private fun GroupHeaderItem(
     modifier: Modifier = Modifier,
     groupName: String,
@@ -1541,17 +1553,6 @@ private fun GroupHeaderItem(
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     )
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun ShimmerEmailItem() {
-    Box(
-        modifier = Modifier.fillMaxWidth().height(72.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        LoadingIndicator()
-    }
 }
 
 private data class ReleaseNotes(
