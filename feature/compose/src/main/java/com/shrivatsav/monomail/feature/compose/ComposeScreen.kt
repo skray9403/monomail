@@ -859,7 +859,7 @@ private fun SuggestionsDropdown(
                 ListItem(
                     leadingContent = {
                         Icon(
-                            imageVector = Icons.Rounded.AccountCircle,
+                            imageVector = Icons.Rounded.Person,
                             contentDescription = null,
                         )
                     },
