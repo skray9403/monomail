@@ -1,22 +1,10 @@
 package com.shrivatsav.monomail.feature.inbox.components
 
 import com.shrivatsav.monomail.feature.inbox.*
-
-import android.annotation.SuppressLint
-import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
-import com.shrivatsav.monomail.ui.theme.cornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.shrivatsav.monomail.core.data.auth.UserProfile
 
@@ -35,7 +23,11 @@ internal data class ModalCallbacks(
     val onToggleUnified: (Boolean) -> Unit = {},
 )
 
-@SuppressLint("UnusedContentLambdaTargetStateParameter")
+/**
+ * Account/profile presentation is hosted by the standard Material 3 modal
+ * bottom sheet. Provider selection remains its own destination dialog because
+ * it is a separate sign-in flow, not sheet content.
+ */
 @Composable
 internal fun ModalOverlay(
     activeModal: ModalType?,
@@ -44,75 +36,32 @@ internal fun ModalOverlay(
     callbacks: ModalCallbacks,
     unifiedInboxEnabled: Boolean = false,
 ) {
-    var displayed by remember { mutableStateOf<ModalType?>(null) }
-    displayed = activeModal ?: displayed
-
-
-    if (activeModal != null) {
-        BackHandler {
-            when (activeModal) {
-                ModalType.SWITCH_ACCOUNT -> callbacks.onBackToProfile()
-                ModalType.PROFILE -> callbacks.onDismiss()
-                ModalType.ADD_ACCOUNT -> callbacks.onDismiss()
+    when (activeModal) {
+        ModalType.ADD_ACCOUNT -> {
+            val vm: com.shrivatsav.monomail.feature.auth.SignInViewModel = hiltViewModel()
+            com.shrivatsav.monomail.feature.auth.ProviderSelectionDialog(
+                viewModel = vm,
+                onSuccess = callbacks.onDismiss,
+                onNavigateToImapSetup = callbacks.onNavigateToImapSetup,
+            )
+        }
+        ModalType.PROFILE, ModalType.SWITCH_ACCOUNT -> {
+            ModalBottomSheet(
+                onDismissRequest = callbacks.onDismiss,
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            ) {
+                key(activeModal) {
+                    ModalContentBody(
+                        modal = activeModal,
+                        userProfile = userProfile,
+                        accounts = accounts,
+                        callbacks = callbacks,
+                        unifiedInboxEnabled = unifiedInboxEnabled,
+                    )
+                }
             }
         }
-    }
-
-    val isVisible = activeModal != null
-
-    // 1. Scrim layer (fades in)
-    AnimatedVisibility(
-        visible = isVisible,
-        enter = fadeIn(tween(220)),
-        exit = fadeOut(tween(180)),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() }
-                ) { callbacks.onDismiss() }
-        )
-    }
-
-    // 2. Modal content layer (slides down)
-    AnimatedVisibility(
-        visible = isVisible,
-        enter = fadeIn(tween(220)) + slideInVertically(
-            initialOffsetY = { -it },
-            animationSpec = tween(300, easing = FastOutSlowInEasing)
-        ),
-        exit = fadeOut(tween(180)) + slideOutVertically(
-            targetOffsetY = { -it },
-            animationSpec = tween(250)
-        ),
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            AnimatedContent(
-                targetState = displayed,
-                transitionSpec = {
-                    fadeIn(tween(200)) togetherWith fadeOut(tween(180))
-                },
-                label = "ModalContent",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 16.dp)
-            ) { modal ->
-                ModalContentBody(
-                    modal = modal,
-                    userProfile = userProfile,
-                    accounts = accounts,
-                    callbacks = callbacks,
-                    unifiedInboxEnabled = unifiedInboxEnabled,
-                )
-            }
-        }
+        null -> Unit
     }
 }
 
@@ -124,51 +73,35 @@ private fun ModalContentBody(
     callbacks: ModalCallbacks,
     unifiedInboxEnabled: Boolean,
 ) {
-    Box(
-        modifier = Modifier.clickable(
-            indication = null,
-            interactionSource = remember { MutableInteractionSource() }
-        ) {},
-        contentAlignment = Alignment.Center
-    ) {
-        when (modal) {
-            ModalType.ADD_ACCOUNT -> {
-                val vm: com.shrivatsav.monomail.feature.auth.SignInViewModel = hiltViewModel()
-                com.shrivatsav.monomail.feature.auth.ProviderSelectionDialog(
-                    viewModel = vm,
-                    onSuccess = { callbacks.onDismiss() },
-                    onNavigateToImapSetup = callbacks.onNavigateToImapSetup,
+    when (modal) {
+        ModalType.PROFILE -> {
+            if (userProfile != null) {
+                ProfileCard(
+                    userProfile = userProfile,
+                    accounts = accounts,
+                    callbacks = ProfileCardCallbacks(
+                        onSignOut = callbacks.onSignOut,
+                        onShowSwitchAccount = callbacks.onShowSwitchAccount,
+                        onCycleAccount = callbacks.onCycleAccount,
+                        onSettings = callbacks.onSettings,
+                        onAddAccount = callbacks.onAddAccount,
+                        onToggleUnified = callbacks.onToggleUnified,
+                    ),
+                    unifiedInboxEnabled = unifiedInboxEnabled,
                 )
             }
-            ModalType.PROFILE -> {
-                if (userProfile != null) {
-                    ProfileCard(
-                        userProfile = userProfile,
-                        accounts = accounts,
-                        callbacks = ProfileCardCallbacks(
-                            onSignOut = callbacks.onSignOut,
-                            onShowSwitchAccount = callbacks.onShowSwitchAccount,
-                            onCycleAccount = callbacks.onCycleAccount,
-                            onSettings = callbacks.onSettings,
-                            onAddAccount = callbacks.onAddAccount,
-                            onToggleUnified = callbacks.onToggleUnified,
-                        ),
-                        unifiedInboxEnabled = unifiedInboxEnabled,
-                    )
-                }
-            }
-            ModalType.SWITCH_ACCOUNT -> {
-                if (userProfile != null) {
-                    SwitchAccountCard(
-                        userProfile = userProfile,
-                        accounts = accounts,
-                        onSwitchAccount = callbacks.onSwitchAccount,
-                        onAddAccount = callbacks.onAddAccount,
-                        onBack = callbacks.onBackToProfile,
-                    )
-                }
-            }
-            null -> { /* no modal */ }
         }
+        ModalType.SWITCH_ACCOUNT -> {
+            if (userProfile != null) {
+                SwitchAccountCard(
+                    userProfile = userProfile,
+                    accounts = accounts,
+                    onSwitchAccount = callbacks.onSwitchAccount,
+                    onAddAccount = callbacks.onAddAccount,
+                    onBack = callbacks.onBackToProfile,
+                )
+            }
+        }
+        ModalType.ADD_ACCOUNT, null -> Unit
     }
 }
