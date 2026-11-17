@@ -80,7 +80,11 @@ class GmailProvider(
                 async(Dispatchers.IO) {
                     semaphore.withPermit {
                         try {
-                            api.getThread(ref.id, format = "metadata")
+                            api.getThread(
+                                ref.id,
+                                format = "metadata",
+                                metadataHeaders = listOf("From", "To", "Cc", "Subject")
+                            )
                         } catch (e: Exception) {
                             null
                         }
