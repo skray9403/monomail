@@ -1,63 +1,46 @@
 package com.shrivatsav.monomail.feature.inbox.components
 
 import com.shrivatsav.monomail.feature.inbox.*
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.CornerSize
-import androidx.compose.foundation.shape.RoundedCornerShape
-import com.shrivatsav.monomail.ui.theme.cornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.background
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.shrivatsav.monomail.data.model.EmailThread
-import com.shrivatsav.monomail.ui.theme.MonoOpacity
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-private val displayNameRegex = Regex("""^"?([^"<]+?)"?\s*<""")
 
-/** Where this unread item sits in a consecutive run of unread items. */
+/** Where an unread item sits in a consecutive run, retained for grouping logic. */
 enum class UnreadPosition { SOLO, TOP, MIDDLE, BOTTOM }
 
 data class SelectionState(
@@ -68,6 +51,11 @@ data class SelectionState(
     val onAvatarLongClick: () -> Unit = {}
 )
 
+/**
+ * Email-specific content displayed through Material 3 ListItem. The row keeps
+ * Gmail-style sender/subject/snippet semantics, while selection and gestures
+ * remain application behaviour rather than a custom row layout system.
+ */
 @Composable
 fun EmailItem(
     thread: EmailThread,
@@ -81,169 +69,99 @@ fun EmailItem(
     modifier: Modifier = Modifier
 ) {
     val isUnread = !thread.isRead
-    val senderInitial = thread.from.firstOrNull()?.uppercase() ?: "?"
-    val unreadShape = if (isUnread) {
-        val r = cornerShape(14.dp)
-        when (unreadPosition) {
-            UnreadPosition.SOLO   -> r
-            UnreadPosition.TOP    -> RoundedCornerShape(r.topStart, r.topEnd, CornerSize(0.dp), CornerSize(0.dp))
-            UnreadPosition.MIDDLE -> RoundedCornerShape(CornerSize(0.dp), CornerSize(0.dp), CornerSize(0.dp), CornerSize(0.dp))
-            UnreadPosition.BOTTOM -> RoundedCornerShape(CornerSize(0.dp), CornerSize(0.dp), r.bottomEnd, r.bottomStart)
+    val haptics = LocalHapticFeedback.current
+    val rowClick = if (selection.isBulkMode) selection.onRangeSelect else onClick
+    val rowLongClick = if (selection.isBulkMode) selection.onSelectToggle else {
+        {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            onLongClick()
         }
-    } else null
-    val verticalPad = if (compactMode) 7.dp else 11.dp
-    val hapticFeedback = LocalHapticFeedback.current
-    val avatarClickAction = if (selection.isBulkMode) selection.onSelectToggle else onClick
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val rowScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.985f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "rowScale"
-    )
-    Row(
+    }
+
+    ListItem(
         modifier = modifier
             .fillMaxWidth()
-            .padding(
-                start = 8.dp, end = 8.dp,
-                top = if (isUnread) when (unreadPosition) {
-                    UnreadPosition.SOLO, UnreadPosition.TOP -> 8.dp
-                    else -> 0.dp
-                } else 0.dp,
-                bottom = if (isUnread) when (unreadPosition) {
-                    UnreadPosition.SOLO, UnreadPosition.BOTTOM -> 8.dp
-                    else -> 0.dp
-                } else 0.dp
-            )
-            .then(
-                if (unreadShape != null)
-                    Modifier
-                        .clip(unreadShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = MonoOpacity.subtle))
-                else Modifier
-            )
-            .scale(rowScale)
-            .then(
-                if (selection.isBulkMode) {
-                    Modifier.combinedClickable(
-                        interactionSource = interactionSource,
-                        onClick = selection.onRangeSelect,
-                        onLongClick = selection.onSelectToggle
-                    )
-                } else {
-                    Modifier.combinedClickable(
-                        interactionSource = interactionSource,
-                        onClick = onClick,
-                        onLongClick = onLongClick
-                    )
-                }
-            )
-            .padding(horizontal = 12.dp, vertical = verticalPad),
-        verticalAlignment = Alignment.Top
-    ) {
-        Box {
+            .padding(horizontal = 8.dp)
+            .combinedClickable(
+                onClick = rowClick,
+                onLongClick = rowLongClick,
+            ),
+        leadingContent = {
             SenderAvatar(
-                senderInitial = senderInitial,
+                senderInitial = thread.from.firstOrNull()?.uppercase() ?: "?",
                 isSelected = selection.isSelected,
                 isBulkMode = selection.isBulkMode,
-                onClick = avatarClickAction,
+                onClick = if (selection.isBulkMode) selection.onSelectToggle else onClick,
                 onLongClick = {
                     if (!selection.isBulkMode) {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         selection.onAvatarLongClick()
                     }
                 },
-                modifier = Modifier.padding(top = 2.dp)
             )
-        }
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            EmailItemSenderInfo(thread = thread, isUnread = isUnread, use24HourTime = use24HourTime)
-            EmailItemSubject(thread = thread, isUnread = isUnread)
-            if (showSnippet) {
-                EmailItemSnippet(thread = thread, compactMode = compactMode)
-            }
-        }
-    }
-}
-
-
-@Composable
-private fun EmailItemSenderInfo(thread: EmailThread, isUnread: Boolean, use24HourTime: Boolean) {
-    val senderWeight = if (isUnread) FontWeight.ExtraBold else FontWeight.Medium
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f, fill = false)
-        ) {
-            Text(
-                text = displayName(thread.from),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = senderWeight,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false)
-            )
-            if (thread.messageCount > 1) {
-                Spacer(modifier = Modifier.width(6.dp))
+        },
+        headlineContent = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    text = "${thread.messageCount}",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = MonoOpacity.secondary),
-                    modifier = Modifier
-                        .background(
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            shape = cornerShape(4.dp)
-                        )
-                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                    text = displayName(thread.from),
+                    modifier = Modifier.weight(1f, fill = false),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = if (isUnread) FontWeight.Bold else FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                if (thread.messageCount > 1) {
+                    Spacer(Modifier.width(6.dp))
+                    Badge {
+                        Text(thread.messageCount.toString())
+                    }
+                }
             }
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = formatTimestamp(thread.date, use24HourTime),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = if (isUnread) FontWeight.Bold else FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface.copy(
-                alpha = if (isUnread) 0.85f else MonoOpacity.tertiary
+        },
+        supportingContent = {
+            Column(verticalArrangement = Arrangement.spacedBy(if (compactMode) 0.dp else 2.dp)) {
+                Text(
+                    text = thread.subject,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (isUnread) FontWeight.SemiBold else FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (showSnippet) {
+                    Text(
+                        text = thread.snippet,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = if (compactMode) 1 else 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        },
+        trailingContent = {
+            Text(
+                text = formatTimestamp(thread.date, use24HourTime),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (isUnread) FontWeight.SemiBold else FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
             )
-        )
-    }
-}
-
-@Composable
-private fun EmailItemSubject(thread: EmailThread, isUnread: Boolean) {
-    Text(
-        text = thread.subject,
-        style = MaterialTheme.typography.bodyMedium,
-        fontWeight = if (isUnread) FontWeight.Bold else FontWeight.Normal,
-        color = MaterialTheme.colorScheme.onSurface.copy(
-            alpha = if (isUnread) 1f else MonoOpacity.secondary
+        },
+        colors = ListItemDefaults.colors(
+            containerColor = if (isUnread) {
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.38f)
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
         ),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
     )
 }
 
-@Composable
-private fun EmailItemSnippet(thread: EmailThread, compactMode: Boolean) {
-    Text(
-        text = thread.snippet,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = MonoOpacity.secondary),
-        maxLines = if (compactMode) 1 else 2,
-        overflow = TextOverflow.Ellipsis
-    )
-}
 @Composable
 private fun SenderAvatar(
     senderInitial: String,
@@ -251,66 +169,51 @@ private fun SenderAvatar(
     isBulkMode: Boolean = false,
     onClick: () -> Unit = {},
     onLongClick: () -> Unit = {},
-    modifier: Modifier = Modifier
 ) {
-    val avatarModifier = modifier
-        .size(40.dp)
-        .clip(CircleShape)
     Box(
-        modifier = avatarModifier
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            ),
-        contentAlignment = Alignment.Center
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+        contentAlignment = Alignment.Center,
     ) {
-        AnimatedVisibility(
-            visible = !isBulkMode,
-            enter = scaleIn() + fadeIn(),
-            exit = scaleOut() + fadeOut()
-        ) {
+        if (!isBulkMode) {
             Text(
                 text = senderInitial,
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
-        }
-        AnimatedVisibility(
-            visible = isBulkMode,
-            enter = scaleIn() + fadeIn(),
-            exit = scaleOut() + fadeOut()
-        ) {
-            if (isSelected) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(3.dp)
-                        .background(MaterialTheme.colorScheme.primary, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Check,
-                        contentDescription = "Selected",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            } else {
+        } else if (isSelected) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(3.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
                 Icon(
-                    imageVector = Icons.Rounded.RadioButtonUnchecked,
-                    contentDescription = "Not selected",
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
-                    modifier = Modifier.size(32.dp)
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = "Selected",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(28.dp),
                 )
             }
+        } else {
+            Icon(
+                imageVector = Icons.Rounded.RadioButtonUnchecked,
+                contentDescription = "Not selected",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(30.dp),
+            )
         }
     }
 }
-private fun displayName(from: String): String {
-    val nameMatch = displayNameRegex.find(from)
-    return nameMatch?.groupValues?.get(1)?.trim() ?: from.trim()
-}
+
+private val displayNameRegex = Regex("""^"?([^"<]+?)"?\\s*<""")
+private fun displayName(from: String): String =
+    displayNameRegex.find(from)?.groupValues?.get(1)?.trim() ?: from.trim()
+
 private val time12Formatter = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
 private val time24Formatter = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
 private val dayFormatter = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
@@ -318,19 +221,15 @@ private val dateFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.getDefau
 private val fullDateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.getDefault())
 
 private fun formatTimestamp(epochMillis: Long, use24HourTime: Boolean): String {
-    val timeFormatter = if (use24HourTime) time24Formatter else time12Formatter
     if (epochMillis == 0L) return ""
-    val zdt = Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault())
-    val date = zdt.toLocalDate()
+    val formatter = if (use24HourTime) time24Formatter else time12Formatter
+    val zoned = Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault())
+    val date = zoned.toLocalDate()
     val today = LocalDate.now(ZoneId.systemDefault())
     return when {
-        date == today ->
-            timeFormatter.format(zdt)
-        date.isAfter(today.minusDays(7)) ->
-            dayFormatter.format(zdt)
-        date.year == today.year ->
-            dateFormatter.format(zdt)
-        else ->
-            fullDateFormatter.format(zdt)
+        date == today -> formatter.format(zoned)
+        date.isAfter(today.minusDays(7)) -> dayFormatter.format(zoned)
+        date.year == today.year -> dateFormatter.format(zoned)
+        else -> fullDateFormatter.format(zoned)
     }
 }
