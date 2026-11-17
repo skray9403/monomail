@@ -20,10 +20,11 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Inject secrets.properties
+        env:
+          RAW_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
         run: |
-          cat << 'EOF' > secrets.properties
-          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-          EOF
+          CLEAN_CLIENT_ID=$(printf '%s' "$RAW_CLIENT_ID" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+          printf 'GOOGLE_CLIENT_ID=%s\n' "$CLEAN_CLIENT_ID" > secrets.properties
 
       - name: Restore persistent debug keystore
         run: |
@@ -39,6 +40,16 @@ jobs:
           APK="app/build/outputs/apk/playstore/debug/app-playstore-debug.apk"
           AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -V | tail -n 1)
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
+          EXPECTED_CLIENT_ID="193693002878-ajpu4r5m7f5qjr20v9a1g7qj0c58iqod.apps.googleusercontent.com"
+
+          INJECTED_CLIENT_ID=$(grep -E '^GOOGLE_CLIENT_ID=' secrets.properties | cut -d'=' -f2-)
+          INJECTED_LEN=${#INJECTED_CLIENT_ID}
+          EXPECTED_LEN=${#EXPECTED_CLIENT_ID}
+          INJECTED_SHA256=$(printf '%s' "$INJECTED_CLIENT_ID" | sha256sum | awk '{print $1}')
+          EXPECTED_SHA256=$(printf '%s' "$EXPECTED_CLIENT_ID" | sha256sum | awk '{print $1}')
+
+          PGP_BC="core/pgp/build/generated/source/buildConfig/playstore/debug/com/shrivatsav/monomail/core/pgp/BuildConfig.java"
+          APP_BC="app/build/generated/source/buildConfig/playstore/debug/com/shrivatsav/monomail/BuildConfig.java"
 
           {
             echo "Built APK metadata"
@@ -47,6 +58,28 @@ jobs:
             echo
             echo "Signing certificate:"
             "$APKSIGNER" verify --print-certs "$APK"
+            echo
+            echo "OAuth Client ID Verification:"
+            echo "- Expected Web Client ID: $EXPECTED_CLIENT_ID (len=$EXPECTED_LEN, sha256=$EXPECTED_SHA256)"
+            echo "- Injected Web Client ID len: $INJECTED_LEN, sha256: $INJECTED_SHA256"
+            if [ "$INJECTED_CLIENT_ID" = "$EXPECTED_CLIENT_ID" ]; then
+              echo "- Client ID Match: EXACT MATCH (character-for-character verified)"
+            else
+              echo "- Client ID Match: MISMATCH!"
+              echo "  Injected: '$INJECTED_CLIENT_ID'"
+            fi
+            echo
+            echo "BuildConfig Verification:"
+            if [ -f "$PGP_BC" ]; then
+              echo "- core:pgp BuildConfig: $(grep 'GOOGLE_CLIENT_ID' "$PGP_BC" | tr -d '\r' | sed -e 's/^[[:space:]]*//')"
+            else
+              echo "- core:pgp BuildConfig not found at $PGP_BC"
+            fi
+            if [ -f "$APP_BC" ]; then
+              echo "- app BuildConfig: $(grep 'GOOGLE_CLIENT_ID' "$APP_BC" | tr -d '\r' | sed -e 's/^[[:space:]]*//')"
+            else
+              echo "- app BuildConfig not found at $APP_BC"
+            fi
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APK artifact

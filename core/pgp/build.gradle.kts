@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.ksp)
@@ -26,9 +28,16 @@ android {
         create("playstore") {
             dimension = "distribution"
             val secretsFile = rootProject.file("secrets.properties")
-            val googleClientId = if (secretsFile.exists()) {
-                secretsFile.readLines().firstOrNull { it.startsWith("GOOGLE_CLIENT_ID=") }?.substringAfter("=") ?: ""
-            } else ""
+            val secrets = Properties()
+            if (secretsFile.isFile) {
+                secretsFile.inputStream().use { secrets.load(it) }
+            }
+            val rawClientId = secrets.getProperty("GOOGLE_CLIENT_ID")
+                ?: (if (secretsFile.isFile) {
+                    secretsFile.readLines().firstOrNull { it.startsWith("GOOGLE_CLIENT_ID=") }?.substringAfter("=")
+                } else null)
+                ?: ""
+            val googleClientId = rawClientId.trim().removeSurrounding("\"").removeSurrounding("'").trim()
             buildConfigField("String", "GOOGLE_CLIENT_ID", "\"$googleClientId\"")
         }
     }

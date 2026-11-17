@@ -194,13 +194,18 @@ class AuthManager(
         return try {
             val clientId = com.shrivatsav.monomail.security.SecurityUtil.getGoogleClientId(activityContext)
             if (clientId.isBlank()) {
+                android.util.Log.e(TAG, "signIn: Google Client ID is not configured (blank).")
                 return SignInResult.Failure(Exception("Google Client ID is not configured. Please set your API key first."))
             }
+            android.util.Log.d(TAG, "signIn: Initiating Google sign-in via GoogleAuthHelper...")
             val googleData = googleAuthHelper.signIn(activityContext, clientId)
+            android.util.Log.i(TAG, "signIn: Google ID credential received for ${googleData.email}; proceeding to acquire API access token...")
             requestAccessToken(activityContext, googleData.email, googleData.displayName, googleData.photoUrl)
         } catch (e: GoogleAuthException) {
+            android.util.Log.e(TAG, "signIn: GoogleAuthException: ${e.message}", e)
             SignInResult.Failure(e)
         } catch (e: Exception) {
+            android.util.Log.e(TAG, "signIn: Unexpected error during sign-in: ${e.message}", e)
             SignInResult.Failure(e)
         }
     }
@@ -347,6 +352,7 @@ class AuthManager(
         photoUrl: String?
     ): SignInResult {
         return try {
+            android.util.Log.d(TAG, "requestAccessToken: Requesting OAuth access token for $email (scope: $GMAIL_SCOPE)")
             var accessToken = withContext(Dispatchers.IO) {
                 googleAuthHelper.getToken(
                     activityContext,
@@ -354,13 +360,16 @@ class AuthManager(
                     GMAIL_SCOPE
                 )
             }
+            android.util.Log.d(TAG, "requestAccessToken: Validating access token with Gmail profile API for $email")
             val responseCode = withContext(Dispatchers.IO) {
                 val url = java.net.URI("https://gmail.googleapis.com/gmail/v1/users/me/profile").toURL()
                 val connection = url.openConnection() as java.net.HttpURLConnection
                 connection.setRequestProperty("Authorization", "Bearer $accessToken")
                 connection.responseCode
             }
+            android.util.Log.d(TAG, "requestAccessToken: Gmail API profile check returned HTTP $responseCode for $email")
             if (responseCode == 401 || responseCode == 403) {
+                android.util.Log.w(TAG, "requestAccessToken: HTTP $responseCode received; clearing cached token and requesting fresh token...")
                 accessToken = withContext(Dispatchers.IO) {
                     googleAuthHelper.clearToken(activityContext, accessToken)
                     googleAuthHelper.getToken(
@@ -370,6 +379,7 @@ class AuthManager(
                     )
                 }
             } else if (responseCode == 404) {
+                android.util.Log.e(TAG, "requestAccessToken: Gmail API returned HTTP 404 (account deleted or disabled) for $email")
                 return SignInResult.Failure(Exception(
                     "Account not found. It may have been deleted or disabled."
                 ))
@@ -390,19 +400,23 @@ class AuthManager(
             kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                 try { pushNotificationManager.registerForPushNotifications(profile) } catch (e: Exception) { android.util.Log.w(TAG, "Push registration failed", e) }
             }
+            android.util.Log.i(TAG, "requestAccessToken: Successfully signed in and stored profile for $email")
             SignInResult.Success(profile)
         } catch (e: GoogleAuthException) {
             val consentIntent = e.intent
             if (consentIntent != null) {
+                android.util.Log.i(TAG, "requestAccessToken: User consent required; launching consent intent for $email")
                 _pendingConsentProfile = UserProfile(
                     id = "gmail_$email", displayName = displayName, email = email,
                     photoUrl = photoUrl, accessToken = "", provider = "gmail", refreshToken = ""
                 )
                 SignInResult.NeedsConsent(consentIntent)
             } else {
+                android.util.Log.e(TAG, "requestAccessToken: GoogleAuthException: ${e.message}", e)
                 SignInResult.Failure(e)
             }
         } catch (e: Exception) {
+            android.util.Log.e(TAG, "requestAccessToken: Unexpected exception: ${e.message}", e)
             SignInResult.Failure(e)
         }
     }

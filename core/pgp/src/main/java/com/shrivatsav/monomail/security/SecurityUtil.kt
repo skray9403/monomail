@@ -118,9 +118,7 @@ object SecurityUtil {
     fun getGoogleClientId(context: Context): String {
         val prefs = getSecurePrefs(context)
         val customId = prefs.getString("custom_google_client_id", null)
-        if (!customId.isNullOrBlank()) {
-            return customId
-        }
-        return BuildConfig.GOOGLE_CLIENT_ID
+        val raw = if (!customId.isNullOrBlank()) customId else BuildConfig.GOOGLE_CLIENT_ID
+        return raw.trim().removeSurrounding("\"").removeSurrounding("'").trim()
     }
 }

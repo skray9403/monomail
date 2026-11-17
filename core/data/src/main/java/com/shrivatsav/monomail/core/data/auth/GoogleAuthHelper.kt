@@ -18,5 +18,8 @@ data class GoogleSignInData(
 
 class GoogleAuthException(
     message: String,
-    val intent: Intent? = null
-) : Exception(message)
+    val intent: Intent? = null,
+    cause: Throwable? = null
+) : Exception(message, cause) {
+    constructor(message: String, cause: Throwable?) : this(message, null, cause)
+}
