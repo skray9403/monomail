@@ -1370,6 +1370,7 @@ private fun LongPressMenu(
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SnoozePickerDialog(
     onDismiss: () -> Unit,
