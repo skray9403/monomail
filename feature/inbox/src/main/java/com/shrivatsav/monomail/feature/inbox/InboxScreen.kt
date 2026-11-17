@@ -331,25 +331,25 @@ fun InboxScreen(
                             var expandedGroupsList by androidx.compose.runtime.saveable.rememberSaveable {
                                 mutableStateOf(emptyList<String>())
                             }
-                            var inboxStructure by remember { mutableStateOf(InboxStructure(emptyList(), emptyList())) }
-                            var isComputingStructure by remember { mutableStateOf(true) }
-                            LaunchedEffect(threadsToDisplay, appSettings.smartGroupingEnabled, appSettings.smartGroupingRecentOnly) {
-                                isComputingStructure = true
-                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                                    val useGrouping = appSettings.smartGroupingEnabled &&
-                                            !isSearchActive && currentTab == InboxTab.INBOX
-                                    val result = computeInboxStructure(
-                                        threadsToDisplay,
-                                        useGrouping,
-                                        appSettings.smartGroupingRecentOnly
-                                    )
-                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                        inboxStructure = result
-                                        isComputingStructure = false
-                                    }
-                                }
+                            // Inbox tabs contain at most 500 locally cached rows. Building their
+                            // lightweight grouping/sort structure synchronously avoids showing
+                            // an empty list for a frame while an async calculation catches up.
+                            val inboxStructure = remember(
+                                threadsToDisplay,
+                                appSettings.smartGroupingEnabled,
+                                appSettings.smartGroupingRecentOnly,
+                                isSearchActive,
+                                currentTab
+                            ) {
+                                val useGrouping = appSettings.smartGroupingEnabled &&
+                                    !isSearchActive && currentTab == InboxTab.INBOX
+                                computeInboxStructure(
+                                    threadsToDisplay,
+                                    useGrouping,
+                                    appSettings.smartGroupingRecentOnly
+                                )
                             }
-                            val displayItems = remember(inboxStructure, expandedGroupsList) {
+                            val displayItems = remember(inboxStructure, expandedGroupsList, currentTab) {
                                 flattenDisplayItems(inboxStructure, expandedGroupsList.toSet(), tabPrefix = currentTab.name)
                             }
                             val orderedThreadIds by remember(displayItems) {
@@ -502,12 +502,7 @@ fun InboxScreen(
                                                 }
                                             }
                                         ) { index, displayItem ->
-                                            com.shrivatsav.monomail.ui.components.AnimatedListItem(
-                                                index = index,
-                                                itemKey = itemKeyFn(displayItem),
-                                                animatedItemsTracker = viewModel.animatedItemsTracker
-                                            ) {
-                                                when (displayItem) {
+                                            when (displayItem) {
                                                 is InboxDisplayItem.DateHeader -> {
                                                     com.shrivatsav.monomail.ui.components.SectionHeader(
                                                         label = displayItem.title,
@@ -652,7 +647,7 @@ fun InboxScreen(
                                                     }
                                                 }
                                             }
-                                        }
+                                        
                                         }
 
                                         if (isSearchActive && s.threads.isNotEmpty()) {
