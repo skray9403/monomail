@@ -1125,50 +1125,26 @@ fun InboxScreen(
     }
 
 
-    com.shrivatsav.monomail.ui.components.MaterialDialog(
-        visible = threadToDelete != null,
-        onDismiss = { threadToDelete = null }
-    ) {
-        Surface(
-            shape = cornerShape(28.dp),
-            color = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.onBackground,
-            shadowElevation = 32.dp,
-            modifier = Modifier.fillMaxWidth(0.88f)
-        ) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Text(
-                    text = "Move to Trash?",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "Are you sure you want to move this conversation to the trash?",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = { threadToDelete = null }) {
-                        Text("Cancel")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    TextButton(onClick = {
-                        threadToDelete?.let { viewModel.deleteThread(it.threadId, it.accountId) }
-                        threadToDelete = null
-                    }) {
-                        Text("Move to Trash")
-                    }
+    threadToDelete?.let { thread ->
+        AlertDialog(
+            onDismissRequest = { threadToDelete = null },
+            title = { Text("Move to Trash?") },
+            text = { Text("Are you sure you want to move this conversation to the trash?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteThread(thread.threadId, thread.accountId)
+                    threadToDelete = null
+                }) {
+                    Text("Move to Trash")
                 }
-            }
-        }
+            },
+            dismissButton = {
+                TextButton(onClick = { threadToDelete = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
-
 
 
     if (showSnoozePicker && snoozeThread != null) {
@@ -1349,11 +1325,7 @@ private fun LongPressMenu(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .clickable {
-                        onDismiss()
-                        actions.onEmailClick()
-                    },
+                    .padding(horizontal = 16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),
@@ -1450,38 +1422,31 @@ private fun SnoozePickerDialog(
         }
     }
 
-    com.shrivatsav.monomail.ui.components.MaterialDialog(
-        visible = true,
-        onDismiss = onDismiss
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
-        Surface(
-            shape = cornerShape(28.dp),
-            color = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.onBackground,
-            shadowElevation = 32.dp,
-            modifier = Modifier.fillMaxWidth(0.88f)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
         ) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Text(
-                    text = "Snooze until",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+            Text(
+                text = "Snooze until",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+            )
+            options.forEach { option ->
+                ListItem(
+                    headlineContent = { Text(option.label) },
+                    trailingContent = {
+                        Icon(Icons.Rounded.ChevronRight, contentDescription = null)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSnooze(option.timestamp) },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-                options.forEach { opt ->
-                    TextButton(
-                        onClick = { onSnooze(opt.timestamp) },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = cornerShape(12.dp)
-                    ) {
-                        Text(opt.label, modifier = Modifier.fillMaxWidth())
-                    }
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
-                }
             }
         }
     }
