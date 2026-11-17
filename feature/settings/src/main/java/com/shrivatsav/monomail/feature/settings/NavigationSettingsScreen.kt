@@ -17,11 +17,6 @@ internal fun NavigationSettingsScreen(
 
     ScrollableSettingsScaffold(title = "Navigation", onBack = onBack) {
         SettingsCard {
-            NavSizeRow(
-                scale = settings.navScale,
-                onScaleChanged = { viewModel.setNavScale(it) }
-            )
-            CardDivider()
             SwipeThresholdRow(
                 threshold = settings.swipeThreshold,
                 onThresholdChanged = { viewModel.setSwipeThreshold(it) }
