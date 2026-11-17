@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Inbox
 import androidx.compose.material.icons.rounded.Search
@@ -45,6 +46,8 @@ fun EmptyStateView(
         IllustrationType.SHIELD -> Icons.Rounded.Security
         IllustrationType.PAPER_PLANE -> Icons.Rounded.Send
         IllustrationType.CONNECTION -> Icons.Rounded.CloudOff
+        IllustrationType.ERROR_CLOUD -> Icons.Rounded.CloudOff
+        IllustrationType.CLOUD_SYNC -> Icons.Rounded.Cloud
     }
 
     Column(
