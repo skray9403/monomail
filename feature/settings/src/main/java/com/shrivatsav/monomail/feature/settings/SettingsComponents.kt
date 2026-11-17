@@ -355,118 +355,6 @@ internal fun FontSizeRow(
 }
 
 @Composable
-internal fun NavSizeRow(
-    scale: Float,
-    onScaleChanged: (Float) -> Unit
-) {
-    val previewScale by animateFloatAsState(
-        targetValue = scale,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "navScale"
-    )
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Rounded.SpaceDashboard,
-                contentDescription = "Navigation Size",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(14.dp))
-            Text(
-                text = "Navigation Size",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                text = "${(scale * 100).toInt()}%",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Spacer(modifier = Modifier.height(10.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(60.dp * previewScale),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp * previewScale),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shadowElevation = 2.dp
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 6.dp * previewScale, vertical = 4.dp * previewScale),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp * previewScale),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        repeat(3) { i ->
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp * previewScale)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (i == 0) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                                    )
-                            )
-                        }
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .size(20.dp * previewScale)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.tertiaryContainer)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(16.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
-            )
-            Slider(
-                value = scale,
-                onValueChange = onScaleChanged,
-                valueRange = 0.6f..1.4f,
-                steps = 7,
-                modifier = Modifier.weight(1f),
-                colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.onSurface,
-                    activeTrackColor = MaterialTheme.colorScheme.onSurface,
-                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                )
-            )
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
-            )
-        }
-    }
-}
-
-@Composable
 internal fun SwipeThresholdRow(
     threshold: Float,
     onThresholdChanged: (Float) -> Unit
@@ -1018,49 +906,23 @@ internal fun SupportButton(
     primary: Boolean = false,
     icon: @Composable (Modifier) -> Unit
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val btnScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.97f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "btnScale"
-    )
     if (primary) {
         FilledTonalButton(
             onClick = onClick,
-            interactionSource = interactionSource,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .graphicsLayer(scaleX = btnScale, scaleY = btnScale),
-            shape = cornerShape(14.dp),
-            colors = ButtonDefaults.filledTonalButtonColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            )
+            modifier = Modifier.fillMaxWidth(),
         ) {
             icon(Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(label, style = MaterialTheme.typography.bodyMedium)
         }
     } else {
         OutlinedButton(
             onClick = onClick,
-            interactionSource = interactionSource,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .graphicsLayer(scaleX = btnScale, scaleY = btnScale),
-            shape = cornerShape(14.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
+            modifier = Modifier.fillMaxWidth(),
         ) {
             icon(Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(label, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
