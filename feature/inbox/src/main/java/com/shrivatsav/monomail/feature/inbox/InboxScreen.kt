@@ -304,7 +304,7 @@ fun InboxScreen(
                         is InboxState.Success -> {
                             val currentTab = s.currentTab
                             key(currentTab) {
-                            val savedPos = viewModel.scrollPositions.collectAsState().value[currentTab] ?: (0 to 0)
+                            val savedPos = remember(currentTab) { viewModel.getSavedScrollPosition(currentTab) }
                             val listState = rememberLazyListState(
                                 initialFirstVisibleItemIndex = savedPos.first,
                                 initialFirstVisibleItemScrollOffset = savedPos.second
@@ -489,7 +489,18 @@ fun InboxScreen(
                                             .fillMaxSize(),
                                         contentPadding = PaddingValues(bottom = 100.dp)
                                     ) {
-                                        itemsIndexed(displayItems, key = { _, it -> itemKeyFn(it) }) { index, displayItem ->
+                                        itemsIndexed(
+                                            items = displayItems,
+                                            key = { _, item -> itemKeyFn(item) },
+                                            contentType = { _, item ->
+                                                when (item) {
+                                                    is InboxDisplayItem.DateHeader -> "date_header"
+                                                    is InboxDisplayItem.GroupHeader -> "group_header"
+                                                    is InboxDisplayItem.SingleThread -> "email_thread"
+                                                    is InboxDisplayItem.NestedThread -> "nested_email_thread"
+                                                }
+                                            }
+                                        ) { index, displayItem ->
                                             com.shrivatsav.monomail.ui.components.AnimatedListItem(
                                                 index = index,
                                                 itemKey = itemKeyFn(displayItem),
