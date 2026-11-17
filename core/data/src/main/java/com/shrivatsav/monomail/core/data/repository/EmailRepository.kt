@@ -338,12 +338,14 @@ class EmailRepository(
                 if (entity.attachmentsJson in listOf("[]", "") && !existingJson.isNullOrEmpty() && existingJson != "[]") {
                     entity = entity.copy(attachmentsJson = existingJson)
                 }
-                if (entity.body.isEmpty() && !existing?.body.isNullOrEmpty()) {
-                    entity = entity.copy(body = existing!!.body, bodyIsHtml = existing.bodyIsHtml)
-                }
-                // Preserve existing non-empty snippet when provider returns empty
-                if (entity.snippet.isEmpty() && !existing?.snippet.isNullOrEmpty()) {
-                    entity = entity.copy(snippet = existing!!.snippet)
+                existing?.let { stored ->
+                    if (entity.body.isEmpty() && stored.body.isNotEmpty()) {
+                        entity = entity.copy(body = stored.body, bodyIsHtml = stored.bodyIsHtml)
+                    }
+                    // Preserve an existing non-empty snippet when the provider returns empty.
+                    if (entity.snippet.isEmpty() && stored.snippet.isNotEmpty()) {
+                        entity = entity.copy(snippet = stored.snippet)
+                    }
                 }
                 entity
             }
