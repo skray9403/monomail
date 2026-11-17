@@ -260,15 +260,14 @@ class EmailRepository(
         providerThread: com.shrivatsav.monomail.core.network.provider.ProviderThread,
         targetAccountId: String,
         existingSnippets: Map<String, ThreadSnippetProjection>,
-        existingThreadReadStatuses: Map<String, Boolean>,
-        existingEmailIdSet: Set<String>,
-        existingThreadFlags: Map<String, ThreadFolderFlagsProjection>
+        existingThreadStates: Map<String, ThreadSyncStateProjection>,
+        existingEmailIdSet: Set<String>
     ): ThreadEntity {
         val messages = providerThread.messages
         val latest = messages.maxByOrNull { it.date }
         val first = messages.minByOrNull { it.date }
         val allFolders = messages.flatMap { it.folders }.toSet()
-        val existing = existingThreadFlags[providerThread.threadId]
+        val existing = existingThreadStates[providerThread.threadId]
         // Gmail's All Mail contains INBOX + SENT messages too. Union with the
         // flags the thread already has so a folder pass never wipes membership
         // discovered by an earlier pass (INBOX → sent → All Mail order).
@@ -284,7 +283,7 @@ class EmailRepository(
         val participants = messages.map { it.from }.distinct()
         val serverIsRead = messages.all { it.isRead }
         val hasNewMessages = messages.any { it.id !in existingEmailIdSet }
-        val isRead = if (hasNewMessages) serverIsRead else (existingThreadReadStatuses[providerThread.threadId] == true || serverIsRead)
+        val isRead = if (hasNewMessages) serverIsRead else (existing?.isRead == true || serverIsRead)
         val isStarred = messages.any { it.isStarred }
         val finalSnippet = (latest?.snippet ?: "").ifBlank {
             existingSnippets[providerThread.threadId]?.snippet ?: ""
@@ -316,38 +315,35 @@ class EmailRepository(
     private fun buildEmailEntities(
         listResponse: com.shrivatsav.monomail.core.network.provider.ProviderThreadListResult,
         targetAccountId: String,
-        existingEmailReadStatuses: Map<String, Boolean>,
-        existingAttachments: Map<String, String>,
-        existingBodies: Map<String, EmailBodyProjection>,
-        pendingThreadIds: Set<String>,
-        existingLabels: Map<String, List<String>>
+        existingEmailStates: Map<String, EmailSyncStateProjection>,
+        pendingThreadIds: Set<String>
     ): List<EmailEntity> {
         return listResponse.threads.filter { it.threadId !in pendingThreadIds }.flatMap { providerThread ->
             providerThread.messages.map { msg ->
                 // Gmail's All Mail contains INBOX + SENT messages too. Union with the
                 // labels already stored so a folder pass never wipes membership
                 // discovered by an earlier pass (INBOX → sent → All Mail order).
-                val mergedLabels = (msg.folders.map { it.name } + existingLabels[msg.id].orEmpty()).distinct()
+                val existing = existingEmailStates[msg.id]
+                val mergedLabels = (msg.folders.map { it.name } + existing?.labels.orEmpty()).distinct()
                 var entity = Email(
                     id = msg.id, threadId = msg.threadId, subject = msg.subject,
                     from = msg.from, fromEmail = msg.fromEmail, to = msg.to, cc = msg.cc,
                     bcc = msg.bcc, snippet = msg.snippet, body = msg.body,
                     bodyIsHtml = msg.bodyIsHtml, date = msg.date,
-                    isRead = existingEmailReadStatuses[msg.id] == true || msg.isRead,
+                    isRead = existing?.isRead == true || msg.isRead,
                     isStarred = msg.isStarred, labels = mergedLabels,
                     attachments = msg.attachments
                 ).toEntity(targetAccountId)
-                val existingJson = existingAttachments[entity.id]
-                if (entity.attachmentsJson in listOf("[]", "") && existingJson != null && existingJson != "[]" && existingJson.isNotEmpty()) {
+                val existingJson = existing?.attachmentsJson
+                if (entity.attachmentsJson in listOf("[]", "") && !existingJson.isNullOrEmpty() && existingJson != "[]") {
                     entity = entity.copy(attachmentsJson = existingJson)
                 }
-                val existingBody = existingBodies[entity.id]
-                if (entity.body.isEmpty() && existingBody != null && existingBody.body.isNotEmpty()) {
-                    entity = entity.copy(body = existingBody.body, bodyIsHtml = existingBody.bodyIsHtml)
+                if (entity.body.isEmpty() && !existing?.body.isNullOrEmpty()) {
+                    entity = entity.copy(body = existing!!.body, bodyIsHtml = existing.bodyIsHtml)
                 }
                 // Preserve existing non-empty snippet when provider returns empty
-                if (entity.snippet.isEmpty() && existingBody != null && existingBody.snippet.isNotEmpty()) {
-                    entity = entity.copy(snippet = existingBody.snippet)
+                if (entity.snippet.isEmpty() && !existing?.snippet.isNullOrEmpty()) {
+                    entity = entity.copy(snippet = existing!!.snippet)
                 }
                 entity
             }
@@ -419,31 +415,30 @@ class EmailRepository(
                 onProgress = null
             )
             if (listResponse.threads.isEmpty()) return Result.success(listResponse.nextPageToken)
-            val existingSnippets = if (provider.providerName == "imap") {
-                threadDao.getSnippetsForAccount(resolvedAccountId).associateBy { it.threadId }
-            } else emptyMap()
             val pendingThreadIds = pendingActionDao.getPendingForAccount(resolvedAccountId).map { it.threadId }.toSet()
-            val existingThreadReadStatuses = threadDao.getReadStatuses(resolvedAccountId).associate { it.threadId to it.isRead }
-            val existingEmailReadStatuses = emailDao.getEmailReadStatuses(resolvedAccountId).associate { it.id to it.isRead }
+            val pageThreads = listResponse.threads.filter { it.threadId !in pendingThreadIds }
+            val pageThreadIds = pageThreads.map { it.threadId }.distinct()
+            val existingSnippets = if (provider.providerName == "imap" && pageThreadIds.isNotEmpty()) {
+                threadDao.getSnippetsForThreads(pageThreadIds, resolvedAccountId).associateBy { it.threadId }
+            } else emptyMap()
+            val existingThreadStates = if (pageThreadIds.isNotEmpty()) {
+                threadDao.getSyncStatesForThreads(pageThreadIds, resolvedAccountId).associateBy { it.threadId }
+            } else emptyMap()
+            val existingEmailStates = if (pageThreadIds.isNotEmpty()) {
+                emailDao.getSyncStateForThreads(pageThreadIds, resolvedAccountId).associateBy { it.id }
+            } else emptyMap()
 
-            val existingThreadFlags = threadDao.getThreadFolderFlags(resolvedAccountId).associateBy { it.threadId }
-            val existingLabels = emailDao.getLabelsForAccount(resolvedAccountId).associate { it.id to it.labels }
-
-            val entities = listResponse.threads.filter { it.threadId !in pendingThreadIds }.map { pt ->
-                buildThreadEntity(pt, resolvedAccountId, existingSnippets, existingThreadReadStatuses, existingEmailReadStatuses.keys, existingThreadFlags)
+            val entities = pageThreads.map { pt ->
+                buildThreadEntity(pt, resolvedAccountId, existingSnippets, existingThreadStates, existingEmailStates.keys)
             }
-            val allEmails = buildEmailEntities(listResponse, resolvedAccountId, existingEmailReadStatuses,
-                emailDao.getAttachmentJsonForAccount(resolvedAccountId).associate { it.id to it.attachmentsJson },
-                emailDao.getEmailBodyForAccount(resolvedAccountId).associate { it.id to it },
-                pendingThreadIds,
-                existingLabels
-            )
+            val allEmails = buildEmailEntities(listResponse, resolvedAccountId, existingEmailStates, pendingThreadIds)
+
             val now = System.currentTimeMillis()
             val existingSnoozed = threadDao.getSnoozeStateForThreads(entities.map { it.threadId }, resolvedAccountId)
                 .filter { it.isSnoozed }.associateBy { it.threadId }
 
             emailContentWriteMutex.withLock {
-                val contentSafeEmails = preserveStoredEmailContent(allEmails)
+                val contentSafeEmails = allEmails
                 database.withTransaction {
                     threadDao.insertThreads(entities)
                     // Keep snoozing only while the snooze window is still active;
@@ -543,25 +538,25 @@ class EmailRepository(
                 }
             )
             if (listResponse.threads.isEmpty()) break
-            val existingSnippets = if (provider.providerName == "imap") {
-                threadDao.getSnippetsForAccount(accountId).associateBy { it.threadId }
-            } else emptyMap()
             val pendingThreadIds = pendingActionDao.getPendingForAccount(accountId).map { it.threadId }.toSet()
-            val existingThreadReadStatuses = threadDao.getReadStatuses(accountId).associate { it.threadId to it.isRead }
-            val existingEmailReadStatuses = emailDao.getEmailReadStatuses(accountId).associate { it.id to it.isRead }
-            val existingThreadFlags = threadDao.getThreadFolderFlags(accountId).associateBy { it.threadId }
-            val existingLabels = emailDao.getLabelsForAccount(accountId).associate { it.id to it.labels }
-            val entities = listResponse.threads.filter { it.threadId !in pendingThreadIds }.map { pt ->
-                buildThreadEntity(pt, accountId, existingSnippets, existingThreadReadStatuses, existingEmailReadStatuses.keys, existingThreadFlags)
+            val pageThreads = listResponse.threads.filter { it.threadId !in pendingThreadIds }
+            val pageThreadIds = pageThreads.map { it.threadId }.distinct()
+            val existingSnippets = if (provider.providerName == "imap" && pageThreadIds.isNotEmpty()) {
+                threadDao.getSnippetsForThreads(pageThreadIds, accountId).associateBy { it.threadId }
+            } else emptyMap()
+            val existingThreadStates = if (pageThreadIds.isNotEmpty()) {
+                threadDao.getSyncStatesForThreads(pageThreadIds, accountId).associateBy { it.threadId }
+            } else emptyMap()
+            val existingEmailStates = if (pageThreadIds.isNotEmpty()) {
+                emailDao.getSyncStateForThreads(pageThreadIds, accountId).associateBy { it.id }
+            } else emptyMap()
+
+            val entities = pageThreads.map { pt ->
+                buildThreadEntity(pt, accountId, existingSnippets, existingThreadStates, existingEmailStates.keys)
             }
-            val allEmails = buildEmailEntities(listResponse, accountId, existingEmailReadStatuses,
-                emailDao.getAttachmentJsonForAccount(accountId).associate { it.id to it.attachmentsJson },
-                emailDao.getEmailBodyForAccount(accountId).associate { it.id to it },
-                pendingThreadIds,
-                existingLabels
-            )
+            val allEmails = buildEmailEntities(listResponse, accountId, existingEmailStates, pendingThreadIds)
             emailContentWriteMutex.withLock {
-                val contentSafeEmails = preserveStoredEmailContent(allEmails)
+                val contentSafeEmails = allEmails
                 database.withTransaction {
                     threadDao.insertThreads(entities)
                     emailDao.insertEmails(contentSafeEmails)
@@ -904,18 +899,6 @@ class EmailRepository(
         }
     } ?: Int.MAX_VALUE
 
-    private suspend fun preserveStoredEmailContent(entities: List<EmailEntity>): List<EmailEntity> =
-        entities.map { incoming ->
-            val existing = emailDao.getEmailById(incoming.id, incoming.accountId) ?: return@map incoming
-            incoming.copy(
-                body = incoming.body.takeUnless { it.isBlank() } ?: existing.body,
-                bodyIsHtml = if (incoming.body.isBlank() && existing.body.isNotBlank()) existing.bodyIsHtml else incoming.bodyIsHtml,
-                snippet = incoming.snippet.takeUnless { it.isBlank() } ?: existing.snippet,
-                attachmentsJson = incoming.attachmentsJson.takeUnless { it.isBlank() || it == "[]" }
-                    ?: existing.attachmentsJson
-            )
-        }
-
     suspend fun refreshThread(threadId: String, explicitAccountId: String? = null): Result<Unit> {
         val accountId = explicitAccountId ?: resolveAccountId(threadId)
         return try {
@@ -962,7 +945,16 @@ class EmailRepository(
                         attachments = msg.attachments
                     ).toEntity(accountId)
                 }
-                val contentSafeEmails = preserveStoredEmailContent(emails)
+                val contentSafeEmails = emails.map { incoming ->
+                    val existing = existingById[incoming.id] ?: return@map incoming
+                    incoming.copy(
+                        body = incoming.body.takeUnless { it.isBlank() } ?: existing.body,
+                        bodyIsHtml = if (incoming.body.isBlank() && existing.body.isNotBlank()) existing.bodyIsHtml else incoming.bodyIsHtml,
+                        snippet = incoming.snippet.takeUnless { it.isBlank() } ?: existing.snippet,
+                        attachmentsJson = incoming.attachmentsJson.takeUnless { it.isBlank() || it == "[]" }
+                            ?: existing.attachmentsJson
+                    )
+                }
                 database.withTransaction {
                     if (threadResponse.isComplete) {
                         emailDao.deleteOrphanedEmails(threadId, accountId, contentSafeEmails.map { it.id })
