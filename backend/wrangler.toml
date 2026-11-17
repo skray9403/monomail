@@ -10,7 +10,7 @@ id = "36c6042608ff4f71adf1be8d58398e57"
 
 [vars]
 # For Gmail Pub/Sub push notification setup
-GCP_PROJECT_ID = "monomail-500604"
+GCP_PROJECT_ID = "monomail-2ff10"
 PUBSUB_TOPIC = "projects/monomail-500604/topics/monomail-push"
 PUBSUB_AUDIENCE = "https://monomail-push-backend.monomail.workers.dev/webhook/gmail"
 PUBSUB_SERVICE_ACCOUNT = "pubsub-push@monomail-500604.iam.gserviceaccount.com"
