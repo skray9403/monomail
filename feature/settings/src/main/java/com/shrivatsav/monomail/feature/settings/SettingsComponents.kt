@@ -79,26 +79,13 @@ internal fun CardDivider() {
 
 @Composable
 internal fun SectionHeader(icon: ImageVector, title: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(22.dp)
-        )
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
+    ListItem(
+        leadingContent = { Icon(icon, contentDescription = title) },
+        headlineContent = {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
 }
 
 @Composable
@@ -570,48 +557,22 @@ internal fun BottomSheetPickerRow(
     indented: Boolean = false
 ) {
     var showSheet by remember { mutableStateOf(false) }
-    val chevronRotation by animateFloatAsState(
-        targetValue = if (showSheet) 90f else 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "chevronRot"
-    )
-    Row(
+    ListItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { showSheet = true }
-            .padding(start = if (indented) 32.dp else 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(14.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = currentValue,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Icon(
-            imageVector = Icons.Rounded.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            modifier = Modifier.size(18.dp).rotate(chevronRotation)
-        )
-    }
+            .padding(start = if (indented) 16.dp else 0.dp),
+        leadingContent = { Icon(icon, contentDescription = title) },
+        headlineContent = { Text(title) },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(currentValue, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(4.dp))
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Choose $title")
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
     if (showSheet) {
         PickerBottomSheet(
             title = title,
@@ -634,31 +595,17 @@ private fun PickerBottomSheet(
 ) {
     SlideSheet(onDismiss = onDismiss, title = title) {
         options.forEachIndexed { index, option ->
-            val isSelected = option == currentValue
-            Row(
+            val selected = option == currentValue
+            ListItem(
+                headlineContent = { Text(option) },
+                trailingContent = {
+                    RadioButton(selected = selected, onClick = null)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onSelected(index) }
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = option,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (isSelected) MaterialTheme.colorScheme.onSurface
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-                if (isSelected) {
-                    Icon(
-                        imageVector = Icons.Rounded.Check,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
+                    .clickable { onSelected(index) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            )
         }
     }
 }
@@ -670,47 +617,20 @@ internal fun InfoRow(
     value: String,
     onClick: (() -> Unit)? = null
 ) {
-    Row(
+    ListItem(
         modifier = Modifier
             .fillMaxWidth()
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(14.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
-        if (value.isNotEmpty()) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        if (onClick != null) {
-            Spacer(modifier = Modifier.width(4.dp))
-            Icon(
-                imageVector = Icons.Rounded.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = MonoOpacity.secondary),
-                modifier = Modifier.size(18.dp)
-            )
-        }
-    }
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        leadingContent = { Icon(icon, contentDescription = title) },
+        headlineContent = { Text(title) },
+        trailingContent = {
+            if (value.isNotEmpty()) {
+                Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
 }
-
-// ── Display-name extensions ──────────────────────────────────────────
 
 internal fun ThemeMode.displayName() = when (this) {
     ThemeMode.SYSTEM -> "System"
