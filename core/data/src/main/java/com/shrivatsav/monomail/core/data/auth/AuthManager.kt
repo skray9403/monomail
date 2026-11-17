@@ -179,6 +179,20 @@ class AuthManager(
     }
 
     private fun handleRefreshFailure(profile: UserProfile, lastException: Exception?) {
+        // GoogleAuthUtil wraps many non-interactive failures (account visibility,
+        // Play services and transient API errors) in GoogleAuthException. Those
+        // failures do not prove that the user's Google session has expired.
+        // Only UserRecoverableAuthException, surfaced above with an Intent, may
+        // open the reauthentication dialog for Gmail.
+        if (profile.provider == "gmail") {
+            android.util.Log.w(
+                TAG,
+                "Gmail token refresh failed without a recoverable consent intent; preserving the local session",
+                lastException
+            )
+            return
+        }
+
         when (lastException) {
             is java.net.SocketTimeoutException,
             is java.net.UnknownHostException -> {
