@@ -27,10 +27,15 @@ import androidx.compose.material.icons.rounded.FolderZip
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.VideoFile
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -105,102 +110,96 @@ private fun ThumbnailPreview(
     onClick: (() -> Unit)?,
     modifier: Modifier
 ) {
-    Box(
+    Card(
         modifier = modifier
             .size(100.dp)
-            .clip(cornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        when {
-            category == AttachmentCategory.IMAGE && thumbnailUri != null -> {
-                AsyncImage(
-                    model = thumbnailUri,
-                    contentDescription = name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-
-            category == AttachmentCategory.VIDEO -> {
-                if (thumbnailUri != null) {
+        Box(Modifier.fillMaxSize()) {
+            when {
+                category == AttachmentCategory.IMAGE && thumbnailUri != null -> {
                     AsyncImage(
                         model = thumbnailUri,
                         contentDescription = name,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
-                } else {
-                    CategoryIconTile(category = category, iconSize = 36.dp)
                 }
-                // Play icon overlay
-                Box(
+                category == AttachmentCategory.VIDEO -> {
+                    if (thumbnailUri != null) {
+                        AsyncImage(
+                            model = thumbnailUri,
+                            contentDescription = name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        CategoryIconTile(category = category, iconSize = 36.dp)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.AttachFile,
+                            contentDescription = "Play",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                else -> CategoryIconTile(category = category, iconSize = 36.dp)
+            }
+
+            if (category != AttachmentCategory.IMAGE) {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.5f)),
-                    contentAlignment = Alignment.Center
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.88f))
+                        .padding(6.dp)
+                )
+            }
+
+            if (onRemove != null) {
+                IconButton(
+                    onClick = onRemove,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .size(32.dp)
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.88f), CircleShape)
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.AttachFile,
-                        contentDescription = "Play",
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp)
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "Remove",
+                        modifier = Modifier.size(16.dp),
                     )
                 }
             }
 
-            else -> CategoryIconTile(category = category, iconSize = 36.dp)
-        }
-
-        // Filename label at bottom for non-image thumbnails
-        if (category != AttachmentCategory.IMAGE) {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .padding(6.dp)
-            )
-        }
-
-        // Remove button
-        if (onRemove != null) {
-            IconButton(
-                onClick = onRemove,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(4.dp)
-                    .size(24.dp)
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
-                        CircleShape
+            if (isFetching) {
+                Box(
+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.25f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
                     )
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Close,
-                    contentDescription = "Remove",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        // Loading spinner
-        if (isFetching) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(22.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                )
+                }
             }
         }
     }
@@ -218,58 +217,30 @@ private fun DetailPreview(
     modifier: Modifier
 ) {
     val (icon, color) = categoryIconAndColor(category)
-
-    Row(
+    ListItem(
         modifier = modifier
             .fillMaxWidth()
-            .clip(cornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Category badge
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(cornerShape(10.dp))
-                .background(color),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(22.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = formatFileSize(size),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-            )
-        }
-
-        if (isFetching) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-            )
-        }
-    }
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        leadingContent = {
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ) {
+                Icon(icon, contentDescription = null, modifier = Modifier.padding(10.dp).size(22.dp))
+            }
+        },
+        headlineContent = {
+            Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        supportingContent = {
+            Text(formatFileSize(size), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        },
+        trailingContent = {
+            if (isFetching) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+        },
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    )
 }
 
 // ─── Category icon tile (for THUMBNAIL mode fallback) ────────────────────────
