@@ -263,14 +263,20 @@ class InboxViewModel @Inject constructor(
                             }
                         }
                     }
+                    // Keep the visible thread list stable when only transient UI flags
+                    // (refresh spinner / load-more spinner) change. Otherwise each flag
+                    // emission creates a brand-new filtered list and restarts screen work.
+                    val visibleThreads = combine(flow, pendingHideIds) { threads, hiddenIds ->
+                        if (hiddenIds.isEmpty()) threads
+                        else threads.filter { it.threadId !in hiddenIds }
+                    }.distinctUntilChanged()
+
                     combine(
-                        flow,
+                        visibleThreads,
                         _isRefreshing,
-                        _isLoadingMore,
-                        pendingHideIds
-                    ) { threads, isRefreshing, isLoadingMore, hiddenIds ->
-                        val filteredThreads = threads.filter { it.threadId !in hiddenIds }
-                        InboxState.Success(filteredThreads, tab, isRefreshing, isLoadingMore, pageTokens[getPageTokenKey()])
+                        _isLoadingMore
+                    ) { threads, isRefreshing, isLoadingMore ->
+                        InboxState.Success(threads, tab, isRefreshing, isLoadingMore, pageTokens[getPageTokenKey()])
                     }
                 }.collect { newState ->
                     _state.value = newState
