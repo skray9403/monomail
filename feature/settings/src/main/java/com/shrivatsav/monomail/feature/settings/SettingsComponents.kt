@@ -215,6 +215,7 @@ private data class SelectorEntry(
  * Icon + title header above a segmented row of [SelectorItem]s, with an optional
  * description line below. Shared by the theme and email-color pickers.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SelectorRow(
     icon: ImageVector,
