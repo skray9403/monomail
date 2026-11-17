@@ -1,6 +1,7 @@
 package com.shrivatsav.monomail.feature.inbox.components
 
 import com.shrivatsav.monomail.feature.inbox.*
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -28,6 +29,7 @@ internal data class ModalCallbacks(
  * bottom sheet. Provider selection remains its own destination dialog because
  * it is a separate sign-in flow, not sheet content.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ModalOverlay(
     activeModal: ModalType?,
