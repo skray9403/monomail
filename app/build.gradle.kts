@@ -44,7 +44,6 @@ abstract class ValidatePlaystoreReleaseConfigTask : DefaultTask() {
         val releaseSecrets = loadProperties(File(rootDirectory, "secrets.properties"))
         val requiredSecrets = mapOf(
             "GOOGLE_CLIENT_ID" to releaseSecrets.getProperty("GOOGLE_CLIENT_ID"),
-            "PUSH_BACKEND_URL" to releaseSecrets.getProperty("PUSH_BACKEND_URL")
         )
         val invalidSecrets = requiredSecrets.filterValues { it.isMissingOrPlaceholder() }.keys
         check(invalidSecrets.isEmpty()) {
@@ -63,11 +62,6 @@ abstract class ValidatePlaystoreReleaseConfigTask : DefaultTask() {
             "Play Store release signing is incomplete or the configured keystore does not exist."
         }
 
-        val googleServicesFile = File(rootDirectory, "app/src/playstore/google-services.json")
-        check(googleServicesFile.isFile && !googleServicesFile.readText().isMissingOrPlaceholder()) {
-            "A non-placeholder app/src/playstore/google-services.json is required for Play Store releases."
-        }
-
         val msalConfigFile = File(rootDirectory, "app/src/playstoreRelease/res/raw/msal_config.json")
         check(msalConfigFile.isFile && !msalConfigFile.readText().isMissingOrPlaceholder()) {
             "A non-placeholder Play Store release MSAL configuration is required."
@@ -80,7 +74,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
-    id("com.google.gms.google-services")
 }
 
 val secretsFile = rootProject.file("secrets.properties")
@@ -259,7 +252,6 @@ dependencies {
     "playstoreImplementation"(libs.androidx.credentials.play.services)
     "playstoreImplementation"(libs.google.identity.googleid)
     "playstoreImplementation"(libs.google.play.services.auth)
-    "playstoreImplementation"(libs.firebase.messaging)
 
     // Local modules
     implementation(project(":core:model"))
@@ -335,10 +327,6 @@ tasks.matching { it.name.contains("Github", ignoreCase = true) && it.name.contai
     enabled = false
 }
 
-val hasPlaystoreGoogleServices = project.file("src/playstore/google-services.json").isFile
-tasks.matching { it.name == "processPlaystoreDebugGoogleServices" }.configureEach {
-    enabled = hasPlaystoreGoogleServices
-}
 
 // Retain ProGuard/R8 mapping files for crash deobfuscation across releases.
 // Mapping files are at build/outputs/mapping/{variant}/mapping.txt after each build.
