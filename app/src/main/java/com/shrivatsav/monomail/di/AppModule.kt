@@ -80,7 +80,12 @@ object AppModule {
         authManager: AuthManager
     ) = RetrofitClient(
         tokenRefresher = { refreshProfileToken(profile, context, accountManager, authManager) },
-        onRefreshFailed = { authManager.notifyReauthRequired(profile.email, profile.provider) },
+        onRefreshFailed = {
+            // A final HTTP auth rejection plus a failed silent refresh is not
+            // enough to prove that interactive sign-in is required. The inbox
+            // keeps its cached data and the next sync can retry.
+            android.util.Log.w("AppModule", "Silent token refresh failed after API auth rejection for ${profile.id}; not forcing reauthentication")
+        },
         onHttpError = { code -> android.util.Log.w("AppModule", "HTTP $code for ${profile.id}") }
     )
 
@@ -101,14 +106,18 @@ object AppModule {
             }
             newToken
         } catch (e: GoogleAuthException) {
-            runBlocking(kotlinx.coroutines.Dispatchers.Main) {
-                if (e.intent != null) {
+            if (e.intent != null) {
+                runBlocking(kotlinx.coroutines.Dispatchers.Main) {
                     authManager.notifyReauthRequired(profile.email, profile.provider, e.intent)
-                } else {
-                    authManager.notifyReauthRequired(profile.email, profile.provider)
                 }
+                android.util.Log.w("AppModule", "Google token refresh requires explicit user consent for ${profile.id}", e)
+            } else {
+                android.util.Log.w(
+                    "AppModule",
+                    "Non-interactive Google token refresh failed for ${profile.id}; preserving the current session",
+                    e
+                )
             }
-            android.util.Log.e("AppModule", "Token refresh requires consent for ${profile.id}", e)
             null
         } catch (e: Exception) {
             android.util.Log.e("AppModule", "Token refresh failed for ${profile.id}", e)
