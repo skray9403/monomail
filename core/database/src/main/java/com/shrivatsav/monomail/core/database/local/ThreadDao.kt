@@ -125,6 +125,17 @@ interface ThreadDao {
     @Query("SELECT threadId, snippet FROM threads WHERE accountId = :accountId AND snippet != ''")
     suspend fun getSnippetsForAccount(accountId: String): List<ThreadSnippetProjection>
 
+    @Query("SELECT threadId, snippet FROM threads WHERE accountId = :accountId AND threadId IN (:threadIds) AND snippet != ''")
+    suspend fun getSnippetsForThreads(threadIds: List<String>, accountId: String): List<ThreadSnippetProjection>
+
+    /** Load only the flags for thread IDs present in the current sync page. */
+    @Query("""
+        SELECT threadId, isRead, inInbox, inSent, inArchived, inTrash, inSpam, inDrafts
+        FROM threads
+        WHERE accountId = :accountId AND threadId IN (:threadIds)
+    """)
+    suspend fun getSyncStatesForThreads(threadIds: List<String>, accountId: String): List<ThreadSyncStateProjection>
+
     @Query("SELECT threadId, isRead FROM threads WHERE accountId = :accountId")
     suspend fun getReadStatuses(accountId: String): List<ThreadReadStatusProjection>
 
@@ -212,6 +223,18 @@ data class ThreadSnoozeProjection(
 
 data class ThreadFolderFlagsProjection(
     val threadId: String,
+    val inInbox: Boolean,
+    val inSent: Boolean,
+    val inArchived: Boolean,
+    val inTrash: Boolean,
+    val inSpam: Boolean,
+    val inDrafts: Boolean
+)
+
+
+data class ThreadSyncStateProjection(
+    val threadId: String,
+    val isRead: Boolean,
     val inInbox: Boolean,
     val inSent: Boolean,
     val inArchived: Boolean,
