@@ -35,7 +35,7 @@ class RetrofitClient(
             val newToken = synchronized(this) { tryRefreshToken(cachedToken.get(), originalToken) }
             if (newToken != null) {
                 val retryResponse = chain.proceed(addAuthHeader(request, newToken))
-                if (retryResponse.code != 401 && retryResponse.code != 403) return retryResponse
+                if (retryResponse.code != 401) return retryResponse
                 retryResponse.close()
             }
             if (attempt < 2) Thread.sleep(500L * attempt)
@@ -48,7 +48,7 @@ class RetrofitClient(
         val token = cachedToken.get()
         val response = chain.proceed(addAuthHeader(request, token))
 
-        if (response.code == 401 || response.code == 403) {
+        if (response.code == 401) {
             response.close()
             val retryResponse = retryWithAuth(chain, request, token)
             if (retryResponse != null) return@Interceptor retryResponse
