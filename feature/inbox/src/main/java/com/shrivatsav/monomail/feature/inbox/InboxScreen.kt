@@ -1520,6 +1520,144 @@ private fun GroupHeaderItem(
     )
 }
 
+@Composable
+private fun rememberConnectivityState(): Boolean {
+    val cm = androidx.compose.ui.platform.LocalContext.current
+        .getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    val currentOnline = remember {
+        val activeNetwork = cm.activeNetwork
+        val caps = activeNetwork?.let { cm.getNetworkCapabilities(it) }
+        caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+    }
+    var isOnline by remember { mutableStateOf(currentOnline) }
+    DisposableEffect(Unit) {
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) { isOnline = true }
+            override fun onLost(network: Network) { isOnline = false }
+            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                isOnline = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            }
+        }
+        cm.registerDefaultNetworkCallback(callback)
+        onDispose { cm.unregisterNetworkCallback(callback) }
+    }
+    return isOnline
+}
+
+@Composable
+private fun OfflineBanner() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        shape = MaterialTheme.shapes.small,
+    ) {
+        ListItem(
+            leadingContent = {
+                Icon(Icons.Rounded.CloudOff, contentDescription = null)
+            },
+            headlineContent = { Text("You are offline") },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+@Composable
+private fun BackfillProgressBanner(progress: BodyBackfillState?, onClick: () -> Unit = {}) {
+    val total = progress?.total ?: 0
+    val completed = progress?.completed ?: 0
+    val pct = if (total > 0) (completed.toFloat() / total * 100).toInt() else 0
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        ListItem(
+            leadingContent = {
+                Icon(Icons.Rounded.CloudDownload, contentDescription = null)
+            },
+            headlineContent = {
+                Text(if (progress?.folder != null) "Downloading ${progress.folder} content" else "Downloading email content")
+            },
+            supportingContent = {
+                Column {
+                    Text("$completed of $total emails · $pct%")
+                    LinearProgressIndicator(
+                        progress = { progress?.progress ?: 0f },
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        trackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.25f),
+                    )
+                }
+            },
+            trailingContent = {
+                CircularProgressIndicator(
+                    progress = { if (total > 0) completed.toFloat() / total else 0f },
+                    modifier = Modifier.size(28.dp),
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    trackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.25f),
+                    strokeWidth = 3.dp,
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+/** Material alert dialog showing live backfill progress and cancellation. */
+@Composable
+private fun BackfillProgressDialog(
+    progress: BodyBackfillState,
+    onCancel: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val pct = if (progress.total > 0) (progress.completed.toFloat() / progress.total * 100).toInt() else 0
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Downloading email content") },
+        confirmButton = {
+            TextButton(onClick = onCancel) { Text("Cancel download") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        },
+        text = {
+            Column {
+                Text(
+                    if (progress.folder != null) "Downloading ${progress.folder} content" else "Downloading email content",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
+                LinearProgressIndicator(
+                    progress = { progress.progress },
+                    modifier = Modifier.fillMaxWidth().height(8.dp),
+                )
+                Spacer(Modifier.height(12.dp))
+                Text("${progress.completed} of ${progress.total} emails · $pct%")
+            }
+        },
+    )
+}
+
+@Composable
+private fun BackfillErrorBanner(errorMessage: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        shape = MaterialTheme.shapes.small,
+    ) {
+        ListItem(
+            leadingContent = {
+                Icon(Icons.Rounded.CloudOff, contentDescription = null)
+            },
+            headlineContent = { Text(errorMessage) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
 private data class ReleaseNotes(
     val version: String,
     val changes: List<String>
