@@ -93,12 +93,13 @@ internal fun SwipeableEmailItem(
     val topPad = if (groupPosition == GroupPosition.SOLO || groupPosition == GroupPosition.TOP) 2.dp else 0.dp
     val bottomPad = if (groupPosition == GroupPosition.SOLO || groupPosition == GroupPosition.BOTTOM) 4.dp else 0.dp
 
-    Column(
+    Card(
         modifier = modifier
             .padding(horizontal = 12.dp)
-            .padding(top = topPad, bottom = bottomPad)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(top = topPad, bottom = bottomPad),
+        shape = shape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         if (selection.isBulkMode) {
             EmailItem(
@@ -126,24 +127,22 @@ internal fun SwipeableEmailItem(
                     SwipeBackground(dismissState, appSettings, tabForSwipe, optIsStarred, optIsRead)
                 }
             ) {
-                Box(modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainer)) {
-                    EmailItem(
-                        thread = displayThread,
-                        onClick = callbacks.onEmailClick,
-                        onLongClick = callbacks.onLongClick,
-                        showSnippet = appSettings.showSnippet,
-                        use24HourTime = appSettings.use24HourTime,
-                        compactMode = appSettings.compactList,
-                        selection = SelectionState(
-                            isSelected = selection.isSelected,
-                            isBulkMode = false,
-                            onSelectToggle = selection.onSelectToggle,
-                            onRangeSelect = selection.onRangeSelect,
-                            onAvatarLongClick = selection.onAvatarLongClick
-                        ),
-                        unreadPosition = unreadPosition
-                    )
-                }
+                EmailItem(
+                    thread = displayThread,
+                    onClick = callbacks.onEmailClick,
+                    onLongClick = callbacks.onLongClick,
+                    showSnippet = appSettings.showSnippet,
+                    use24HourTime = appSettings.use24HourTime,
+                    compactMode = appSettings.compactList,
+                    selection = SelectionState(
+                        isSelected = selection.isSelected,
+                        isBulkMode = false,
+                        onSelectToggle = selection.onSelectToggle,
+                        onRangeSelect = selection.onRangeSelect,
+                        onAvatarLongClick = selection.onAvatarLongClick
+                    ),
+                    unreadPosition = unreadPosition
+                )
             }
         }
     }
