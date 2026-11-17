@@ -2,6 +2,8 @@ import java.util.Properties
 import java.io.FileInputStream
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 
@@ -9,10 +11,18 @@ abstract class ValidatePlaystoreReleaseConfigTask : DefaultTask() {
     @get:Internal
     abstract val rootDirectory: DirectoryProperty
 
+    @get:Input
+    abstract val skipValidation: Property<Boolean>
+
     @TaskAction
     fun validate() {
+        if (skipValidation.get()) {
+            logger.lifecycle("Skipping Play Store release configuration validation.")
+            return
+        }
         val rootDirectory = rootDirectory.get().asFile
-        if (project.hasProperty("skipReleaseValidation") || File(rootDirectory, ".skip-release-validation").exists()) {
+        if (File(rootDirectory, ".skip-release-validation").exists()) {
+            logger.lifecycle("Skipping Play Store release configuration validation.")
             return
         }
         fun String?.isMissingOrPlaceholder(): Boolean {
@@ -194,6 +204,11 @@ val validatePlaystoreReleaseConfig by tasks.registering(ValidatePlaystoreRelease
     group = "verification"
     description = "Fails Play Store release builds when required release configuration is missing."
     rootDirectory.set(rootProject.layout.projectDirectory)
+    skipValidation.set(
+        providers.gradleProperty("skipReleaseValidation")
+            .map(String::toBoolean)
+            .orElse(false)
+    )
 }
 
 tasks.matching { it.name == "prePlaystoreReleaseBuild" }.configureEach {
