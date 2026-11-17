@@ -26,35 +26,6 @@ jobs:
           CLEAN_CLIENT_ID=$(printf '%s' "$RAW_CLIENT_ID" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" -e 's#^https://##' -e 's#^http://##' -e 's#/$##')
           printf 'GOOGLE_CLIENT_ID=%s\n' "$CLEAN_CLIENT_ID" > secrets.properties
 
-      - name: Inject Firebase configuration
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: |
-          set -euo pipefail
-          if [ -z "${GOOGLE_SERVICES_JSON:-}" ]; then
-            echo "::error::Missing GitHub Actions secret GOOGLE_SERVICES_JSON. Add the complete contents of app/src/playstore/google-services.json as this secret."
-            exit 1
-          fi
-
-          mkdir -p app/src/playstore
-          printf '%s' "$GOOGLE_SERVICES_JSON" > app/src/playstore/google-services.json
-          python3 - <<'PY'
-          import json
-
-          config_path = "app/src/playstore/google-services.json"
-          with open(config_path, encoding="utf-8") as config_file:
-              config = json.load(config_file)
-
-          package_names = [
-              client.get("client_info", {}).get("android_client_info", {}).get("package_name")
-              for client in config.get("client", [])
-          ]
-          if "com.shrivatsav.monomail" not in package_names:
-              raise SystemExit("google-services.json does not contain package com.shrivatsav.monomail")
-
-          print("Firebase configuration injected and validated.")
-          PY
-
       - name: Restore persistent keystore
         run: |
           mkdir -p ~/.android
