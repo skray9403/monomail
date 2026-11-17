@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.dp
  * stock Material 3 ModalBottomSheet, including its scrim, drag handle, shape,
  * insets and dismissal behaviour.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SlideSheet(
     onDismiss: () -> Unit,
