@@ -14,9 +14,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.jvm.JvmSuppressWildcards
 import javax.inject.Inject
@@ -47,19 +47,22 @@ class ActionQueueManager @Inject constructor(
                 Log.e(tag, "Failed to recover stale IN_FLIGHT actions", e)
             }
             Log.d(tag, "Queue processor started")
-            while (isActive) {
-                try {
-                    val action = pendingActionDao.getNextPending()
-                    if (action == null) {
-                        delay(2000)
-                        continue
-                    }
-                    processAction(action)
-                } catch (e: Exception) {
-                    Log.e(tag, "Queue loop error", e)
-                    delay(5000)
+            pendingActionDao.getPendingFlow()
+                .map { actions ->
+                    actions.asSequence()
+                        .filter { it.status == PendingActionStatus.PENDING }
+                        .minByOrNull { it.createdAt }
                 }
-            }
+                .distinctUntilChangedBy { action -> action?.let { it.id to it.retryCount } }
+                .collect { action ->
+                    if (action != null) {
+                        try {
+                            processAction(action)
+                        } catch (e: Exception) {
+                            Log.e(tag, "Queue processor failed for action ${action.id}", e)
+                        }
+                    }
+                }
         }
     }
 
