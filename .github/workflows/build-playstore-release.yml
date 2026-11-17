@@ -40,7 +40,7 @@ jobs:
           APK="app/build/outputs/apk/playstore/release/app-playstore-release.apk"
           AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -V | tail -n 1)
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
-          EXPECTED_CLIENT_ID="193693002878-ajpu4r5m7f5qjr20v9a1g7qj0c58iqod.apps.googleusercontent.com"
+          EXPECTED_CLIENT_ID="193693002878-ajpu4r5m7f5qjr20v9a1g7qi0c58iqod.apps.googleusercontent.com"
 
           INJECTED_CLIENT_ID=$(grep -E '^GOOGLE_CLIENT_ID=' secrets.properties | cut -d'=' -f2-)
           INJECTED_LEN=${#INJECTED_CLIENT_ID}
