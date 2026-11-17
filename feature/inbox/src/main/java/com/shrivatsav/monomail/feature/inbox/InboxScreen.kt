@@ -38,6 +38,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.graphicsLayer
@@ -80,13 +81,13 @@ fun InboxScreen(
     userProfile: UserProfile?,
     navActions: InboxNavActions
 ) {
-    val state by viewModel.state.collectAsState()
-    val unifiedInboxEnabled by viewModel.unifiedInboxEnabled.collectAsState()
-    val showWelcomePrompt by viewModel.showWelcomePrompt.collectAsState()
-    val scheduledCount by viewModel.scheduledCount.collectAsState()
-    val accounts by viewModel.accounts.collectAsState()
-    val syncState by viewModel.inboxSyncState.collectAsState()
-    val immediateTab by viewModel.currentTab.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val unifiedInboxEnabled by viewModel.unifiedInboxEnabled.collectAsStateWithLifecycle()
+    val showWelcomePrompt by viewModel.showWelcomePrompt.collectAsStateWithLifecycle()
+    val scheduledCount by viewModel.scheduledCount.collectAsStateWithLifecycle()
+    val accounts by viewModel.accounts.collectAsStateWithLifecycle()
+    val syncState by viewModel.inboxSyncState.collectAsStateWithLifecycle()
+    val immediateTab by viewModel.currentTab.collectAsStateWithLifecycle()
     var showBackfillDialog by remember { mutableStateOf(false) }
 
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
@@ -106,9 +107,9 @@ fun InboxScreen(
     }
 
     var threadToDelete by remember { mutableStateOf<EmailThread?>(null) }
-    val appSettings by viewModel.appSettingsState.collectAsState()
-    val searchFilters by viewModel.searchFilters.collectAsState()
-    val searchResults by viewModel.searchResults.collectAsState()
+    val appSettings by viewModel.appSettingsState.collectAsStateWithLifecycle()
+    val searchFilters by viewModel.searchFilters.collectAsStateWithLifecycle()
+    val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
 
     val pullToRefreshState = rememberPullToRefreshState()
     val currentThreads = (state as? InboxState.Success)?.threads ?: emptyList()
@@ -122,9 +123,9 @@ fun InboxScreen(
     var showMoveToTrashDialog by remember { mutableStateOf(false) }
 
     val onSnoozeSelected: (EmailThread) -> Unit = remember { { thread -> snoozeThread = thread; showSnoozePicker = true } }
-    val isBulkMode by viewModel.isBulkSelectMode.collectAsState()
-    val selectedThreadIds by viewModel.selectedThreadIds.collectAsState()
-    val selectedCount by viewModel.selectedCount.collectAsState()
+    val isBulkMode by viewModel.isBulkSelectMode.collectAsStateWithLifecycle()
+    val selectedThreadIds by viewModel.selectedThreadIds.collectAsStateWithLifecycle()
+    val selectedCount by viewModel.selectedCount.collectAsStateWithLifecycle()
     var isSearchFocused by remember { mutableStateOf(false) }
     val isSearchActive = searchFilters.query.isNotEmpty()
     if (isSearchActive) {
@@ -821,7 +822,7 @@ fun InboxScreen(
             )
         }
             
-            val toastState by viewModel.toastState.collectAsState()
+            val toastState by viewModel.toastState.collectAsStateWithLifecycle()
             Box {
                 TopAlertBanner(
                     toastState = toastState,
