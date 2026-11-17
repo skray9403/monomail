@@ -19,7 +19,7 @@ import java.security.SecureRandom
 
 object GoogleAuthHelperImpl : GoogleAuthHelper {
     private const val TAG = "GoogleAuth"
-    private const val EXPECTED_WEB_CLIENT_ID = "193693002878-ajpu4r5m7f5qjr20v9a1g7qj0c58iqod.apps.googleusercontent.com"
+    private const val EXPECTED_WEB_CLIENT_ID = "193693002878-ajpu4r5m7f5qjr20v9a1g7qi0c58iqod.apps.googleusercontent.com"
 
     override suspend fun clearToken(context: Context, token: String) {
         android.util.Log.d(TAG, "clearToken: Clearing token from GoogleAuthUtil cache")
@@ -76,6 +76,7 @@ object GoogleAuthHelperImpl : GoogleAuthHelper {
 
         val credentialManager = CredentialManager.create(context)
 
+        // Stage 1: Attempt GetGoogleIdOption (bottom sheet / one-tap sign-in)
         try {
             android.util.Log.d(TAG, "[GetGoogleIdOption] Building request (filterByAuthorizedAccounts=false)...")
             val googleIdOption = GetGoogleIdOption.Builder()
@@ -93,89 +94,69 @@ object GoogleAuthHelperImpl : GoogleAuthHelper {
             val result = credentialManager.getCredential(request = request, context = context)
             android.util.Log.i(TAG, "[GetGoogleIdOption] Credential received successfully.")
             return parseGoogleCredential(result, "GetGoogleIdOption")
-        } catch (e: NoCredentialException) {
-            android.util.Log.w(
-                TAG,
-                "[GetGoogleIdOption] No credentials found (NoCredentialException); trying explicit Google sign-in fallback.",
-                e
-            )
-
-            try {
-                android.util.Log.d(TAG, "[GetSignInWithGoogleOption] Building fallback request...")
-                val signInOption = GetSignInWithGoogleOption.Builder(cleanClientId)
-                    .setNonce(generateNonce())
-                    .build()
-
-                val fallbackRequest = GetCredentialRequest.Builder()
-                    .addCredentialOption(signInOption)
-                    .build()
-
-                android.util.Log.d(TAG, "[GetSignInWithGoogleOption] Calling credentialManager.getCredential...")
-                val result = credentialManager.getCredential(
-                    request = fallbackRequest,
-                    context = context
-                )
-                android.util.Log.i(TAG, "[GetSignInWithGoogleOption] Credential received successfully.")
-                return parseGoogleCredential(result, "GetSignInWithGoogleOption")
-            } catch (fallbackError: GetCredentialCancellationException) {
-                android.util.Log.i(TAG, "[GetSignInWithGoogleOption] Sign-in cancelled or dismissed: ${fallbackError.message}")
-                throw GoogleAuthException("Google sign-in cancelled: ${fallbackError.message ?: "User cancelled"} (GetSignInWithGoogleOption)", null, fallbackError)
-            } catch (fallbackError: GetCredentialException) {
-                android.util.Log.e(
-                    TAG,
-                    "[GetSignInWithGoogleOption] Explicit Sign in with Google failed: type=${fallbackError.type}, message=${fallbackError.message}",
-                    fallbackError
-                )
-                try {
-                    credentialManager.clearCredentialState(ClearCredentialStateRequest())
-                } catch (clearError: Exception) {
-                    android.util.Log.w(TAG, "Could not clear Credential Manager state after failed sign-in.", clearError)
-                }
-                throw GoogleAuthException(
-                    "Google sign-in failed (GetSignInWithGoogleOption): [${fallbackError.type}] ${fallbackError.message ?: fallbackError.type} ($clientDiagnostic)",
-                    null,
-                    fallbackError
-                )
-            } catch (fallbackError: Exception) {
-                android.util.Log.e(
-                    TAG,
-                    "[GetSignInWithGoogleOption] Unexpected error: ${fallbackError::class.java.simpleName}: ${fallbackError.message}",
-                    fallbackError
-                )
-                try {
-                    credentialManager.clearCredentialState(ClearCredentialStateRequest())
-                } catch (clearError: Exception) {
-                    android.util.Log.w(TAG, "Could not clear Credential Manager state after failed sign-in.", clearError)
-                }
-                throw GoogleAuthException(
-                    "Google sign-in failed (GetSignInWithGoogleOption): ${fallbackError.message ?: fallbackError::class.java.simpleName} ($clientDiagnostic)",
-                    null,
-                    fallbackError
-                )
-            }
         } catch (e: GetCredentialCancellationException) {
             android.util.Log.i(TAG, "[GetGoogleIdOption] Account selection cancelled or dismissed: ${e.message}")
             throw GoogleAuthException("Google sign-in cancelled: ${e.message ?: "User cancelled"} (GetGoogleIdOption)", null, e)
-        } catch (e: GetCredentialCustomException) {
-            android.util.Log.e(TAG, "[GetGoogleIdOption] GetCredentialCustomException: type=${e.type}, message=${e.message}", e)
-            throw GoogleAuthException(
-                "Google sign-in failed (GetGoogleIdOption): [${e.type}] ${e.message ?: e.type} ($clientDiagnostic)",
-                null,
-                e
-            )
-        } catch (e: GetCredentialException) {
-            android.util.Log.e(TAG, "[GetGoogleIdOption] Credential Manager failed: type=${e.type}, message=${e.message}", e)
-            throw GoogleAuthException(
-                "Google sign-in failed (GetGoogleIdOption): [${e.type}] ${e.message ?: e.type} ($clientDiagnostic)",
-                null,
-                e
-            )
         } catch (e: Exception) {
-            android.util.Log.e(TAG, "[GetGoogleIdOption] Unexpected Google sign-in error: ${e::class.java.simpleName}: ${e.message}", e)
-            throw GoogleAuthException(
-                "Google sign-in failed (GetGoogleIdOption): ${e.message ?: e::class.java.simpleName} ($clientDiagnostic)",
-                null,
+            android.util.Log.w(
+                TAG,
+                "[GetGoogleIdOption] Failed with [${e::class.java.simpleName}] ${e.message}; attempting explicit GetSignInWithGoogleOption fallback...",
                 e
+            )
+        }
+
+        // Stage 2: Fallback to GetSignInWithGoogleOption (explicit account picker dialog)
+        try {
+            android.util.Log.d(TAG, "[GetSignInWithGoogleOption] Building fallback request...")
+            val signInOption = GetSignInWithGoogleOption.Builder(cleanClientId)
+                .setNonce(generateNonce())
+                .build()
+
+            val fallbackRequest = GetCredentialRequest.Builder()
+                .addCredentialOption(signInOption)
+                .build()
+
+            android.util.Log.d(TAG, "[GetSignInWithGoogleOption] Calling credentialManager.getCredential...")
+            val result = credentialManager.getCredential(
+                request = fallbackRequest,
+                context = context
+            )
+            android.util.Log.i(TAG, "[GetSignInWithGoogleOption] Credential received successfully.")
+            return parseGoogleCredential(result, "GetSignInWithGoogleOption")
+        } catch (fallbackError: GetCredentialCancellationException) {
+            android.util.Log.i(TAG, "[GetSignInWithGoogleOption] Sign-in cancelled or dismissed: ${fallbackError.message}")
+            throw GoogleAuthException("Google sign-in cancelled: ${fallbackError.message ?: "User cancelled"} (GetSignInWithGoogleOption)", null, fallbackError)
+        } catch (fallbackError: GetCredentialException) {
+            android.util.Log.e(
+                TAG,
+                "[GetSignInWithGoogleOption] Explicit Sign in with Google failed: type=${fallbackError.type}, message=${fallbackError.message}",
+                fallbackError
+            )
+            try {
+                credentialManager.clearCredentialState(ClearCredentialStateRequest())
+            } catch (clearError: Exception) {
+                android.util.Log.w(TAG, "Could not clear Credential Manager state after failed sign-in.", clearError)
+            }
+            throw GoogleAuthException(
+                "Google sign-in failed (GetSignInWithGoogleOption): [${fallbackError.type}] ${fallbackError.message ?: fallbackError.type} ($clientDiagnostic)",
+                null,
+                fallbackError
+            )
+        } catch (fallbackError: Exception) {
+            android.util.Log.e(
+                TAG,
+                "[GetSignInWithGoogleOption] Unexpected error: ${fallbackError::class.java.simpleName}: ${fallbackError.message}",
+                fallbackError
+            )
+            try {
+                credentialManager.clearCredentialState(ClearCredentialStateRequest())
+            } catch (clearError: Exception) {
+                android.util.Log.w(TAG, "Could not clear Credential Manager state after failed sign-in.", clearError)
+            }
+            throw GoogleAuthException(
+                "Google sign-in failed (GetSignInWithGoogleOption): ${fallbackError.message ?: fallbackError::class.java.simpleName} ($clientDiagnostic)",
+                null,
+                fallbackError
             )
         }
     }
