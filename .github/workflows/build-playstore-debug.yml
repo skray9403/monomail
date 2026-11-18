@@ -40,6 +40,9 @@ jobs:
           mkdir -p ~/.android
           cp debug.keystore ~/.android/debug.keystore
 
+      - name: Run core data regression tests
+        run: ./gradlew :core:data:testPlaystoreDebugUnitTest
+
       - name: Build playstoreDebug APK
         run: ./gradlew assemblePlaystoreDebug
 
