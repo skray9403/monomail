@@ -322,10 +322,30 @@ fun NavGraph(
             startDestination = startDestination,
             enterTransition = { slideInForRoute(motionScheme) },
             exitTransition = { slideOutForRoute(motionScheme) },
-            // Use Navigation Compose's built-in predictive-back transition.
-            // Its transition is seekable by the platform gesture from either edge.
-            popEnterTransition = { fadeIn(animationSpec = motionScheme.fastEffectsSpec()) },
-            popExitTransition = { fadeOut(animationSpec = motionScheme.fastEffectsSpec()) },
+            // Keep drill-down back navigation spatial. Navigation Compose makes these
+            // transitions seekable, so Android's predictive-back gesture drives the
+            // same motion continuously and can reverse it when the gesture is cancelled.
+            // initialState is the screen being popped (the outgoing destination).
+            popEnterTransition = {
+                if (routeType(initialState.destination.route) == "drill") {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Start,
+                        animationSpec = NavSpatialSpec,
+                    )
+                } else {
+                    fadeIn(animationSpec = motionScheme.fastEffectsSpec())
+                }
+            },
+            popExitTransition = {
+                if (routeType(initialState.destination.route) == "drill") {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.End,
+                        animationSpec = NavSpatialSpec,
+                    )
+                } else {
+                    fadeOut(animationSpec = motionScheme.fastEffectsSpec())
+                }
+            },
         ) {
             composable(Screen.Onboarding.route) {
                 val onboardingScope = androidx.compose.runtime.rememberCoroutineScope()
