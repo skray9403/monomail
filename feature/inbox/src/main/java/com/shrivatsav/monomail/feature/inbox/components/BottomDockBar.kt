@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.semantics.Role
@@ -52,7 +51,7 @@ internal fun BottomDockBar(
             .height(64.dp),
         shape = RoundedCornerShape(percent = 50),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        contentColor = MaterialTheme.colorScheme.onSurface,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         tonalElevation = 1.dp,
         shadowElevation = 5.dp,
     ) {
@@ -85,7 +84,7 @@ internal fun BottomDockBar(
                                 .fillMaxWidth()
                                 .height(48.dp),
                             shape = RoundedCornerShape(percent = 50),
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            color = MaterialTheme.colorScheme.primaryContainer,
                         ) {
                             Row(
                                 modifier = Modifier
@@ -99,11 +98,13 @@ internal fun BottomDockBar(
                                     imageVector = id.icon(unifiedInboxEnabled),
                                     contentDescription = null,
                                     modifier = Modifier.size(22.dp),
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 )
                                 Text(
                                     text = id.label(unifiedInboxEnabled),
                                     modifier = Modifier.padding(start = 7.dp),
                                     style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -113,6 +114,7 @@ internal fun BottomDockBar(
                         Text(
                             text = id.label(unifiedInboxEnabled),
                             style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
