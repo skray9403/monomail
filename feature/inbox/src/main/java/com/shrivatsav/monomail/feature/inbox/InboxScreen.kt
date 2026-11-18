@@ -421,8 +421,8 @@ fun InboxScreen(
                                                 illustration = com.shrivatsav.monomail.ui.components.IllustrationType.PAPER_PLANE
                                                 title = "Nothing sent yet"
                                                 subtitle = "Your sent emails will appear here."
-                                                ctaText = "Compose"
-                                                onCtaClick = { navActions.onCompose() }
+                                                ctaText = null
+                                                onCtaClick = null
                                             }
                                             InboxTab.STARRED -> {
                                                 illustration = com.shrivatsav.monomail.ui.components.IllustrationType.INBOX_ZERO
@@ -1163,43 +1163,43 @@ private fun BottomFabArea(
     navBarHeight: Dp,
     onMoveSpamToTrash: () -> Unit,
 ) {
-    Column(
+    // Follow the Google Photos-style floating composition: a destination pill
+    // and an independent circular primary action on one horizontal baseline.
+    // Keep a 16dp safe-area gap above gesture navigation and 16dp screen gutters.
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = navBarHeight + 12.dp),
-        horizontalAlignment = Alignment.End,
+            .padding(
+                start = 16.dp,
+                end = 16.dp,
+                bottom = navBarHeight + 16.dp,
+            ),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(end = 16.dp),
-        ) {
-            AnimatedContent(
-                targetState = if (immediateTab == InboxTab.SPAM) "spam" else "default",
-                label = "FabIconMorph",
-                modifier = Modifier.align(Alignment.CenterEnd),
-                transitionSpec = {
-                    (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.85f)) togetherWith
-                        (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.85f))
-                }
-            ) { state ->
-                when (state) {
-                    "spam" -> MoveToTrashFab(onMoveSpamToTrash)
-                    else -> ComposeFab(navActions.onCompose)
-                }
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-
         BottomDockBar(
             currentTab = immediateTab,
             dockConfig = appSettings.dockConfig,
             unifiedInboxEnabled = unifiedInboxEnabled,
             appSettings = appSettings,
             onTabClick = { viewModel.switchTab(it) },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            modifier = Modifier.weight(1f),
         )
+
+        AnimatedContent(
+            targetState = immediateTab == InboxTab.SPAM,
+            label = "InboxFloatingAction",
+            transitionSpec = {
+                (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.88f)) togetherWith
+                    (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.88f))
+            },
+        ) { isSpam ->
+            if (isSpam) {
+                MoveToTrashFab(onMoveSpamToTrash)
+            } else {
+                ComposeFab(navActions.onCompose)
+            }
+        }
     }
 }
 
