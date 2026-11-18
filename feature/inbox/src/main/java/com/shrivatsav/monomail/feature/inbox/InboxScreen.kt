@@ -1,5 +1,7 @@
 package com.shrivatsav.monomail.feature.inbox
 
+import android.text.format.DateFormat as AndroidDateFormat
+
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -50,6 +52,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
@@ -108,6 +111,7 @@ fun InboxScreen(
 
     var threadToDelete by remember { mutableStateOf<EmailThread?>(null) }
     val appSettings by viewModel.appSettingsState.collectAsStateWithLifecycle()
+    val is24HourTime = AndroidDateFormat.is24HourFormat(LocalContext.current)
     val searchFilters by viewModel.searchFilters.collectAsStateWithLifecycle()
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
 
@@ -160,10 +164,10 @@ fun InboxScreen(
             snackbarHostState.showSnackbar(errorMsg)
         }
     }
-    val currentAppSettings by rememberUpdatedState(appSettings)
+    val currentIs24HourTime by rememberUpdatedState(is24HourTime)
     LaunchedEffect(Unit) {
         viewModel.scheduledEmailEvents.collect { event ->
-            val pattern = if (currentAppSettings.use24HourTime) "MMM dd, HH:mm" else "MMM dd, hh:mm a"
+            val pattern = if (currentIs24HourTime) "MMM dd, HH:mm" else "MMM dd, hh:mm a"
             val formatted = java.text.SimpleDateFormat(pattern, java.util.Locale.getDefault())
                 .format(java.util.Date(event.scheduledAt))
             snackbarHostState.showSnackbar(
@@ -744,7 +748,6 @@ fun InboxScreen(
                 LongPressMenu(
                     thread = thread,
                     state = state,
-                    use24HourTime = appSettings.use24HourTime,
                     onDismiss = { longPressedThread = null },
                     actions = LongPressMenuActions(
                         onEmailClick = { navActions.onEmailClick(thread.accountId, thread.threadId, thread.latestMessageId) },
@@ -1251,7 +1254,6 @@ private fun LongPressMenu(
     thread: EmailThread,
     state: InboxState,
     onDismiss: () -> Unit,
-    use24HourTime: Boolean,
     actions: LongPressMenuActions
 ) {
     val tabForMenu = (state as? InboxState.Success)?.currentTab ?: InboxTab.INBOX
@@ -1332,7 +1334,6 @@ private fun LongPressMenu(
                         actions.onEmailClick()
                     },
                     onLongClick = {},
-                    use24HourTime = use24HourTime,
                 )
             }
 
