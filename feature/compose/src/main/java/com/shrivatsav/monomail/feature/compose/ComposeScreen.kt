@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -76,13 +77,14 @@ import androidx.compose.material.icons.rounded.FormatUnderlined
 import androidx.compose.material.icons.automirrored.rounded.FormatListBulleted
 import androidx.compose.material.icons.rounded.FormatListNumbered
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -1160,6 +1162,7 @@ private fun QuotedBodySection(originalBody: String) {
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ComposeBottomBar(
     isSending: Boolean,
@@ -1169,40 +1172,59 @@ private fun ComposeBottomBar(
     onDraftsClick: () -> Unit,
     onSend: () -> Unit
 ) {
-    BottomAppBar(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 3.dp,
-        contentPadding = PaddingValues(horizontal = 8.dp),
+    // Keep the toolbar detached from the system gesture area. The IME inset is
+    // consumed here as well, so the actions remain reachable while composing.
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .imePadding()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        IconButton(onClick = onDraftsClick, enabled = !isSending && !isSent) {
-            Icon(
-                imageVector = Icons.Rounded.Drafts,
-                contentDescription = "Drafts",
-            )
-        }
-        IconButton(onClick = onAttach, enabled = !isSending && !isSent) {
-            Icon(
-                imageVector = Icons.Rounded.AttachFile,
-                contentDescription = "Attach",
-            )
-        }
-        Spacer(Modifier.weight(1f))
-        when {
-            isSending -> LoadingIndicator(
-                modifier = Modifier.size(36.dp),
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            !isSent -> IconButton(
-                onClick = onSend,
-                enabled = canSend,
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.Send,
-                    contentDescription = "Send",
-                )
+        HorizontalFloatingToolbar(
+            expanded = true,
+            modifier = Modifier.fillMaxWidth(),
+            colors = FloatingToolbarDefaults.standardFloatingToolbarColors(),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            expandedShadowElevation = 8.dp,
+            content = {
+                IconButton(
+                    onClick = onDraftsClick,
+                    enabled = !isSending && !isSent,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Drafts,
+                        contentDescription = "Drafts",
+                    )
+                }
+                IconButton(
+                    onClick = onAttach,
+                    enabled = !isSending && !isSent,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.AttachFile,
+                        contentDescription = "Attach",
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                when {
+                    isSending -> LoadingIndicator(
+                        modifier = Modifier.size(36.dp),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    !isSent -> IconButton(
+                        onClick = onSend,
+                        enabled = canSend,
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.Send,
+                            contentDescription = "Send",
+                        )
+                    }
+                }
             }
-        }
+        )
     }
 }
 
