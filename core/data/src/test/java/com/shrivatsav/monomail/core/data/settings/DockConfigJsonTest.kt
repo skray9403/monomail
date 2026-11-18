@@ -33,4 +33,30 @@ class DockConfigJsonTest {
         assertEquals(DockConfig.defaults(), SettingsDataStore.parseDockConfigJson("not-json"))
         assertEquals(DockConfig.defaults(), SettingsDataStore.parseDockConfigJson("""{"primaryTabs":[]}"""))
     }
+
+    @Test
+    fun ignoresNonStringAndUnifiedTabs() {
+        assertEquals(
+            listOf(DockTabId.STARRED, DockTabId.SNOOZED),
+            SettingsDataStore.parseDockConfigJson(
+                """{"primaryTabs":["UNIFIED",true,17,"STARRED","SNOOZED"]}"""
+            ).primaryTabs
+        )
+    }
+
+    @Test
+    fun normalizedConfigAlwaysHasAtMostThreeVisibleTabs() {
+        assertEquals(
+            listOf(DockTabId.INBOX, DockTabId.SENT, DockTabId.ARCHIVED),
+            DockConfig.normalized(
+                listOf(
+                    DockTabId.UNIFIED,
+                    DockTabId.INBOX,
+                    DockTabId.SENT,
+                    DockTabId.ARCHIVED,
+                    DockTabId.SPAM
+                )
+            ).primaryTabs
+        )
+    }
 }
