@@ -74,6 +74,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -1341,7 +1342,7 @@ private fun EmailWebViewCard(
                     }
                 )
                     if (!isLoaded && loadError == null) {
-                        EmailBodyLoadingSkeleton(modifier = Modifier.matchParentSize().padding(12.dp))
+                        EmailBodyLoadingSkeleton(modifier = Modifier.fillMaxSize().padding(12.dp))
                     }
                 }
             }
