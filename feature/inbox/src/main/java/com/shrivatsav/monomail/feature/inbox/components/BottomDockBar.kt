@@ -60,7 +60,8 @@ internal fun BottomDockBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .padding(horizontal = 6.dp, vertical = 6.dp),
+                // Give the selected capsule equal optical breathing room.
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             space = 4.dp,
         ) {
             primaryIds.forEachIndexed { index, id ->

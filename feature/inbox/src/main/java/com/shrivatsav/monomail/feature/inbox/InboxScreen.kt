@@ -239,22 +239,6 @@ fun InboxScreen(
                         unifiedInboxEnabled = unifiedInboxEnabled
                     )
 
-                    // A short feather blends the search header into the scrolling
-                    // content without blurring rows or adding a visible divider.
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(16.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    colorStops = arrayOf(
-                                        0.0f to MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.24f),
-                                        1.0f to MaterialTheme.colorScheme.background.copy(alpha = 0.0f),
-                                    )
-                                )
-                            )
-                    )
-
                     SearchFilterBar(
                         filters = searchFilters,
                         onFiltersChanged = { viewModel.updateSearch(it) },
@@ -377,11 +361,31 @@ fun InboxScreen(
                                     }
                                 }
                             }
+                            val searchFeatherColor = MaterialTheme.colorScheme.background
                             PullToRefreshBox(
                                 isRefreshing = s.isRefreshing,
                                 onRefresh = { viewModel.refresh() },
                                 state = pullToRefreshState,
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    // Draw over the first rows, not in the gap above them.
+                                    // This makes the header blend into scrolling content.
+                                    .drawWithContent {
+                                        drawContent()
+                                        val featherHeight = 30.dp.toPx()
+                                        drawRect(
+                                            brush = Brush.verticalGradient(
+                                                colorStops = arrayOf(
+                                                    0.0f to searchFeatherColor.copy(alpha = 0.96f),
+                                                    0.45f to searchFeatherColor.copy(alpha = 0.72f),
+                                                    1.0f to searchFeatherColor.copy(alpha = 0.0f),
+                                                ),
+                                                startY = 0f,
+                                                endY = featherHeight,
+                                            ),
+                                            size = Size(size.width, featherHeight),
+                                        )
+                                    },
                                 indicator = {}
                             ) {
                                 if (threadsToDisplay.isEmpty()) {
@@ -722,6 +726,17 @@ fun InboxScreen(
                                 0.0f to MaterialTheme.colorScheme.background.copy(alpha = 0.0f),
                                 0.58f to MaterialTheme.colorScheme.background.copy(alpha = 0.18f),
                                 1.0f to MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
+                            )
+                        )
+                    )
+                    // Very subtle side shading, confined to the floating dock zone.
+                    .background(
+                        Brush.horizontalGradient(
+                            colorStops = arrayOf(
+                                0.0f to MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f),
+                                0.14f to Color.Transparent,
+                                0.86f to Color.Transparent,
+                                1.0f to MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f),
                             )
                         )
                     )

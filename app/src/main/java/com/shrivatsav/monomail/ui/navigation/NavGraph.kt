@@ -14,7 +14,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -51,9 +50,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import androidx.navigation.compose.rememberNavController
-import androidx.navigationevent.NavigationEvent
-import androidx.navigationevent.NavigationEventTransitionState
-import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import androidx.navigation.navArgument
 import com.shrivatsav.monomail.core.data.auth.AuthManager
 import com.shrivatsav.monomail.core.data.repository.EmailRepository
@@ -274,66 +270,6 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.popEnterForRoute(
-    motionScheme: MotionScheme
-): EnterTransition = when (routeType(initialState.destination.route)) {
-    "compose" ->
-        scaleIn(
-            initialScale = 0.94f,
-            animationSpec = NavFloatSpec,
-        )
-    "drill" ->
-        fadeIn(
-            animationSpec = motionScheme.fastEffectsSpec(),
-            initialAlpha = 0.85f,
-        )
-    else -> fadeIn(animationSpec = motionScheme.fastEffectsSpec())
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.popExitForRoute(
-    motionScheme: MotionScheme,
-    backSwipeEdge: Int,
-): ExitTransition = when (routeType(initialState.destination.route)) {
-    "compose" ->
-        slideOutOfContainer(
-            AnimatedContentTransitionScope.SlideDirection.Down,
-            animationSpec = NavSpatialSpec,
-        ) +
-            scaleOut(
-                targetScale = 0.965f,
-                animationSpec = NavFloatSpec,
-            )
-    "drill" -> when (backSwipeEdge) {
-        NavigationEvent.EDGE_RIGHT ->
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = NavSpatialSpec,
-                targetOffset = { fullWidth -> (fullWidth * 0.22f).toInt() },
-            ) +
-                scaleOut(
-                    targetScale = 0.92f,
-                    transformOrigin = TransformOrigin(0.95f, 0.5f),
-                    animationSpec = NavFloatSpec,
-                )
-        NavigationEvent.EDGE_LEFT ->
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = NavSpatialSpec,
-                targetOffset = { fullWidth -> (fullWidth * 0.22f).toInt() },
-            ) +
-                scaleOut(
-                    targetScale = 0.92f,
-                    transformOrigin = TransformOrigin(0.05f, 0.5f),
-                    animationSpec = NavFloatSpec,
-                )
-        else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
-    }
-    else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
-}
-
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun NavGraph(
     authManager: AuthManager,
@@ -345,24 +281,8 @@ fun NavGraph(
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val motionScheme = MaterialTheme.motionScheme
 
-    // Observe the Activity's native predictive-back stream without registering
-    // another handler. Navigation Compose remains responsible for consuming back.
-    val navigationEventDispatcher =
-        LocalNavigationEventDispatcherOwner.current?.navigationEventDispatcher
-    var backSwipeEdge by remember { mutableStateOf(NavigationEvent.EDGE_NONE) }
-    LaunchedEffect(navigationEventDispatcher) {
-        val dispatcher = navigationEventDispatcher ?: return@LaunchedEffect
-        dispatcher.transitionState.collect { transition ->
-            val inProgress = transition as? NavigationEventTransitionState.InProgress
-                ?: return@collect
-            if (inProgress.direction == NavigationEventTransitionState.TRANSITIONING_BACK) {
-                // EDGE_NONE covers button/keyboard back; real gestures report
-                // EDGE_LEFT or EDGE_RIGHT.
-                val edge = inProgress.latestEvent.swipeEdge
-                if (backSwipeEdge != edge) backSwipeEdge = edge
-            }
-        }
-    }
+    // Navigation Compose owns the system predictive-back gesture, progress,
+    // cancellation and completion. Avoid a second gesture observer here.
     var isLoading by remember { mutableStateOf(true) }
     var isAuthenticated by remember { mutableStateOf(false) }
     var hasSeenWelcomePrompt by remember { mutableStateOf(false) }
@@ -402,8 +322,10 @@ fun NavGraph(
             startDestination = startDestination,
             enterTransition = { slideInForRoute(motionScheme) },
             exitTransition = { slideOutForRoute(motionScheme) },
-            popEnterTransition = { popEnterForRoute(motionScheme) },
-            popExitTransition = { popExitForRoute(motionScheme, backSwipeEdge) }
+            // Use Navigation Compose's built-in predictive-back transition.
+            // Its transition is seekable by the platform gesture from either edge.
+            popEnterTransition = { fadeIn(animationSpec = motionScheme.fastEffectsSpec()) },
+            popExitTransition = { fadeOut(animationSpec = motionScheme.fastEffectsSpec()) },
         ) {
             composable(Screen.Onboarding.route) {
                 val onboardingScope = androidx.compose.runtime.rememberCoroutineScope()
