@@ -46,17 +46,18 @@ fun SettingsScreen(
     viewModel: SettingsViewModel,
     authManager: com.shrivatsav.monomail.core.data.auth.AuthManager,
     onNavigateBack: () -> Unit,
+    onNavigateToSection: (SettingsSection) -> Unit = {},
     onNavigateToLegal: (String) -> Unit,
     onNavigateToPgpKeys: () -> Unit = {},
 ) {
-    var currentSection by remember { mutableStateOf<SettingsSection?>(null) }
-    BackHandler(currentSection != null) { currentSection = null }
-
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
-    val motionScheme = MaterialTheme.motionScheme
 
     if (isTablet) {
+        var currentSection by remember { mutableStateOf<SettingsSection?>(null) }
+        BackHandler(currentSection != null) { currentSection = null }
+        val motionScheme = MaterialTheme.motionScheme
+
         androidx.compose.foundation.layout.Row(
             modifier = androidx.compose.ui.Modifier.fillMaxSize()
         ) {
@@ -109,64 +110,33 @@ fun SettingsScreen(
                             }
                         }
                     } else {
-                        SettingsSectionScreen(section, viewModel, authManager, onNavigateToPgpKeys) { currentSection = null }
+                        SettingsSectionScreen(
+                            section = section,
+                            viewModel = viewModel,
+                            authManager = authManager,
+                            onNavigateToPgpKeys = onNavigateToPgpKeys,
+                            onBack = { currentSection = null },
+                        )
                     }
                 }
             }
         }
     } else {
-        AnimatedContent(
-            targetState = currentSection,
-            transitionSpec = {
-                val isDrill = targetState != null
-                if (isDrill) {
-                    (
-                        slideInHorizontally(
-                            initialOffsetX = { width -> width },
-                            animationSpec = motionScheme.fastSpatialSpec(),
-                        ) + fadeIn(animationSpec = motionScheme.fastEffectsSpec())
-                    ).togetherWith(
-                        slideOutHorizontally(
-                            targetOffsetX = { width -> -width / 4 },
-                            animationSpec = motionScheme.fastSpatialSpec(),
-                        ) + fadeOut(animationSpec = motionScheme.fastEffectsSpec())
-                    )
-                } else {
-                    (
-                        slideInHorizontally(
-                            initialOffsetX = { width -> -width / 4 },
-                            animationSpec = motionScheme.fastSpatialSpec(),
-                        ) + fadeIn(animationSpec = motionScheme.fastEffectsSpec())
-                    ).togetherWith(
-                        slideOutHorizontally(
-                            targetOffsetX = { width -> width },
-                            animationSpec = motionScheme.fastSpatialSpec(),
-                        ) + fadeOut(animationSpec = motionScheme.fastEffectsSpec())
-                    )
-                }
-            },
-            label = "settingsNav"
-        ) { section ->
-            if (section == null) {
-                SettingsHubScreen(
-                    viewModel = viewModel,
-                    onSectionClick = { currentSection = it },
-                    onNavigateBack = onNavigateBack,
-                    onNavigateToLegal = onNavigateToLegal,
-                )
-            } else {
-                SettingsSectionScreen(section, viewModel, authManager, onNavigateToPgpKeys) { currentSection = null }
-            }
-        }
+        SettingsHubScreen(
+            viewModel = viewModel,
+            onSectionClick = onNavigateToSection,
+            onNavigateBack = onNavigateBack,
+            onNavigateToLegal = onNavigateToLegal,
+        )
     }
 }
 
 @Composable
-private fun SettingsSectionScreen(
+fun SettingsSectionScreen(
     section: SettingsSection,
     viewModel: SettingsViewModel,
     authManager: com.shrivatsav.monomail.core.data.auth.AuthManager,
-    onNavigateToPgpKeys: () -> Unit,
+    onNavigateToPgpKeys: () -> Unit = {},
     onBack: () -> Unit,
 ) {
     when (section) {

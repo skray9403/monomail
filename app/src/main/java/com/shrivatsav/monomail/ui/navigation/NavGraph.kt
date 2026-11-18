@@ -4,11 +4,16 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -103,6 +108,10 @@ sealed class Screen(val route: String) {
     }
     object Scheduled : Screen("scheduled")
     object Settings : Screen("settings")
+    object SettingsSection : Screen("settings/{section}") {
+        fun createRoute(section: com.shrivatsav.monomail.feature.settings.SettingsSection) =
+            "settings/${section.name.lowercase()}"
+    }
     object Legal : Screen("legal/{type}") {
         fun createRoute(type: String) = "legal/$type"
     }
@@ -196,75 +205,105 @@ private fun ReauthDialog(
     )
 }
 
+private val NavSpatialSpec = spring<IntOffset>(
+    dampingRatio = Spring.DampingRatioNoBouncy,
+    stiffness = Spring.StiffnessMediumLow,
+)
+
+private val NavFloatSpec = spring<Float>(
+    dampingRatio = Spring.DampingRatioNoBouncy,
+    stiffness = Spring.StiffnessMediumLow,
+)
+
 private fun routeType(route: String?): String = when {
     route?.startsWith("compose") == true -> "compose"
-    route?.startsWith("thread") == true || route?.startsWith("settings") == true -> "thread"
+    route?.startsWith("thread") == true ||
+        route?.startsWith("settings") == true ||
+        route?.startsWith("scheduled") == true ||
+        route?.startsWith("pgp_keys") == true ||
+        route?.startsWith("legal") == true ||
+        route?.startsWith("attachment-viewer") == true -> "drill"
     else -> ""
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.slideInForRoute(
     motionScheme: MotionScheme
-) = when (routeType(targetState.destination.route)) {
-    "compose" -> {
-        val spatial = motionScheme.defaultSpatialSpec<Float>()
+): EnterTransition = when (routeType(targetState.destination.route)) {
+    "compose" ->
         slideIntoContainer(
             AnimatedContentTransitionScope.SlideDirection.Up,
-            animationSpec = motionScheme.defaultSpatialSpec(),
+            animationSpec = NavSpatialSpec,
         ) +
-            fadeIn(animationSpec = motionScheme.defaultEffectsSpec()) +
-            scaleIn(initialScale = 0.965f, animationSpec = spatial)
-    }
-    "thread" ->
+            fadeIn(animationSpec = motionScheme.fastEffectsSpec()) +
+            scaleIn(
+                initialScale = 0.965f,
+                animationSpec = NavFloatSpec,
+            )
+    "drill" ->
         slideIntoContainer(
-            AnimatedContentTransitionScope.SlideDirection.Left,
-            animationSpec = motionScheme.defaultSpatialSpec(),
-        ) + fadeIn(animationSpec = motionScheme.defaultEffectsSpec())
-    else -> fadeIn(animationSpec = motionScheme.defaultEffectsSpec())
+            AnimatedContentTransitionScope.SlideDirection.Start,
+            animationSpec = NavSpatialSpec,
+        ) + fadeIn(animationSpec = motionScheme.fastEffectsSpec())
+    else -> fadeIn(animationSpec = motionScheme.fastEffectsSpec())
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.slideOutForRoute(
     motionScheme: MotionScheme
-) = when (routeType(initialState.destination.route)) {
+): ExitTransition = when (routeType(targetState.destination.route)) {
     "compose" ->
+        scaleOut(
+            targetScale = 0.985f,
+            animationSpec = NavFloatSpec,
+        ) + fadeOut(animationSpec = motionScheme.fastEffectsSpec())
+    "drill" ->
         slideOutOfContainer(
-            AnimatedContentTransitionScope.SlideDirection.Down,
-            animationSpec = motionScheme.defaultSpatialSpec(),
-        ) +
-            fadeOut(animationSpec = motionScheme.defaultEffectsSpec()) +
-            scaleOut(
-                targetScale = 0.985f,
-                animationSpec = motionScheme.defaultSpatialSpec(),
-            )
-    "thread" ->
-        slideOutOfContainer(
-            AnimatedContentTransitionScope.SlideDirection.Left,
-            animationSpec = motionScheme.defaultSpatialSpec(),
-        ) + fadeOut(animationSpec = motionScheme.defaultEffectsSpec())
-    else -> fadeOut(animationSpec = motionScheme.defaultEffectsSpec())
+            AnimatedContentTransitionScope.SlideDirection.Start,
+            animationSpec = NavSpatialSpec,
+            targetOffset = { it / 4 }
+        ) + fadeOut(animationSpec = motionScheme.fastEffectsSpec())
+    else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.popEnterForRoute(
+    motionScheme: MotionScheme
+): EnterTransition = when (routeType(initialState.destination.route)) {
+    "compose" ->
+        scaleIn(
+            initialScale = 0.985f,
+            animationSpec = NavFloatSpec,
+        ) + fadeIn(animationSpec = motionScheme.fastEffectsSpec())
+    "drill" ->
+        slideIntoContainer(
+            AnimatedContentTransitionScope.SlideDirection.End,
+            animationSpec = NavSpatialSpec,
+            initialOffset = { it / 4 }
+        ) + fadeIn(animationSpec = motionScheme.fastEffectsSpec())
+    else -> fadeIn(animationSpec = motionScheme.fastEffectsSpec())
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.popExitForRoute(
     motionScheme: MotionScheme
-) = when (routeType(initialState.destination.route)) {
+): ExitTransition = when (routeType(initialState.destination.route)) {
     "compose" ->
         slideOutOfContainer(
             AnimatedContentTransitionScope.SlideDirection.Down,
-            animationSpec = motionScheme.defaultSpatialSpec(),
+            animationSpec = NavSpatialSpec,
         ) +
-            fadeOut(animationSpec = motionScheme.defaultEffectsSpec()) +
+            fadeOut(animationSpec = motionScheme.fastEffectsSpec()) +
             scaleOut(
                 targetScale = 0.985f,
-                animationSpec = motionScheme.defaultSpatialSpec(),
+                animationSpec = NavFloatSpec,
             )
-    "thread" ->
+    "drill" ->
         slideOutOfContainer(
-            AnimatedContentTransitionScope.SlideDirection.Right,
-            animationSpec = motionScheme.defaultSpatialSpec(),
-        ) + fadeOut(animationSpec = motionScheme.defaultEffectsSpec())
-    else -> fadeOut(animationSpec = motionScheme.defaultEffectsSpec())
+            AnimatedContentTransitionScope.SlideDirection.End,
+            animationSpec = NavSpatialSpec,
+        ) + fadeOut(animationSpec = motionScheme.fastEffectsSpec())
+    else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
 }
 
 
@@ -318,13 +357,7 @@ fun NavGraph(
             startDestination = startDestination,
             enterTransition = { slideInForRoute(motionScheme) },
             exitTransition = { slideOutForRoute(motionScheme) },
-            popEnterTransition = {
-                fadeIn(animationSpec = motionScheme.defaultEffectsSpec()) +
-                    scaleIn(
-                        initialScale = 1.015f,
-                        animationSpec = motionScheme.defaultSpatialSpec(),
-                    )
-            },
+            popEnterTransition = { popEnterForRoute(motionScheme) },
             popExitTransition = { popExitForRoute(motionScheme) }
         ) {
             composable(Screen.Onboarding.route) {
@@ -524,11 +557,48 @@ fun NavGraph(
                     viewModel = settingsViewModel,
                     authManager = authManager,
                     onNavigateBack = { navController.popBackStack() },
+                    onNavigateToSection = { section ->
+                        navController.navigate(Screen.SettingsSection.createRoute(section)) {
+                            launchSingleTop = true
+                        }
+                    },
                     onNavigateToLegal = { type -> openLegalUrl(ctx, type) },
                     onNavigateToPgpKeys = {
                         navController.navigate(Screen.PgpKeys.route) { launchSingleTop = true }
                     },
                 )
+            }
+
+            composable(
+                route = Screen.SettingsSection.route,
+                arguments = listOf(navArgument("section") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val sectionName = backStackEntry.arguments?.getString("section")
+                val section = remember(sectionName) {
+                    com.shrivatsav.monomail.feature.settings.SettingsSection.entries.find {
+                        it.name.equals(sectionName, ignoreCase = true)
+                    }
+                }
+                val parentEntry = remember(backStackEntry) {
+                    runCatching { navController.getBackStackEntry(Screen.Settings.route) }.getOrNull()
+                }
+                val settingsViewModel: SettingsViewModel = if (parentEntry != null) {
+                    hiltViewModel(parentEntry)
+                } else {
+                    hiltViewModel()
+                }
+
+                if (section != null) {
+                    com.shrivatsav.monomail.feature.settings.SettingsSectionScreen(
+                        section = section,
+                        viewModel = settingsViewModel,
+                        authManager = authManager,
+                        onNavigateToPgpKeys = {
+                            navController.navigate(Screen.PgpKeys.route) { launchSingleTop = true }
+                        },
+                        onBack = { navController.popBackStack() }
+                    )
+                }
             }
 
             composable(Screen.PgpKeys.route) {
