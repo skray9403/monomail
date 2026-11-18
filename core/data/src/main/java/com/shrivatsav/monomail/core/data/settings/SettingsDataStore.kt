@@ -154,7 +154,8 @@ class SettingsDataStore(private val context: Context) {
     }
 
 
-    internal fun parseDockConfigJson(json: String?): DockConfig {
+    companion object {
+        internal fun parseDockConfigJson(json: String?): DockConfig {
         if (json.isNullOrBlank()) return DockConfig.defaults()
         return try {
             val root = com.google.gson.JsonParser.parseString(json)
@@ -167,6 +168,7 @@ class SettingsDataStore(private val context: Context) {
             DockConfig.normalized(tabs)
         } catch (_: Exception) {
             DockConfig.defaults()
+        }
         }
     }
 
