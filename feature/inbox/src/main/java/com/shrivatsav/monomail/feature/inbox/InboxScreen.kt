@@ -220,6 +220,7 @@ fun InboxScreen(
                             scheduledCount = scheduledCount,
                             onUndo = { viewModel.undoAction() },
                             onOpenProfile = { activeModal = ModalType.PROFILE },
+                            onOpenFolders = { activeModal = ModalType.FOLDERS },
                             showMarkAllRead = appSettings.showMarkAllRead
                         ),
                         isRefreshing = isRefreshing,
@@ -784,10 +785,15 @@ fun InboxScreen(
                     onShowSwitchAccount = { activeModal = ModalType.SWITCH_ACCOUNT },
                     onBackToProfile = { activeModal = ModalType.PROFILE },
                     onSettings = { activeModal = null; navActions.onSettings() },
+                    onSelectFolder = {
+                        viewModel.switchTab(it)
+                        activeModal = null
+                    },
                     onNavigateToImapSetup = navActions.onNavigateToImapSetup,
                     onToggleUnified = { viewModel.setUnifiedInboxEnabled(it) }
                 ),
-                unifiedInboxEnabled = unifiedInboxEnabled
+                unifiedInboxEnabled = unifiedInboxEnabled,
+                currentTab = immediateTab,
             )
         }
             
