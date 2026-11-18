@@ -3,6 +3,7 @@ package com.shrivatsav.monomail.feature.inbox.components
 import com.shrivatsav.monomail.feature.inbox.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
