@@ -18,6 +18,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -202,69 +203,69 @@ private fun routeType(route: String?): String = when {
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.slideInForRoute() =
-    when (routeType(targetState.destination.route)) {
-        "compose" -> {
-            val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-            slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.Up,
-                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-            ) +
-                fadeIn(animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec()) +
-                scaleIn(initialScale = 0.965f, animationSpec = spatial)
-        }
-        "thread" ->
-            slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-            ) + fadeIn(animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec())
-        else -> fadeIn(animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec())
+private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.slideInForRoute(
+    motionScheme: MotionScheme
+) = when (routeType(targetState.destination.route)) {
+    "compose" -> {
+        val spatial = motionScheme.defaultSpatialSpec<Float>()
+        slideIntoContainer(
+            AnimatedContentTransitionScope.SlideDirection.Up,
+            animationSpec = motionScheme.defaultSpatialSpec(),
+        ) +
+            fadeIn(animationSpec = motionScheme.defaultEffectsSpec()) +
+            scaleIn(initialScale = 0.965f, animationSpec = spatial)
     }
+    "thread" ->
+        slideIntoContainer(
+            AnimatedContentTransitionScope.SlideDirection.Left,
+            animationSpec = motionScheme.defaultSpatialSpec(),
+        ) + fadeIn(animationSpec = motionScheme.defaultEffectsSpec())
+    else -> fadeIn(animationSpec = motionScheme.defaultEffectsSpec())
+}
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.slideOutForRoute() =
-    when (routeType(initialState.destination.route)) {
-        "compose" ->
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Down,
-                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-            ) +
-                fadeOut(animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec()) +
-                scaleOut(
-                    targetScale = 0.985f,
-                    animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-                )
-        "thread" ->
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-            ) + fadeOut(animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec())
-        else -> fadeOut(animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec())
-    }
+private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.slideOutForRoute(
+    motionScheme: MotionScheme
+) = when (routeType(initialState.destination.route)) {
+    "compose" ->
+        slideOutOfContainer(
+            AnimatedContentTransitionScope.SlideDirection.Down,
+            animationSpec = motionScheme.defaultSpatialSpec(),
+        ) +
+            fadeOut(animationSpec = motionScheme.defaultEffectsSpec()) +
+            scaleOut(
+                targetScale = 0.985f,
+                animationSpec = motionScheme.defaultSpatialSpec(),
+            )
+    "thread" ->
+        slideOutOfContainer(
+            AnimatedContentTransitionScope.SlideDirection.Left,
+            animationSpec = motionScheme.defaultSpatialSpec(),
+        ) + fadeOut(animationSpec = motionScheme.defaultEffectsSpec())
+    else -> fadeOut(animationSpec = motionScheme.defaultEffectsSpec())
+}
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.popExitForRoute() =
-    when (routeType(initialState.destination.route)) {
-        "compose" ->
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Down,
-                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-            ) +
-                fadeOut(animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec()) +
-                scaleOut(
-                    targetScale = 0.985f,
-                    animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-                )
-        "thread" ->
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-            ) + fadeOut(animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec())
-        else -> fadeOut(animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec())
-    }
+private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.popExitForRoute(
+    motionScheme: MotionScheme
+) = when (routeType(initialState.destination.route)) {
+    "compose" ->
+        slideOutOfContainer(
+            AnimatedContentTransitionScope.SlideDirection.Down,
+            animationSpec = motionScheme.defaultSpatialSpec(),
+        ) +
+            fadeOut(animationSpec = motionScheme.defaultEffectsSpec()) +
+            scaleOut(
+                targetScale = 0.985f,
+                animationSpec = motionScheme.defaultSpatialSpec(),
+            )
+    "thread" ->
+        slideOutOfContainer(
+            AnimatedContentTransitionScope.SlideDirection.Right,
+            animationSpec = motionScheme.defaultSpatialSpec(),
+        ) + fadeOut(animationSpec = motionScheme.defaultEffectsSpec())
+    else -> fadeOut(animationSpec = motionScheme.defaultEffectsSpec())
+}
 
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -277,6 +278,7 @@ fun NavGraph(
 ) {
     val navController = rememberNavController()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val motionScheme = MaterialTheme.motionScheme
     var isLoading by remember { mutableStateOf(true) }
     var isAuthenticated by remember { mutableStateOf(false) }
     var hasSeenWelcomePrompt by remember { mutableStateOf(false) }
@@ -314,16 +316,16 @@ fun NavGraph(
         NavHost(
             navController = navController,
             startDestination = startDestination,
-            enterTransition = { slideInForRoute() },
-            exitTransition = { slideOutForRoute() },
+            enterTransition = { slideInForRoute(motionScheme) },
+            exitTransition = { slideOutForRoute(motionScheme) },
             popEnterTransition = {
-                fadeIn(animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec()) +
+                fadeIn(animationSpec = motionScheme.defaultEffectsSpec()) +
                     scaleIn(
                         initialScale = 1.015f,
-                        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                        animationSpec = motionScheme.defaultSpatialSpec(),
                     )
             },
-            popExitTransition = { popExitForRoute() }
+            popExitTransition = { popExitForRoute(motionScheme) }
         ) {
             composable(Screen.Onboarding.route) {
                 val onboardingScope = androidx.compose.runtime.rememberCoroutineScope()
