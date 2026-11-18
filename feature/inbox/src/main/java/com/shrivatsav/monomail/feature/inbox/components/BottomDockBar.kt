@@ -30,9 +30,9 @@ import com.shrivatsav.monomail.core.data.settings.DockTabId
 import com.shrivatsav.monomail.core.data.settings.AppSettings
 
 /**
- * Compact floating destination pill inspired by the Google Photos navigation
- * redesign: only the selected destination receives an icon + filled indicator;
- * sibling destinations remain lightweight text actions.
+ * Official Material 3 single-choice segmented destination control hosted in a
+ * compact floating surface. Selected destination uses the wallpaper-derived
+ * primary container; unselected destinations remain quiet text actions.
  */
 @Composable
 internal fun BottomDockBar(
@@ -43,7 +43,7 @@ internal fun BottomDockBar(
     onTabClick: (InboxTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val primaryIds = dockConfig.primaryTabs.take(4)
+    val primaryIds = dockConfig.primaryTabs.take(3)
 
     Surface(
         modifier = modifier
@@ -51,75 +51,56 @@ internal fun BottomDockBar(
             .height(64.dp),
         shape = RoundedCornerShape(percent = 50),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 1.dp,
         shadowElevation = 5.dp,
     ) {
-        Row(
+        androidx.compose.material3.SingleChoiceSegmentedButtonRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
                 .padding(horizontal = 6.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            space = 0.dp,
         ) {
-            primaryIds.forEach { id ->
+            primaryIds.forEachIndexed { index, id ->
                 val tab = id.toInboxTab()
                 val selected = currentTab == tab
-                Row(
-                    modifier = Modifier
-                        .weight(if (selected) 1.45f else 1f)
-                        .fillMaxHeight()
-                        .selectable(
-                            selected = selected,
-                            onClick = { onTabClick(tab) },
-                            role = Role.Tab,
-                        ),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (selected) {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp),
-                            shape = RoundedCornerShape(percent = 50),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .fillMaxHeight()
-                                    .padding(horizontal = 10.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    imageVector = id.icon(unifiedInboxEnabled),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(22.dp),
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                )
-                                Text(
-                                    text = id.label(unifiedInboxEnabled),
-                                    modifier = Modifier.padding(start = 7.dp),
-                                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
+                androidx.compose.material3.SegmentedButton(
+                    selected = selected,
+                    onClick = { onTabClick(tab) },
+                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(
+                        index = index,
+                        count = primaryIds.size,
+                    ),
+                    modifier = Modifier.weight(1f),
+                    colors = androidx.compose.material3.SegmentedButtonDefaults.colors(
+                        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        inactiveContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                    border = androidx.compose.material3.SegmentedButtonDefaults.borderStroke(
+                        color = androidx.compose.ui.graphics.Color.Transparent,
+                        disabledColor = androidx.compose.ui.graphics.Color.Transparent,
+                    ),
+                    icon = {
+                        if (selected) {
+                            Icon(
+                                imageVector = id.icon(unifiedInboxEnabled),
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                            )
                         }
-                    } else {
+                    },
+                    label = {
                         Text(
                             text = id.label(unifiedInboxEnabled),
-                            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.labelLarge,
                         )
-                    }
-                }
+                    },
+                )
             }
         }
     }
