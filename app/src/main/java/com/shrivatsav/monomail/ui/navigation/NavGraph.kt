@@ -20,7 +20,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import com.shrivatsav.monomail.BackGestureTracker
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,8 +48,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import androidx.navigation.compose.rememberNavController
+import androidx.navigationevent.NavigationEvent
+import androidx.navigationevent.NavigationEventTransitionState
+import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import androidx.navigation.navArgument
 import com.shrivatsav.monomail.core.data.auth.AuthManager
 import com.shrivatsav.monomail.core.data.repository.EmailRepository
@@ -289,7 +292,8 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.popExitForRoute(
-    motionScheme: MotionScheme
+    motionScheme: MotionScheme,
+    backSwipeEdge: Int,
 ): ExitTransition = when (routeType(initialState.destination.route)) {
     "compose" ->
         slideOutOfContainer(
@@ -300,23 +304,10 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
                 targetScale = 0.965f,
                 animationSpec = NavFloatSpec,
             )
-    "drill" -> {
-        val isRight = BackGestureTracker.isRightEdge
-        if (isRight) {
+    "drill" -> when (backSwipeEdge) {
+        NavigationEvent.EDGE_RIGHT ->
             slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                animationSpec = NavSpatialSpec,
-                targetOffset = { fullWidth -> (fullWidth * 0.22f).toInt() },
-            ) +
-                scaleOut(
-                    targetScale = 0.92f,
-                    transformOrigin = TransformOrigin(0.05f, 0.5f),
-                    animationSpec = NavFloatSpec,
-                ) +
-                fadeOut(animationSpec = motionScheme.fastEffectsSpec())
-        } else {
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.End,
+                towards = AnimatedContentTransitionScope.SlideDirection.Left,
                 animationSpec = NavSpatialSpec,
                 targetOffset = { fullWidth -> (fullWidth * 0.22f).toInt() },
             ) +
@@ -324,9 +315,19 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
                     targetScale = 0.92f,
                     transformOrigin = TransformOrigin(0.95f, 0.5f),
                     animationSpec = NavFloatSpec,
-                ) +
-                fadeOut(animationSpec = motionScheme.fastEffectsSpec())
-        }
+                )
+        NavigationEvent.EDGE_LEFT ->
+            slideOutOfContainer(
+                towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                animationSpec = NavSpatialSpec,
+                targetOffset = { fullWidth -> (fullWidth * 0.22f).toInt() },
+            ) +
+                scaleOut(
+                    targetScale = 0.92f,
+                    transformOrigin = TransformOrigin(0.05f, 0.5f),
+                    animationSpec = NavFloatSpec,
+                )
+        else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
     }
     else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
 }
@@ -343,6 +344,25 @@ fun NavGraph(
     val navController = rememberNavController()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val motionScheme = MaterialTheme.motionScheme
+
+    // Observe the Activity's native predictive-back stream without registering
+    // another handler. Navigation Compose remains responsible for consuming back.
+    val navigationEventDispatcher =
+        LocalNavigationEventDispatcherOwner.current?.navigationEventDispatcher
+    var backSwipeEdge by remember { mutableStateOf(NavigationEvent.EDGE_NONE) }
+    LaunchedEffect(navigationEventDispatcher) {
+        val dispatcher = navigationEventDispatcher ?: return@LaunchedEffect
+        dispatcher.transitionState.collect { transition ->
+            val inProgress = transition as? NavigationEventTransitionState.InProgress
+                ?: return@collect
+            if (inProgress.direction == NavigationEventTransitionState.TRANSITIONING_BACK) {
+                // EDGE_NONE covers button/keyboard back; real gestures report
+                // EDGE_LEFT or EDGE_RIGHT.
+                val edge = inProgress.latestEvent.swipeEdge
+                if (backSwipeEdge != edge) backSwipeEdge = edge
+            }
+        }
+    }
     var isLoading by remember { mutableStateOf(true) }
     var isAuthenticated by remember { mutableStateOf(false) }
     var hasSeenWelcomePrompt by remember { mutableStateOf(false) }
@@ -383,7 +403,7 @@ fun NavGraph(
             enterTransition = { slideInForRoute(motionScheme) },
             exitTransition = { slideOutForRoute(motionScheme) },
             popEnterTransition = { popEnterForRoute(motionScheme) },
-            popExitTransition = { popExitForRoute(motionScheme) }
+            popExitTransition = { popExitForRoute(motionScheme, backSwipeEdge) }
         ) {
             composable(Screen.Onboarding.route) {
                 val onboardingScope = androidx.compose.runtime.rememberCoroutineScope()
