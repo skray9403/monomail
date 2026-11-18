@@ -371,11 +371,34 @@ private fun SettingsGroupDivider() {
     )
 }
 
+private fun sectionColors(section: SettingsSection, isDark: Boolean): Pair<Color, Color> {
+    val base = when (section) {
+        SettingsSection.ACCOUNTS -> Color(0xFF2563EB)
+        SettingsSection.APPEARANCE -> Color(0xFF9333EA)
+        SettingsSection.INBOX -> Color(0xFF0284C7)
+        SettingsSection.READING -> Color(0xFFD97706)
+        SettingsSection.NAVIGATION -> Color(0xFF16A34A)
+        SettingsSection.COMPOSE -> Color(0xFF4F46E5)
+        SettingsSection.PRIVACY -> Color(0xFF0D9488)
+        SettingsSection.NOTIFICATIONS -> Color(0xFFE11D48)
+        SettingsSection.DEVELOPER -> Color(0xFF64748B)
+        SettingsSection.SUPPORT -> Color(0xFFDB2777)
+    }
+    return if (isDark) {
+        Pair(base.copy(alpha = 0.25f), base.copy(alpha = 0.95f))
+    } else {
+        Pair(base.copy(alpha = 0.14f), base)
+    }
+}
+
 @Composable
 private fun SettingsHubItem(
     section: SettingsSection,
     onClick: (SettingsSection) -> Unit,
 ) {
+    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val (containerColor, iconColor) = remember(section, isDark) { sectionColors(section, isDark) }
+
     ListItem(
         modifier = Modifier
             .fillMaxWidth()
@@ -385,13 +408,13 @@ private fun SettingsHubItem(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    .background(containerColor),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = section.icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = iconColor,
                     modifier = Modifier.size(22.dp),
                 )
             }
@@ -410,7 +433,7 @@ private fun SettingsHubItem(
             Icon(
                 Icons.Rounded.ChevronRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             )
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),

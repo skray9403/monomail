@@ -1267,14 +1267,14 @@ private fun EmailWebViewCard(
     Column {
         if (htmlContent.isBlank()) {
             EmailBodyLoadingSkeleton(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp)
+                modifier = Modifier.fillMaxWidth().heightIn(min = 450.dp)
             )
         } else {
             androidx.compose.runtime.key(emailId, htmlContent, allowRemoteImages, renderGeneration) {
                 val callbackGeneration = renderGeneration
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                        .heightIn(min = 180.dp)
+                        .heightIn(min = 450.dp)
                         .clip(cornerShape(16.dp))
                         .background(cardBgColor, cornerShape(16.dp))
                 ) {

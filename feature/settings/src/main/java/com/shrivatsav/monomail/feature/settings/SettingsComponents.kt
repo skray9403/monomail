@@ -308,11 +308,28 @@ internal fun InfoRow(
     value: String,
     onClick: (() -> Unit)? = null
 ) {
+    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val bg = if (isDark) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceVariant
     ListItem(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        leadingContent = { Icon(icon, contentDescription = title) },
+        leadingContent = {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .background(bg),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = title,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        },
         headlineContent = { Text(title) },
         trailingContent = {
             if (value.isNotEmpty()) {

@@ -15,6 +15,9 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -235,7 +238,6 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
             AnimatedContentTransitionScope.SlideDirection.Up,
             animationSpec = NavSpatialSpec,
         ) +
-            fadeIn(animationSpec = motionScheme.fastEffectsSpec()) +
             scaleIn(
                 initialScale = 0.965f,
                 animationSpec = NavFloatSpec,
@@ -244,7 +246,7 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
         slideIntoContainer(
             AnimatedContentTransitionScope.SlideDirection.Start,
             animationSpec = NavSpatialSpec,
-        ) + fadeIn(animationSpec = motionScheme.fastEffectsSpec())
+        )
     else -> fadeIn(animationSpec = motionScheme.fastEffectsSpec())
 }
 
@@ -254,15 +256,14 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
 ): ExitTransition = when (routeType(targetState.destination.route)) {
     "compose" ->
         scaleOut(
-            targetScale = 0.985f,
+            targetScale = 0.94f,
             animationSpec = NavFloatSpec,
-        ) + fadeOut(animationSpec = motionScheme.fastEffectsSpec())
+        )
     "drill" ->
-        slideOutOfContainer(
-            AnimatedContentTransitionScope.SlideDirection.Start,
-            animationSpec = NavSpatialSpec,
-            targetOffset = { it / 4 }
-        ) + fadeOut(animationSpec = motionScheme.fastEffectsSpec())
+        scaleOut(
+            targetScale = 0.94f,
+            animationSpec = NavFloatSpec,
+        )
     else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
 }
 
@@ -272,15 +273,14 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
 ): EnterTransition = when (routeType(initialState.destination.route)) {
     "compose" ->
         scaleIn(
-            initialScale = 0.985f,
+            initialScale = 0.94f,
             animationSpec = NavFloatSpec,
-        ) + fadeIn(animationSpec = motionScheme.fastEffectsSpec())
+        )
     "drill" ->
-        slideIntoContainer(
-            AnimatedContentTransitionScope.SlideDirection.End,
-            animationSpec = NavSpatialSpec,
-            initialOffset = { it / 4 }
-        ) + fadeIn(animationSpec = motionScheme.fastEffectsSpec())
+        scaleIn(
+            initialScale = 0.94f,
+            animationSpec = NavFloatSpec,
+        )
     else -> fadeIn(animationSpec = motionScheme.fastEffectsSpec())
 }
 
@@ -293,16 +293,19 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
             AnimatedContentTransitionScope.SlideDirection.Down,
             animationSpec = NavSpatialSpec,
         ) +
-            fadeOut(animationSpec = motionScheme.fastEffectsSpec()) +
             scaleOut(
-                targetScale = 0.985f,
+                targetScale = 0.965f,
                 animationSpec = NavFloatSpec,
             )
     "drill" ->
         slideOutOfContainer(
             AnimatedContentTransitionScope.SlideDirection.End,
             animationSpec = NavSpatialSpec,
-        ) + fadeOut(animationSpec = motionScheme.fastEffectsSpec())
+        ) +
+            scaleOut(
+                targetScale = 0.88f,
+                animationSpec = NavFloatSpec,
+            )
     else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
 }
 
@@ -348,7 +351,7 @@ fun NavGraph(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color.Black)
     ) {
         ReauthDialog(authManager, navController, scope)
 
@@ -407,214 +410,224 @@ fun NavGraph(
                 )
             }
             composable(Screen.Inbox.route) {
-                val vm: InboxViewModel = hiltViewModel()
-                val inboxScope = androidx.compose.runtime.rememberCoroutineScope()
-                val activeAccount by authManager.activeAccountFlow.collectAsState(initial = authManager.currentUser)
-                val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-                val isTablet = configuration.screenWidthDp >= 600
-                var selectedThreadId by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
-                var selectedAccountId by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+                Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))) {
+                    val vm: InboxViewModel = hiltViewModel()
+                    val inboxScope = androidx.compose.runtime.rememberCoroutineScope()
+                    val activeAccount by authManager.activeAccountFlow.collectAsState(initial = authManager.currentUser)
+                    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+                    val isTablet = configuration.screenWidthDp >= 600
+                    var selectedThreadId by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+                    var selectedAccountId by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
 
-                if (isTablet) {
-                    androidx.compose.foundation.layout.Row(
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        androidx.compose.foundation.layout.Box(modifier = Modifier.weight(0.4f)) {
-                            InboxScreen(
-                                viewModel = vm,
-                                userProfile = activeAccount,
-                                navActions = InboxNavActions(
-                                    onEmailClick = { accountId, threadId, _ ->
-                                        selectedAccountId = accountId
-                                        selectedThreadId = threadId
-                                    },
-                                    onSignOut = {
-                                        inboxScope.launch {
-                                            authManager.signOutActiveAccount()
-                                            if (authManager.getAccounts().isEmpty()) {
-                                                navController.navigate(Screen.SignIn.route) { popUpTo(0) { inclusive = true } }
-                                                emailRepository.clearLocalData()
+                    if (isTablet) {
+                        androidx.compose.foundation.layout.Row(
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            androidx.compose.foundation.layout.Box(modifier = Modifier.weight(0.4f)) {
+                                InboxScreen(
+                                    viewModel = vm,
+                                    userProfile = activeAccount,
+                                    navActions = InboxNavActions(
+                                        onEmailClick = { accountId, threadId, _ ->
+                                            selectedAccountId = accountId
+                                            selectedThreadId = threadId
+                                        },
+                                        onSignOut = {
+                                            inboxScope.launch {
+                                                authManager.signOutActiveAccount()
+                                                if (authManager.getAccounts().isEmpty()) {
+                                                    navController.navigate(Screen.SignIn.route) { popUpTo(0) { inclusive = true } }
+                                                    emailRepository.clearLocalData()
+                                                }
                                             }
-                                        }
-                                    },
-                                    onCompose = {
-                                        val isUnified = vm.currentTab.value == InboxTab.UNIFIED
-                                        navController.navigate(Screen.Compose.createRoute(unified = isUnified)) { launchSingleTop = true }
-                                    },
-                                    onSettings = { navController.navigate(Screen.Settings.route) { launchSingleTop = true } },
-                                    onScheduledClick = { navController.navigate(Screen.Scheduled.route) { launchSingleTop = true } },
-                                    onNavigateToImapSetup = { _, _ ->
-                                        navController.navigate(Screen.ImapSetup.createRoute()) { launchSingleTop = true }
-                                    },
+                                        },
+                                        onCompose = {
+                                            val isUnified = vm.currentTab.value == InboxTab.UNIFIED
+                                            navController.navigate(Screen.Compose.createRoute(unified = isUnified)) { launchSingleTop = true }
+                                        },
+                                        onSettings = { navController.navigate(Screen.Settings.route) { launchSingleTop = true } },
+                                        onScheduledClick = { navController.navigate(Screen.Scheduled.route) { launchSingleTop = true } },
+                                        onNavigateToImapSetup = { _, _ ->
+                                            navController.navigate(Screen.ImapSetup.createRoute()) { launchSingleTop = true }
+                                        },
+                                    )
                                 )
+                            }
+                            androidx.compose.material3.VerticalDivider(
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                thickness = 1.dp
                             )
-                        }
-                        androidx.compose.material3.VerticalDivider(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            thickness = 1.dp
-                        )
-                        androidx.compose.foundation.layout.Box(modifier = Modifier.weight(0.6f)) {
-                            if (selectedThreadId != null) {
-                                val detailViewModel: EmailDetailViewModel = hiltViewModel(key = "${selectedAccountId}:${selectedThreadId}")
-                                androidx.compose.runtime.LaunchedEffect(selectedAccountId, selectedThreadId) {
-                                    detailViewModel.setThread(selectedThreadId!!, selectedAccountId.orEmpty())
-                                }
-                                EmailDetailScreen(
-                                    viewModel = detailViewModel,
-                                    onBack = { selectedThreadId = null },
-                                    onReply = { to, subject, body, threadId, messageId ->
-                                        navController.navigate(
-                                            Screen.Compose.createRoute(
-                                                mode = ComposeMode.REPLY,
-                                                to = to,
-                                                subject = subject,
-                                                threadId = threadId,
-                                                messageId = messageId,
-                                                accountId = detailViewModel.accountId
-                                            )
-                                        )
-                                    },
-                                    onForward = { subject, body, threadId, messageId ->
-                                        navController.navigate(
-                                            Screen.Compose.createRoute(
-                                                mode = ComposeMode.FORWARD,
-                                                subject = subject,
-                                                threadId = threadId,
-                                                messageId = messageId,
-                                                accountId = detailViewModel.accountId
-                                            )
-                                        )
-                                    },
-                                    onFetchAttachment = { msg, att -> detailViewModel.fetchAttachmentBytes(msg, att) },
-                                    onNavigateToAttachmentViewer = { mId, aId, mime, name ->
-                                        navController.navigate(Screen.AttachmentViewer.createRoute(detailViewModel.accountId, mId, aId, mime, name))
+                            androidx.compose.foundation.layout.Box(modifier = Modifier.weight(0.6f)) {
+                                if (selectedThreadId != null) {
+                                    val detailViewModel: EmailDetailViewModel = hiltViewModel(key = "${selectedAccountId}:${selectedThreadId}")
+                                    androidx.compose.runtime.LaunchedEffect(selectedAccountId, selectedThreadId) {
+                                        detailViewModel.setThread(selectedThreadId!!, selectedAccountId.orEmpty())
                                     }
-                                )
-                            } else {
-                                androidx.compose.foundation.layout.Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        androidx.compose.material3.Icon(
-                                            imageVector = Icons.Rounded.Email,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(64.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                        )
-                                        androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(16.dp))
-                                        androidx.compose.material3.Text(
-                                            text = "Select an email to read",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                        )
+                                    EmailDetailScreen(
+                                        viewModel = detailViewModel,
+                                        onBack = { selectedThreadId = null },
+                                        onReply = { to, subject, body, threadId, messageId ->
+                                            navController.navigate(
+                                                Screen.Compose.createRoute(
+                                                    mode = ComposeMode.REPLY,
+                                                    to = to,
+                                                    subject = subject,
+                                                    threadId = threadId,
+                                                    messageId = messageId,
+                                                    accountId = detailViewModel.accountId
+                                                )
+                                            )
+                                        },
+                                        onForward = { subject, body, threadId, messageId ->
+                                            navController.navigate(
+                                                Screen.Compose.createRoute(
+                                                    mode = ComposeMode.FORWARD,
+                                                    subject = subject,
+                                                    threadId = threadId,
+                                                    messageId = messageId,
+                                                    accountId = detailViewModel.accountId
+                                                )
+                                            )
+                                        },
+                                        onFetchAttachment = { msg, att -> detailViewModel.fetchAttachmentBytes(msg, att) },
+                                        onNavigateToAttachmentViewer = { mId, aId, mime, name ->
+                                            navController.navigate(Screen.AttachmentViewer.createRoute(detailViewModel.accountId, mId, aId, mime, name))
+                                        }
+                                    )
+                                } else {
+                                    androidx.compose.foundation.layout.Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            androidx.compose.material3.Icon(
+                                                imageVector = Icons.Rounded.Email,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(64.dp),
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                            )
+                                            androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(16.dp))
+                                            androidx.compose.material3.Text(
+                                                text = "Select an email to read",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                } else {
-                    InboxScreen(
-                        viewModel    = vm,
-                        userProfile  = activeAccount,
-                        navActions = InboxNavActions(
-                            onEmailClick = { accountId, threadId, focusedId ->
-                                navController.navigate(Screen.ThreadDetail.createRoute(accountId, threadId, focusedId)) { launchSingleTop = true }
-                            },
-                            onSignOut = {
-                                inboxScope.launch {
-                                    authManager.signOutActiveAccount()
-                                    val accounts = authManager.getAccounts()
-                                    if (accounts.isEmpty()) {
-                                        navController.navigate(Screen.SignIn.route) {
-                                            popUpTo(0) { inclusive = true }
+                    } else {
+                        InboxScreen(
+                            viewModel    = vm,
+                            userProfile  = activeAccount,
+                            navActions = InboxNavActions(
+                                onEmailClick = { accountId, threadId, focusedId ->
+                                    navController.navigate(Screen.ThreadDetail.createRoute(accountId, threadId, focusedId)) { launchSingleTop = true }
+                                },
+                                onSignOut = {
+                                    inboxScope.launch {
+                                        authManager.signOutActiveAccount()
+                                        val accounts = authManager.getAccounts()
+                                        if (accounts.isEmpty()) {
+                                            navController.navigate(Screen.SignIn.route) {
+                                                popUpTo(0) { inclusive = true }
+                                            }
+                                            emailRepository.clearLocalData()
                                         }
-                                        emailRepository.clearLocalData()
                                     }
-                                }
-                            },
-                            onCompose = {
-                                val isUnified = vm.currentTab.value == InboxTab.UNIFIED
-                                navController.navigate(Screen.Compose.createRoute(unified = isUnified)) { launchSingleTop = true }
-                            },
-                            onSettings = {
-                                navController.navigate(Screen.Settings.route) { launchSingleTop = true }
-                            },
-                            onScheduledClick = {
-                                navController.navigate(Screen.Scheduled.route) { launchSingleTop = true }
-                            },
-                            onNavigateToImapSetup = { _, _ ->
-                                navController.navigate(Screen.ImapSetup.createRoute()) { launchSingleTop = true }
-                            },
+                                },
+                                onCompose = {
+                                    val isUnified = vm.currentTab.value == InboxTab.UNIFIED
+                                    navController.navigate(Screen.Compose.createRoute(unified = isUnified)) { launchSingleTop = true }
+                                },
+                                onSettings = {
+                                    navController.navigate(Screen.Settings.route) { launchSingleTop = true }
+                                },
+                                onScheduledClick = {
+                                    navController.navigate(Screen.Scheduled.route) { launchSingleTop = true }
+                                },
+                                onNavigateToImapSetup = { _, _ ->
+                                    navController.navigate(Screen.ImapSetup.createRoute()) { launchSingleTop = true }
+                                },
+                            )
                         )
-                    )
+                    }
                 }
             }
             composable(Screen.Settings.route) {
-                val settingsViewModel: SettingsViewModel = hiltViewModel()
-                val ctx = LocalContext.current
-                SettingsScreen(
-                    viewModel = settingsViewModel,
-                    authManager = authManager,
-                    onNavigateBack = { navController.popBackStack() },
-                    onNavigateToSection = { section ->
-                        navController.navigate(Screen.SettingsSection.createRoute(section)) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateToLegal = { type -> openLegalUrl(ctx, type) },
-                    onNavigateToPgpKeys = {
-                        navController.navigate(Screen.PgpKeys.route) { launchSingleTop = true }
-                    },
-                )
+                Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))) {
+                    val settingsViewModel: SettingsViewModel = hiltViewModel()
+                    val ctx = LocalContext.current
+                    SettingsScreen(
+                        viewModel = settingsViewModel,
+                        authManager = authManager,
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToSection = { section ->
+                            navController.navigate(Screen.SettingsSection.createRoute(section)) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onNavigateToLegal = { type -> openLegalUrl(ctx, type) },
+                        onNavigateToPgpKeys = {
+                            navController.navigate(Screen.PgpKeys.route) { launchSingleTop = true }
+                        },
+                    )
+                }
             }
 
             composable(
                 route = Screen.SettingsSection.route,
                 arguments = listOf(navArgument("section") { type = NavType.StringType })
             ) { backStackEntry ->
-                val sectionName = backStackEntry.arguments?.getString("section")
-                val section = remember(sectionName) {
-                    com.shrivatsav.monomail.feature.settings.SettingsSection.entries.find {
-                        it.name.equals(sectionName, ignoreCase = true)
+                Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))) {
+                    val sectionName = backStackEntry.arguments?.getString("section")
+                    val section = remember(sectionName) {
+                        com.shrivatsav.monomail.feature.settings.SettingsSection.entries.find {
+                            it.name.equals(sectionName, ignoreCase = true)
+                        }
                     }
-                }
-                val parentEntry = remember(backStackEntry) {
-                    runCatching { navController.getBackStackEntry(Screen.Settings.route) }.getOrNull()
-                }
-                val settingsViewModel: SettingsViewModel = if (parentEntry != null) {
-                    hiltViewModel(parentEntry)
-                } else {
-                    hiltViewModel()
-                }
+                    val parentEntry = remember(backStackEntry) {
+                        runCatching { navController.getBackStackEntry(Screen.Settings.route) }.getOrNull()
+                    }
+                    val settingsViewModel: SettingsViewModel = if (parentEntry != null) {
+                        hiltViewModel(parentEntry)
+                    } else {
+                        hiltViewModel()
+                    }
 
-                if (section != null) {
-                    com.shrivatsav.monomail.feature.settings.SettingsSectionScreen(
-                        section = section,
-                        viewModel = settingsViewModel,
-                        authManager = authManager,
-                        onNavigateToPgpKeys = {
-                            navController.navigate(Screen.PgpKeys.route) { launchSingleTop = true }
-                        },
-                        onBack = { navController.popBackStack() }
-                    )
+                    if (section != null) {
+                        com.shrivatsav.monomail.feature.settings.SettingsSectionScreen(
+                            section = section,
+                            viewModel = settingsViewModel,
+                            authManager = authManager,
+                            onNavigateToPgpKeys = {
+                                navController.navigate(Screen.PgpKeys.route) { launchSingleTop = true }
+                            },
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
                 }
             }
 
             composable(Screen.PgpKeys.route) {
-                PgpKeyManagementScreen(
-                    onNavigateBack = { navController.popBackStack() }
-                )
+                Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))) {
+                    PgpKeyManagementScreen(
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
             }
             composable(
                 route = Screen.Legal.route,
                 arguments = listOf(navArgument("type") { type = NavType.StringType })
             ) { backStackEntry ->
-                val type = backStackEntry.arguments?.getString("type") ?: "privacy"
-                com.shrivatsav.monomail.feature.settings.LegalScreen(
-                    type = type,
-                    onNavigateBack = { navController.popBackStack() }
-                )
+                Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))) {
+                    val type = backStackEntry.arguments?.getString("type") ?: "privacy"
+                    com.shrivatsav.monomail.feature.settings.LegalScreen(
+                        type = type,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
             }
             composable(
                 route = Screen.ThreadDetail.route,
@@ -624,43 +637,45 @@ fun NavGraph(
                     navArgument("focusedId") { type = NavType.StringType; nullable = true; defaultValue = null }
                 )
             ) { _ ->
-                val vm: EmailDetailViewModel = hiltViewModel()
-                EmailDetailScreen(
-                    viewModel = vm,
-                    onBack    = { navController.popBackStack() },
-                    onReply   = { to, subject, _, tid, messageId ->
-                        navController.navigate(
-                            Screen.Compose.createRoute(
-                                mode = ComposeMode.REPLY,
-                                to = to,
-                                subject = subject,
-                                threadId = tid,
-                                messageId = messageId,
-                                accountId = vm.accountId
+                Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))) {
+                    val vm: EmailDetailViewModel = hiltViewModel()
+                    EmailDetailScreen(
+                        viewModel = vm,
+                        onBack    = { navController.popBackStack() },
+                        onReply   = { to, subject, _, tid, messageId ->
+                            navController.navigate(
+                                Screen.Compose.createRoute(
+                                    mode = ComposeMode.REPLY,
+                                    to = to,
+                                    subject = subject,
+                                    threadId = tid,
+                                    messageId = messageId,
+                                    accountId = vm.accountId
+                                )
                             )
-                        )
-                    },
-                    onForward = { subject, _, tid, messageId ->
-                        navController.navigate(
-                            Screen.Compose.createRoute(
-                                mode = ComposeMode.FORWARD,
-                                to = "",
-                                subject = subject,
-                                threadId = tid,
-                                messageId = messageId,
-                                accountId = vm.accountId
+                        },
+                        onForward = { subject, _, tid, messageId ->
+                            navController.navigate(
+                                Screen.Compose.createRoute(
+                                    mode = ComposeMode.FORWARD,
+                                    to = "",
+                                    subject = subject,
+                                    threadId = tid,
+                                    messageId = messageId,
+                                    accountId = vm.accountId
+                                )
                             )
-                        )
-                    },
-                    onFetchAttachment = { messageId, attachmentId ->
-                        vm.fetchAttachmentBytes(messageId, attachmentId)
-                    },
-                    onNavigateToAttachmentViewer = { messageId, attachmentId, mimeType, name ->
-                        navController.navigate(
-                            Screen.AttachmentViewer.createRoute(vm.accountId, messageId, attachmentId, mimeType, name)
-                        )
-                    }
-                )
+                        },
+                        onFetchAttachment = { messageId, attachmentId ->
+                            vm.fetchAttachmentBytes(messageId, attachmentId)
+                        },
+                        onNavigateToAttachmentViewer = { messageId, attachmentId, mimeType, name ->
+                            navController.navigate(
+                                Screen.AttachmentViewer.createRoute(vm.accountId, messageId, attachmentId, mimeType, name)
+                            )
+                        }
+                    )
+                }
             }
             composable(
                 route = Screen.Compose.route,
