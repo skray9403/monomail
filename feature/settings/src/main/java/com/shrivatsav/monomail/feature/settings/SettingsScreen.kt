@@ -10,6 +10,7 @@ import com.shrivatsav.monomail.ui.theme.cornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -17,6 +18,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -51,52 +53,6 @@ fun SettingsScreen(
 
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
-
-    val DetailScreen: @Composable (SettingsSection) -> Unit = { section ->
-        when (section) {
-            SettingsSection.ACCOUNTS -> AccountsSettingsScreen(
-                authManager = authManager,
-                onBack = { currentSection = null }
-            )
-            SettingsSection.APPEARANCE -> AppearanceSettingsScreen(
-                viewModel = viewModel,
-                onBack = { currentSection = null }
-            )
-            SettingsSection.INBOX -> InboxSettingsScreen(
-                viewModel = viewModel,
-                onBack = { currentSection = null }
-            )
-            SettingsSection.READING -> ReadingSettingsScreen(
-                viewModel = viewModel,
-                onBack = { currentSection = null }
-            )
-            SettingsSection.PRIVACY -> PrivacySettingsScreen(
-                viewModel = viewModel,
-                onNavigateToPgpKeys = onNavigateToPgpKeys,
-                onBack = { currentSection = null }
-            )
-            SettingsSection.COMPOSE -> ComposeSettingsScreen(
-                viewModel = viewModel,
-                onBack = { currentSection = null }
-            )
-            SettingsSection.NAVIGATION -> NavigationSettingsScreen(
-                viewModel = viewModel,
-                onBack = { currentSection = null }
-            )
-            SettingsSection.DEVELOPER -> DeveloperSettingsScreen(
-                viewModel = viewModel,
-                onBack = { currentSection = null }
-            )
-            SettingsSection.NOTIFICATIONS -> NotificationSettingsScreen(
-                authManager = authManager,
-                viewModel = viewModel,
-                onBack = { currentSection = null }
-            )
-            SettingsSection.SUPPORT -> SupportSettingsScreen(
-                onBack = { currentSection = null }
-            )
-        }
-    }
 
     if (isTablet) {
         androidx.compose.foundation.layout.Row(
@@ -151,7 +107,7 @@ fun SettingsScreen(
                             }
                         }
                     } else {
-                        DetailScreen(section)
+                        SettingsSectionScreen(section, viewModel, authManager, onNavigateToPgpKeys) { currentSection = null }
                     }
                 }
             }
@@ -200,6 +156,59 @@ fun SettingsScreen(
                 DetailScreen(section)
             }
         }
+    }
+}
+
+@Composable
+private fun SettingsSectionScreen(
+    section: SettingsSection,
+    viewModel: SettingsViewModel,
+    authManager: com.shrivatsav.monomail.core.data.auth.AuthManager,
+    onNavigateToPgpKeys: () -> Unit,
+    onBack: () -> Unit,
+) {
+    when (section) {
+        SettingsSection.ACCOUNTS -> AccountsSettingsScreen(
+            authManager = authManager,
+            onBack = onBack,
+        )
+        SettingsSection.APPEARANCE -> AppearanceSettingsScreen(
+            viewModel = viewModel,
+            onBack = onBack,
+        )
+        SettingsSection.INBOX -> InboxSettingsScreen(
+            viewModel = viewModel,
+            onBack = onBack,
+        )
+        SettingsSection.READING -> ReadingSettingsScreen(
+            viewModel = viewModel,
+            onBack = onBack,
+        )
+        SettingsSection.PRIVACY -> PrivacySettingsScreen(
+            viewModel = viewModel,
+            onNavigateToPgpKeys = onNavigateToPgpKeys,
+            onBack = onBack,
+        )
+        SettingsSection.COMPOSE -> ComposeSettingsScreen(
+            viewModel = viewModel,
+            onBack = onBack,
+        )
+        SettingsSection.NAVIGATION -> NavigationSettingsScreen(
+            viewModel = viewModel,
+            onBack = onBack,
+        )
+        SettingsSection.DEVELOPER -> DeveloperSettingsScreen(
+            viewModel = viewModel,
+            onBack = onBack,
+        )
+        SettingsSection.NOTIFICATIONS -> NotificationSettingsScreen(
+            authManager = authManager,
+            viewModel = viewModel,
+            onBack = onBack,
+        )
+        SettingsSection.SUPPORT -> SupportSettingsScreen(
+            onBack = onBack,
+        )
     }
 }
 
