@@ -35,11 +35,6 @@ internal fun AppearanceSettingsScreen(
                 onSelected = { idx -> viewModel.setThemeMode(ThemeMode.entries[idx]) }
             )
             CardDivider()
-            MonochromeToggleRow(
-                monochrome = settings.monochromeTheme,
-                onToggle = { viewModel.setMonochromeTheme(it) }
-            )
-            CardDivider()
             FontSizeRow(
                 currentScale = settings.fontScale,
                 onScaleChanged = { viewModel.setFontScale(it) }
@@ -51,14 +46,6 @@ internal fun AppearanceSettingsScreen(
                 subtitle = "Use system font instead of Google Sans",
                 checked = settings.useSystemFont,
                 onCheckedChange = { viewModel.setUseSystemFont(it) }
-            )
-            CardDivider()
-            BottomSheetPickerRow(
-                icon = Icons.Rounded.RoundedCorner,
-                title = "Corner Style",
-                currentValue = settings.cornerStyle.name.lowercase().replace("_", " ").replaceFirstChar { it.titlecase() },
-                options = com.shrivatsav.monomail.core.data.settings.CornerStyle.entries.map { it.name.lowercase().replace("_", " ").replaceFirstChar { it.titlecase() } },
-                onSelected = { idx -> viewModel.setCornerStyle(com.shrivatsav.monomail.core.data.settings.CornerStyle.entries[idx]) }
             )
             CardDivider()
             EmailColorsRow(
