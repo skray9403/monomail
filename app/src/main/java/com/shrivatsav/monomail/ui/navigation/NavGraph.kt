@@ -625,10 +625,10 @@ fun NavGraph(
             }
             composable(Screen.Scheduled.route) {
                 val vm: ScheduledMessagesViewModel = hiltViewModel()
-                val appSettings by settingsDataStore.settingsFlow.collectAsState()
+
                 ScheduledMessagesScreen(
                     viewModel = vm,
-                    use24HourTime = appSettings.use24HourTime,
+
                     onBack = { navController.popBackStack() },
                     onCompose = {
                         navController.navigate(Screen.Compose.createRoute())

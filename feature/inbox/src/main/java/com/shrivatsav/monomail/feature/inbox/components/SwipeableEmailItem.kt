@@ -60,7 +60,7 @@ internal fun SwipeableEmailItem(
     }
 
     val dismissState = rememberSwipeToDismissBoxState(
-        positionalThreshold = { totalDistance -> totalDistance * appSettings.swipeThreshold }
+        positionalThreshold = { totalDistance -> totalDistance * 0.5f }
     )
     val scope = rememberCoroutineScope()
 
@@ -107,7 +107,7 @@ internal fun SwipeableEmailItem(
                 onClick = callbacks.onEmailClick,
                 onLongClick = callbacks.onLongClick,
                 showSnippet = appSettings.showSnippet,
-                use24HourTime = appSettings.use24HourTime,
+
                 compactMode = appSettings.compactList,
                 selection = SelectionState(
                     isSelected = selection.isSelected,
@@ -132,7 +132,7 @@ internal fun SwipeableEmailItem(
                     onClick = callbacks.onEmailClick,
                     onLongClick = callbacks.onLongClick,
                     showSnippet = appSettings.showSnippet,
-                    use24HourTime = appSettings.use24HourTime,
+
                     compactMode = appSettings.compactList,
                     selection = SelectionState(
                         isSelected = selection.isSelected,

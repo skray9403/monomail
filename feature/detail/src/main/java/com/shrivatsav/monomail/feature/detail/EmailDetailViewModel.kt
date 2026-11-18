@@ -9,8 +9,6 @@ import com.shrivatsav.monomail.data.model.Email
 import com.shrivatsav.monomail.data.pgp.PgpDecryptionResult
 import com.shrivatsav.monomail.data.pgp.PgpManager
 import com.shrivatsav.monomail.core.data.repository.EmailRepository
-import com.shrivatsav.monomail.core.data.settings.EmailTheme
-import com.shrivatsav.monomail.core.data.settings.FontScale
 import com.shrivatsav.monomail.core.data.settings.SettingsDataStore
 import com.shrivatsav.monomail.core.network.provider.IncompleteProviderResponseException
 import com.shrivatsav.monomail.core.network.provider.ProviderContentException
@@ -100,18 +98,6 @@ class EmailDetailViewModel @Inject constructor(
     private val _decryptedBodies = MutableStateFlow<Map<String, PgpDecryptionResult>>(emptyMap())
     val decryptedBodies: StateFlow<Map<String, PgpDecryptionResult>> = _decryptedBodies.asStateFlow()
 
-    val fontScaleMultiplier: StateFlow<Float> = settingsDataStore.settingsFlow
-        .map { settings ->
-            when (settings.fontScale) {
-                FontScale.EXTRA_SMALL -> 0.8f
-                FontScale.SMALL -> 0.9f
-                FontScale.DEFAULT -> 1.0f
-                FontScale.LARGE -> 1.15f
-                FontScale.EXTRA_LARGE -> 1.3f
-            }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1.0f)
-
     val isConversationView: StateFlow<Boolean> = settingsDataStore.settingsFlow
         .map { it.organizeByThread }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
@@ -119,10 +105,6 @@ class EmailDetailViewModel @Inject constructor(
     val loadRemoteImages: StateFlow<Boolean> = settingsDataStore.settingsFlow
         .map { it.loadRemoteImages }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
-    val emailTheme: StateFlow<EmailTheme> = settingsDataStore.settingsFlow
-        .map { it.emailTheme }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), EmailTheme.AUTO)
 
     val isDeveloperMode: StateFlow<Boolean> = settingsDataStore.settingsFlow
         .map { it.isDeveloperMode }
@@ -134,10 +116,6 @@ class EmailDetailViewModel @Inject constructor(
     val showInlineAttachments: StateFlow<Boolean> = settingsDataStore.settingsFlow
         .map { it.showInlineAttachments }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val use24HourTime: StateFlow<Boolean> = settingsDataStore.settingsFlow
-        .map { it.use24HourTime }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
     val state: StateFlow<EmailDetailState> = threadKey.flatMapLatest { (id, accountId) ->
         if (id.isEmpty() || accountId.isEmpty()) {
             flowOf(EmailDetailState.Success(emptyList(), emptyList(), isRefreshing = false))

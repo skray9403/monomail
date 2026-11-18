@@ -1,5 +1,7 @@
 package com.shrivatsav.monomail.feature.inbox.scheduled
 
+import android.text.format.DateFormat as AndroidDateFormat
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -24,7 +27,6 @@ import java.util.*
 @Composable
 fun ScheduledMessagesScreen(
     viewModel: ScheduledMessagesViewModel,
-    use24HourTime: Boolean = false,
     onBack: () -> Unit,
     onCompose: () -> Unit = {},
     onEdit: (com.shrivatsav.monomail.core.database.local.ScheduledMessageEntity) -> Unit = {}
@@ -98,7 +100,7 @@ fun ScheduledMessagesScreen(
                 items(messages, key = { it.id }) { msg ->
                     ScheduledMessageItem(
                         message = msg,
-                        use24HourTime = use24HourTime,
+
                         onCancel = { viewModel.cancelSchedule(msg.id) },
                         onEdit = { onEdit(msg) }
                     )
@@ -111,13 +113,13 @@ fun ScheduledMessagesScreen(
 @Composable
 private fun ScheduledMessageItem(
     message: com.shrivatsav.monomail.core.database.local.ScheduledMessageEntity,
-    use24HourTime: Boolean,
     onCancel: () -> Unit,
     onEdit: () -> Unit = {}
 ) {
-    val dateFormat = remember(use24HourTime) {
+    val is24HourTime = AndroidDateFormat.is24HourFormat(LocalContext.current)
+    val dateFormat = remember(is24HourTime) {
         SimpleDateFormat(
-            if (use24HourTime) "MMM dd, yyyy · HH:mm" else "MMM dd, yyyy · hh:mm a",
+            if (is24HourTime) "MMM dd, yyyy · HH:mm" else "MMM dd, yyyy · hh:mm a",
             Locale.getDefault()
         )
     }
