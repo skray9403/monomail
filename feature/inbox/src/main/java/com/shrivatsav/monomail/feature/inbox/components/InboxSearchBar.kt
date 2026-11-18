@@ -41,6 +41,7 @@ data class SearchBarActions(
     val scheduledCount: Int = 0,
     val onUndo: () -> Unit,
     val onOpenProfile: () -> Unit,
+    val onOpenFolders: () -> Unit = {},
     val showMarkAllRead: Boolean = true
 )
 
@@ -230,6 +231,14 @@ private fun SearchTrailingIcon(actions: SearchBarActions, display: SearchDisplay
             IconButton(onClick = actions.onMarkAllRead, modifier = Modifier.size(40.dp)) {
                 Icon(Icons.Rounded.CheckCircle, contentDescription = "Mark all as read", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(25.dp))
             }
+        }
+        IconButton(onClick = actions.onOpenFolders, modifier = Modifier.size(40.dp)) {
+            Icon(
+                imageVector = Icons.Rounded.FolderOpen,
+                contentDescription = "Mail folders",
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                modifier = Modifier.size(24.dp)
+            )
         }
         if (display.unifiedInboxEnabled && display.accounts.size > 1) {
             StackedAccountAvatars(accounts = display.accounts, onClick = actions.onOpenProfile)
