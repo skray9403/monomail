@@ -59,8 +59,10 @@ data class DockConfig(
     )
 ) {
     companion object {
-        const val MAX_SLOTS = 4
+        const val MAX_SLOTS = 3
         fun defaults() = DockConfig()
+        fun normalized(tabs: List<DockTabId>): DockConfig =
+            DockConfig(tabs.distinct().take(MAX_SLOTS).ifEmpty { defaults().primaryTabs })
     }
 }
 data class EmailTemplate(
@@ -148,6 +150,23 @@ class SettingsDataStore(private val context: Context) {
         fun notificationProfileKey(accountId: String) =
             stringPreferencesKey("notification_profile_$accountId")
     }
+
+    internal fun parseDockConfigJson(json: String?): DockConfig {
+        if (json.isNullOrBlank()) return DockConfig.defaults()
+        return try {
+            val root = com.google.gson.JsonParser.parseString(json)
+            if (!root.isJsonObject) return DockConfig.defaults()
+            val entries = root.asJsonObject.getAsJsonArray("primaryTabs")
+                ?: return DockConfig.defaults()
+            val tabs = entries.mapNotNull { entry ->
+                runCatching { DockTabId.valueOf(entry.asString) }.getOrNull()
+            }.distinct().take(DockConfig.MAX_SLOTS)
+            DockConfig.normalized(tabs)
+        } catch (_: Exception) {
+            DockConfig.defaults()
+        }
+    }
+
     private fun mapToSettings(prefs: Preferences): AppSettings {
         val dockConfigJson = prefs[Keys.DOCK_CONFIG]
         return AppSettings(
@@ -178,17 +197,7 @@ class SettingsDataStore(private val context: Context) {
             navScale = prefs[Keys.NAV_SCALE] ?: 1f,
             undoSendEnabled = prefs[Keys.UNDO_SEND_ENABLED] ?: true,
             undoSendWindow = prefs[Keys.UNDO_SEND_WINDOW]?.let { UndoSendWindow.valueOf(it) } ?: UndoSendWindow.SEC_10,
-            dockConfig = dockConfigJson?.let { json ->
-                try {
-                    val raw = gson.fromJson(json, DockConfig::class.java)
-                    // Gson may silently produce broken objects (null/wrong-type primaryTabs)
-                    // when deserializing Kotlin data classes via Unsafe. Validate the result.
-                    val tabs = raw?.primaryTabs
-                    @Suppress("SENSELESS_COMPARISON") // Gson Unsafe may produce wrong-type elements at runtime
-                    if (tabs != null && tabs.isNotEmpty() && tabs.all { it is DockTabId }) raw
-                    else DockConfig.defaults()
-                } catch (e: Exception) { DockConfig.defaults() }
-            } ?: DockConfig.defaults(),
+            dockConfig = parseDockConfigJson(dockConfigJson),
             isDeveloperMode = prefs[Keys.IS_DEVELOPER_MODE] ?: false,
             showInlineImages = prefs[Keys.SHOW_INLINE_IMAGES] ?: true,
             showInlineAttachments = prefs[Keys.SHOW_INLINE_ATTACHMENTS] ?: true,
