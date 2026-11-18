@@ -113,8 +113,6 @@ object MonoMailTheme {
 fun MonoMailTheme(
     themeMode: String = "SYSTEM",
     useSystemFont: Boolean = false,
-    cornerStyle: String = "ROUNDED",
-    monochrome: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val darkTheme = when (themeMode) {
@@ -122,9 +120,9 @@ fun MonoMailTheme(
         "DARK"  -> true
         else    -> isSystemInDarkTheme()
     }
-    val colorScheme = if (monochrome) {
-        if (darkTheme) DarkColors else LightColors
-    } else if (Build.VERSION.SDK_INT >= 31) {
+    // Use wallpaper-derived Android Dynamic Color wherever the platform supports it.
+    // Older Android versions fall back to the app's accessible light/dark palettes.
+    val colorScheme = if (Build.VERSION.SDK_INT >= 31) {
         val context = LocalContext.current
         if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
     } else {
@@ -132,16 +130,14 @@ fun MonoMailTheme(
     }
     val extendedColors = if (darkTheme) DarkExtendedColors else LightExtendedColors
     val typography = if (useSystemFont) SystemTypography else AppTypography
-    val shapes = getMonoMailShapes(cornerStyle)
 
     CompositionLocalProvider(
         LocalMonoMailExtendedColors provides extendedColors,
-        LocalCornerStyle provides cornerStyle
     ) {
         MaterialExpressiveTheme(
             colorScheme  = colorScheme,
             typography   = typography,
-            shapes       = shapes,
+            shapes       = MonoMailShapes,
             motionScheme = MotionScheme.expressive(),
             content      = content
         )
