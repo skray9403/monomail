@@ -16,14 +16,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "app_settings")
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
-enum class CornerStyle { SQUARE, ROUNDED, EXTRA_ROUNDED }
-/**
- * Controls how email HTML bodies are colored when rendered in the detail WebView.
- * - [AUTO]: adapt plain-ish mail to the app theme; render richly-styled mail as-is.
- * - [ORIGINAL]: never adapt — show the sender's original colors on a light card.
- */
-enum class EmailTheme { AUTO, ORIGINAL }
-enum class FontScale { EXTRA_SMALL, SMALL, DEFAULT, LARGE, EXTRA_LARGE }
 enum class SwipeAction { ARCHIVE, STAR, DELETE, READ_UNREAD }
 enum class DefaultReply { REPLY, REPLY_ALL }
 enum class SyncFrequency { MIN_15, MIN_30, HOUR_1, MANUAL }
@@ -72,7 +64,6 @@ data class EmailTemplate(
 )
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val fontScale: FontScale = FontScale.DEFAULT,
     val useSystemFont: Boolean = false,
     val showDividers: Boolean = false,
     val compactList: Boolean = true,
@@ -91,7 +82,6 @@ data class AppSettings(
     val organizeByThread: Boolean = true,
     val loadRemoteImages: Boolean = false,
     val renderMarkdown: Boolean = false,
-    val emailTheme: EmailTheme = EmailTheme.AUTO,
     val navScale: Float = 1f,
     val undoSendEnabled: Boolean = true,
     val undoSendWindow: UndoSendWindow = UndoSendWindow.SEC_10,
@@ -99,12 +89,8 @@ data class AppSettings(
     val isDeveloperMode: Boolean = false,
     val showInlineImages: Boolean = true,
     val showInlineAttachments: Boolean = true,
-    val cornerStyle: CornerStyle = CornerStyle.ROUNDED,
     val showMarkAllRead: Boolean = true,
-    val monochromeTheme: Boolean = false,
-    val swipeThreshold: Float = 0.40f,
     val addSignature: Boolean = true,
-    val use24HourTime: Boolean = false,
 )
 class SettingsDataStore(private val context: Context) {
     private val gson = Gson()
@@ -113,7 +99,6 @@ class SettingsDataStore(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private object Keys {
         val THEME_MODE = stringPreferencesKey("theme_mode")
-        val FONT_SCALE = stringPreferencesKey("font_scale")
         val USE_SYSTEM_FONT = booleanPreferencesKey("use_system_font")
         val SHOW_DIVIDERS = booleanPreferencesKey("show_dividers")
         val COMPACT_LIST = booleanPreferencesKey("compact_list")
@@ -132,7 +117,6 @@ class SettingsDataStore(private val context: Context) {
         val ORGANIZE_BY_THREAD = booleanPreferencesKey("organize_by_thread")
         val LOAD_REMOTE_IMAGES = booleanPreferencesKey("load_remote_images")
         val RENDER_MARKDOWN = booleanPreferencesKey("render_markdown")
-        val EMAIL_THEME = stringPreferencesKey("email_theme")
         val NAV_SCALE = floatPreferencesKey("nav_scale")
         val UNDO_SEND_ENABLED = booleanPreferencesKey("undo_send_enabled")
         val UNDO_SEND_WINDOW = stringPreferencesKey("undo_send_window")
@@ -141,15 +125,34 @@ class SettingsDataStore(private val context: Context) {
         val IS_DEVELOPER_MODE = booleanPreferencesKey("is_developer_mode")
         val SHOW_INLINE_ATTACHMENTS = booleanPreferencesKey("show_inline_attachments")
         val SHOW_MARK_ALL_READ = booleanPreferencesKey("show_mark_all_read")
-        val CORNER_STYLE = stringPreferencesKey("corner_style")
+        val LEGACY_CLEANUP_VERSION = intPreferencesKey("legacy_settings_cleanup_version")
+        val LEGACY_FONT_SCALE = stringPreferencesKey("font_scale")
+        val LEGACY_EMAIL_THEME = stringPreferencesKey("email_theme")
+        val LEGACY_CORNER_STYLE = stringPreferencesKey("corner_style")
+        val LEGACY_MONOCHROME_THEME = booleanPreferencesKey("monochrome_theme")
+        val LEGACY_SWIPE_THRESHOLD = floatPreferencesKey("swipe_threshold")
+        val LEGACY_USE_24_HOUR_TIME = booleanPreferencesKey("use_24_hour_time")
         val SHOW_INLINE_IMAGES = booleanPreferencesKey("show_inline_images")
-        val MONOCHROME_THEME = booleanPreferencesKey("monochrome_theme")
-        val SWIPE_THRESHOLD = floatPreferencesKey("swipe_threshold")
         val ADD_SIGNATURE = booleanPreferencesKey("add_signature")
-        val USE_24_HOUR_TIME = booleanPreferencesKey("use_24_hour_time")
         fun notificationProfileKey(accountId: String) =
             stringPreferencesKey("notification_profile_$accountId")
     }
+    init {
+        scope.launch {
+            context.dataStore.edit { prefs ->
+                if ((prefs[Keys.LEGACY_CLEANUP_VERSION] ?: 0) < 1) {
+                    prefs.remove(Keys.LEGACY_FONT_SCALE)
+                    prefs.remove(Keys.LEGACY_EMAIL_THEME)
+                    prefs.remove(Keys.LEGACY_CORNER_STYLE)
+                    prefs.remove(Keys.LEGACY_MONOCHROME_THEME)
+                    prefs.remove(Keys.LEGACY_SWIPE_THRESHOLD)
+                    prefs.remove(Keys.LEGACY_USE_24_HOUR_TIME)
+                    prefs[Keys.LEGACY_CLEANUP_VERSION] = 1
+                }
+            }
+        }
+    }
+
 
     internal fun parseDockConfigJson(json: String?): DockConfig {
         if (json.isNullOrBlank()) return DockConfig.defaults()
@@ -171,7 +174,6 @@ class SettingsDataStore(private val context: Context) {
         val dockConfigJson = prefs[Keys.DOCK_CONFIG]
         return AppSettings(
             themeMode = prefs[Keys.THEME_MODE]?.let { ThemeMode.valueOf(it) } ?: ThemeMode.SYSTEM,
-            fontScale = prefs[Keys.FONT_SCALE]?.let { FontScale.valueOf(it) } ?: FontScale.DEFAULT,
             useSystemFont = prefs[Keys.USE_SYSTEM_FONT] ?: false,
             showDividers = prefs[Keys.SHOW_DIVIDERS] ?: false,
             compactList = prefs[Keys.COMPACT_LIST] ?: true,
@@ -191,9 +193,6 @@ class SettingsDataStore(private val context: Context) {
             organizeByThread = prefs[Keys.ORGANIZE_BY_THREAD] ?: true,
             loadRemoteImages = prefs[Keys.LOAD_REMOTE_IMAGES] ?: false,
             renderMarkdown = prefs[Keys.RENDER_MARKDOWN] ?: false,
-            emailTheme = prefs[Keys.EMAIL_THEME]?.let {
-                try { EmailTheme.valueOf(it) } catch (e: Exception) { EmailTheme.AUTO }
-            } ?: EmailTheme.AUTO,
             navScale = prefs[Keys.NAV_SCALE] ?: 1f,
             undoSendEnabled = prefs[Keys.UNDO_SEND_ENABLED] ?: true,
             undoSendWindow = prefs[Keys.UNDO_SEND_WINDOW]?.let { UndoSendWindow.valueOf(it) } ?: UndoSendWindow.SEC_10,
@@ -201,11 +200,7 @@ class SettingsDataStore(private val context: Context) {
             isDeveloperMode = prefs[Keys.IS_DEVELOPER_MODE] ?: false,
             showInlineImages = prefs[Keys.SHOW_INLINE_IMAGES] ?: true,
             showInlineAttachments = prefs[Keys.SHOW_INLINE_ATTACHMENTS] ?: true,
-            cornerStyle = prefs[Keys.CORNER_STYLE]?.let { CornerStyle.valueOf(it) } ?: CornerStyle.ROUNDED,
-            monochromeTheme = prefs[Keys.MONOCHROME_THEME] ?: false,
-            swipeThreshold = prefs[Keys.SWIPE_THRESHOLD]?.coerceIn(0.20f, 0.60f) ?: 0.40f,
             addSignature = prefs[Keys.ADD_SIGNATURE] ?: true,
-            use24HourTime = prefs[Keys.USE_24_HOUR_TIME] ?: false,
         )
     }
     private fun parseNotificationProfile(json: String?): NotificationProfile {
@@ -251,9 +246,6 @@ class SettingsDataStore(private val context: Context) {
         .stateIn(scope, SharingStarted.Eagerly, AppSettings())
     suspend fun setThemeMode(mode: ThemeMode) {
         context.dataStore.edit { it[Keys.THEME_MODE] = mode.name }
-    }
-    suspend fun setFontScale(scale: FontScale) {
-        context.dataStore.edit { it[Keys.FONT_SCALE] = scale.name }
     }
     suspend fun setUseSystemFont(enabled: Boolean) {
         context.dataStore.edit { it[Keys.USE_SYSTEM_FONT] = enabled }
@@ -312,9 +304,6 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setRenderMarkdown(enabled: Boolean) {
         context.dataStore.edit { it[Keys.RENDER_MARKDOWN] = enabled }
     }
-    suspend fun setEmailTheme(theme: EmailTheme) {
-        context.dataStore.edit { it[Keys.EMAIL_THEME] = theme.name }
-    }
     suspend fun setNavScale(scale: Float) {
         context.dataStore.edit { it[Keys.NAV_SCALE] = scale }
     }
@@ -325,7 +314,7 @@ class SettingsDataStore(private val context: Context) {
         context.dataStore.edit { it[Keys.UNDO_SEND_WINDOW] = window.name }
     }
     suspend fun setDockConfig(config: DockConfig) {
-        context.dataStore.edit { it[Keys.DOCK_CONFIG] = gson.toJson(config) }
+        context.dataStore.edit { it[Keys.DOCK_CONFIG] = gson.toJson(DockConfig.normalized(config.primaryTabs)) }
     }
     suspend fun setDeveloperMode(enabled: Boolean) {
         context.dataStore.edit { it[Keys.IS_DEVELOPER_MODE] = enabled }
@@ -338,19 +327,6 @@ class SettingsDataStore(private val context: Context) {
     }
     suspend fun setShowMarkAllRead(enabled: Boolean) {
         context.dataStore.edit { it[Keys.SHOW_MARK_ALL_READ] = enabled }
-    }
-    suspend fun setCornerStyle(style: CornerStyle) {
-        context.dataStore.edit { it[Keys.CORNER_STYLE] = style.name }
-    }
-
-    suspend fun setMonochromeTheme(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.MONOCHROME_THEME] = enabled }
-    }
-    suspend fun setSwipeThreshold(threshold: Float) {
-        context.dataStore.edit { it[Keys.SWIPE_THRESHOLD] = threshold.coerceIn(0.20f, 0.60f) }
-    }
-    suspend fun setUse24HourTime(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.USE_24_HOUR_TIME] = enabled }
     }
     suspend fun getTemplates(): List<EmailTemplate> {
         val prefs = context.dataStore.data.first()
