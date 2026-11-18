@@ -2,6 +2,7 @@ package com.shrivatsav.monomail
 
 import android.os.Bundle
 import android.os.Build
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -33,6 +34,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+
+object BackGestureTracker {
+    @Volatile
+    var isRightEdge: Boolean = false
+        private set
+
+    fun onTouchDown(rawX: Float, screenWidth: Int) {
+        if (screenWidth > 0) {
+            isRightEdge = rawX > (screenWidth / 2f)
+        }
+    }
+}
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -93,6 +106,18 @@ class MainActivity : ComponentActivity() {
                 scheduleBackgroundSync(settings.syncFrequency)
             }
         }
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        if (ev != null && ev.actionMasked == MotionEvent.ACTION_DOWN) {
+            val width = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                windowManager.currentWindowMetrics.bounds.width()
+            } else {
+                resources.displayMetrics.widthPixels
+            }
+            BackGestureTracker.onTouchDown(ev.rawX, width)
+        }
+        return super.dispatchTouchEvent(ev)
     }
 
     override fun onResume() {

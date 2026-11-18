@@ -13,11 +13,14 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import com.shrivatsav.monomail.BackGestureTracker
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -260,9 +263,9 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
             animationSpec = NavFloatSpec,
         )
     "drill" ->
-        scaleOut(
-            targetScale = 0.94f,
-            animationSpec = NavFloatSpec,
+        fadeOut(
+            animationSpec = motionScheme.fastEffectsSpec(),
+            targetAlpha = 0.85f,
         )
     else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
 }
@@ -277,9 +280,9 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
             animationSpec = NavFloatSpec,
         )
     "drill" ->
-        scaleIn(
-            initialScale = 0.94f,
-            animationSpec = NavFloatSpec,
+        fadeIn(
+            animationSpec = motionScheme.fastEffectsSpec(),
+            initialAlpha = 0.85f,
         )
     else -> fadeIn(animationSpec = motionScheme.fastEffectsSpec())
 }
@@ -297,15 +300,30 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
                 targetScale = 0.965f,
                 animationSpec = NavFloatSpec,
             )
-    "drill" ->
-        slideOutOfContainer(
-            AnimatedContentTransitionScope.SlideDirection.End,
-            animationSpec = NavSpatialSpec,
-        ) +
-            scaleOut(
-                targetScale = 0.88f,
-                animationSpec = NavFloatSpec,
-            )
+    "drill" -> {
+        val isRight = BackGestureTracker.isRightEdge
+        if (isRight) {
+            slideOutOfContainer(
+                towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                animationSpec = NavSpatialSpec,
+            ) +
+                scaleOut(
+                    targetScale = 0.88f,
+                    transformOrigin = TransformOrigin(0.05f, 0.5f),
+                    animationSpec = NavFloatSpec,
+                )
+        } else {
+            slideOutOfContainer(
+                towards = AnimatedContentTransitionScope.SlideDirection.End,
+                animationSpec = NavSpatialSpec,
+            ) +
+                scaleOut(
+                    targetScale = 0.88f,
+                    transformOrigin = TransformOrigin(0.95f, 0.5f),
+                    animationSpec = NavFloatSpec,
+                )
+        }
+    }
     else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
 }
 
@@ -351,7 +369,7 @@ fun NavGraph(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         ReauthDialog(authManager, navController, scope)
 
@@ -410,7 +428,7 @@ fun NavGraph(
                 )
             }
             composable(Screen.Inbox.route) {
-                Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))) {
+                Box(modifier = Modifier.fillMaxSize()) {
                     val vm: InboxViewModel = hiltViewModel()
                     val inboxScope = androidx.compose.runtime.rememberCoroutineScope()
                     val activeAccount by authManager.activeAccountFlow.collectAsState(initial = authManager.currentUser)
@@ -556,7 +574,13 @@ fun NavGraph(
                 }
             }
             composable(Screen.Settings.route) {
-                Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp), clip = false)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
                     val settingsViewModel: SettingsViewModel = hiltViewModel()
                     val ctx = LocalContext.current
                     SettingsScreen(
@@ -580,7 +604,13 @@ fun NavGraph(
                 route = Screen.SettingsSection.route,
                 arguments = listOf(navArgument("section") { type = NavType.StringType })
             ) { backStackEntry ->
-                Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp), clip = false)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
                     val sectionName = backStackEntry.arguments?.getString("section")
                     val section = remember(sectionName) {
                         com.shrivatsav.monomail.feature.settings.SettingsSection.entries.find {
@@ -611,7 +641,13 @@ fun NavGraph(
             }
 
             composable(Screen.PgpKeys.route) {
-                Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp), clip = false)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
                     PgpKeyManagementScreen(
                         onNavigateBack = { navController.popBackStack() }
                     )
@@ -621,7 +657,13 @@ fun NavGraph(
                 route = Screen.Legal.route,
                 arguments = listOf(navArgument("type") { type = NavType.StringType })
             ) { backStackEntry ->
-                Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp), clip = false)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
                     val type = backStackEntry.arguments?.getString("type") ?: "privacy"
                     com.shrivatsav.monomail.feature.settings.LegalScreen(
                         type = type,
@@ -637,7 +679,13 @@ fun NavGraph(
                     navArgument("focusedId") { type = NavType.StringType; nullable = true; defaultValue = null }
                 )
             ) { _ ->
-                Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp), clip = false)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
                     val vm: EmailDetailViewModel = hiltViewModel()
                     EmailDetailScreen(
                         viewModel = vm,
@@ -709,26 +757,34 @@ fun NavGraph(
                 )
             }
             composable(Screen.Scheduled.route) {
-                val vm: ScheduledMessagesViewModel = hiltViewModel()
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp), clip = false)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
+                    val vm: ScheduledMessagesViewModel = hiltViewModel()
 
-                ScheduledMessagesScreen(
-                    viewModel = vm,
+                    ScheduledMessagesScreen(
+                        viewModel = vm,
 
-                    onBack = { navController.popBackStack() },
-                    onCompose = {
-                        navController.navigate(Screen.Compose.createRoute())
-                    },
-                    onEdit = { scheduled ->
-                        navController.navigate(
-                            Screen.Compose.createRoute(
-                                to = scheduled.to,
-                                subject = scheduled.subject,
-                                scheduledId = scheduled.id,
-                                accountId = scheduled.accountId
+                        onBack = { navController.popBackStack() },
+                        onCompose = {
+                            navController.navigate(Screen.Compose.createRoute())
+                        },
+                        onEdit = { scheduled ->
+                            navController.navigate(
+                                Screen.Compose.createRoute(
+                                    to = scheduled.to,
+                                    subject = scheduled.subject,
+                                    scheduledId = scheduled.id,
+                                    accountId = scheduled.accountId
+                                )
                             )
-                        )
-                    }
-                )
+                        }
+                    )
+                }
             }
             composable(
                 route = Screen.AttachmentViewer.route,
@@ -740,9 +796,17 @@ fun NavGraph(
                     navArgument("name") { type = NavType.StringType; defaultValue = "attachment" }
                 )
             ) {
-                AttachmentViewerScreen(
-                    onBack = { navController.popBackStack() }
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp), clip = false)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
+                    AttachmentViewerScreen(
+                        onBack = { navController.popBackStack() }
+                    )
+                }
             }
         }
     }
