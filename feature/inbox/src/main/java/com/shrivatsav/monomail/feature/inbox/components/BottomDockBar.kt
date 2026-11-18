@@ -65,7 +65,7 @@ internal fun BottomDockBar(
             primaryIds.forEachIndexed { index, id ->
                 val tab = id.toInboxTab()
                 val selected = currentTab == tab
-                androidx.compose.material3.SegmentedButton(
+                SegmentedButton(
                     selected = selected,
                     onClick = { onTabClick(tab) },
                     shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(
