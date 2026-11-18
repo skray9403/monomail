@@ -2,33 +2,38 @@ package com.shrivatsav.monomail.feature.inbox.components
 
 import com.shrivatsav.monomail.feature.inbox.*
 import com.shrivatsav.monomail.model.InboxTab
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.semantics.Role
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.shrivatsav.monomail.core.data.settings.DockConfig
 import com.shrivatsav.monomail.core.data.settings.DockTabId
 import com.shrivatsav.monomail.core.data.settings.AppSettings
 
 /**
- * Floating top-level navigation dock.
- *
- * NavigationBar remains the correct semantic component for destinations.
- * Its container adopts the capsule geometry and elevation language of the
- * Material 3 Expressive floating toolbar without misusing a contextual toolbar
- * as app navigation. Secondary mail folders live in the dedicated Folders sheet.
+ * Compact floating destination pill inspired by the Google Photos navigation
+ * redesign: only the selected destination receives an icon + filled indicator;
+ * sibling destinations remain lightweight text actions.
  */
 @Composable
 internal fun BottomDockBar(
@@ -42,29 +47,77 @@ internal fun BottomDockBar(
     val primaryIds = dockConfig.primaryTabs.take(4)
 
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(64.dp),
         shape = RoundedCornerShape(percent = 50),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 2.dp,
-        shadowElevation = 8.dp,
+        tonalElevation = 1.dp,
+        shadowElevation = 5.dp,
     ) {
-        NavigationBar(
-            modifier = Modifier.fillMaxWidth(),
-            containerColor = Color.Transparent,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 0.dp,
-            windowInsets = WindowInsets(0.dp),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             primaryIds.forEach { id ->
                 val tab = id.toInboxTab()
-                NavigationBarItem(
-                    selected = currentTab == tab,
-                    onClick = { onTabClick(tab) },
-                    icon = { Icon(id.icon(unifiedInboxEnabled), contentDescription = null) },
-                    label = { Text(id.label(unifiedInboxEnabled)) },
-                    alwaysShowLabel = true,
-                )
+                val selected = currentTab == tab
+                Row(
+                    modifier = Modifier
+                        .weight(if (selected) 1.45f else 1f)
+                        .fillMaxHeight()
+                        .selectable(
+                            selected = selected,
+                            onClick = { onTabClick(tab) },
+                            role = Role.Tab,
+                        ),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (selected) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(percent = 50),
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .fillMaxHeight()
+                                    .padding(horizontal = 10.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    imageVector = id.icon(unifiedInboxEnabled),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                                Text(
+                                    text = id.label(unifiedInboxEnabled),
+                                    modifier = Modifier.padding(start = 7.dp),
+                                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = id.label(unifiedInboxEnabled),
+                            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
     }
