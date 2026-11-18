@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyRow
@@ -1199,7 +1200,7 @@ private fun ComposeBottomBar(
     ) {
         HorizontalFloatingToolbar(
             expanded = true,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.widthIn(min = 216.dp, max = 320.dp),
             colors = FloatingToolbarDefaults.standardFloatingToolbarColors(),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
             expandedShadowElevation = 8.dp,
