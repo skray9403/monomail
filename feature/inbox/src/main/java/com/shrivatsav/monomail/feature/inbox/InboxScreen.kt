@@ -709,6 +709,24 @@ fun InboxScreen(
             }
 
 
+            // Softly feather the content into the dock area. The brush is a
+            // single static draw layer; it performs no blur or bitmap capture.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(navBarHeight + 124.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.0f to MaterialTheme.colorScheme.background.copy(alpha = 0.0f),
+                                0.58f to MaterialTheme.colorScheme.background.copy(alpha = 0.18f),
+                                1.0f to MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
+                            )
+                        )
+                    )
+            )
+
             AnimatedVisibility(
                 visible = longPressedThread == null && activeModal == null && !isBulkMode,
                 enter = fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.9f),
