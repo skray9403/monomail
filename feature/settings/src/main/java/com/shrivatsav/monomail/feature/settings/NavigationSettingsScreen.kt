@@ -17,11 +17,6 @@ internal fun NavigationSettingsScreen(
 
     ScrollableSettingsScaffold(title = "Navigation", onBack = onBack) {
         SettingsCard {
-            SwipeThresholdRow(
-                threshold = settings.swipeThreshold,
-                onThresholdChanged = { viewModel.setSwipeThreshold(it) }
-            )
-            CardDivider()
             DockBarEditor(
                 dockConfig = settings.dockConfig,
                 maxSlots = DockConfig.MAX_SLOTS,

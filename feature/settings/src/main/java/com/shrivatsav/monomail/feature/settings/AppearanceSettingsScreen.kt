@@ -35,22 +35,12 @@ internal fun AppearanceSettingsScreen(
                 onSelected = { idx -> viewModel.setThemeMode(ThemeMode.entries[idx]) }
             )
             CardDivider()
-            FontSizeRow(
-                currentScale = settings.fontScale,
-                onScaleChanged = { viewModel.setFontScale(it) }
-            )
-            CardDivider()
             SettingsToggleRow(
                 icon = Icons.Rounded.TextFields,
                 title = "System Font",
                 subtitle = "Use system font instead of Google Sans",
                 checked = settings.useSystemFont,
                 onCheckedChange = { viewModel.setUseSystemFont(it) }
-            )
-            CardDivider()
-            EmailColorsRow(
-                currentTheme = settings.emailTheme,
-                onThemeSelected = { viewModel.setEmailTheme(it) }
             )
             CardDivider()
             SettingsToggleRow(
@@ -85,13 +75,7 @@ internal fun AppearanceSettingsScreen(
                 onCheckedChange = { viewModel.setShowMarkAllRead(it) }
             )
             CardDivider()
-            SettingsToggleRow(
-                icon = Icons.Rounded.Schedule,
-                title = "24-Hour Time",
-                subtitle = "Show times in 24-hour format (e.g. 15:30)",
-                checked = settings.use24HourTime,
-                onCheckedChange = { viewModel.setUse24HourTime(it) }
-            )
+
         }
 }
 }

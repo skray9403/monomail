@@ -22,7 +22,6 @@ class SettingsViewModel @Inject constructor(
     val settings: StateFlow<AppSettings> = settingsDataStore.settingsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppSettings())
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { settingsDataStore.setThemeMode(mode) }
-    fun setFontScale(scale: FontScale) = viewModelScope.launch { settingsDataStore.setFontScale(scale) }
     fun setUseSystemFont(enabled: Boolean) = viewModelScope.launch { settingsDataStore.setUseSystemFont(enabled) }
     fun setShowDividers(show: Boolean) = viewModelScope.launch { settingsDataStore.setShowDividers(show) }
     fun setCompactList(compact: Boolean) = viewModelScope.launch { settingsDataStore.setCompactList(compact) }
@@ -53,7 +52,6 @@ class SettingsViewModel @Inject constructor(
     fun setOrganizeByThread(enabled: Boolean) = viewModelScope.launch { settingsDataStore.setOrganizeByThread(enabled) }
     fun setLoadRemoteImages(enabled: Boolean) = viewModelScope.launch { settingsDataStore.setLoadRemoteImages(enabled) }
     fun setRenderMarkdown(enabled: Boolean) = viewModelScope.launch { settingsDataStore.setRenderMarkdown(enabled) }
-    fun setEmailTheme(theme: EmailTheme) = viewModelScope.launch { settingsDataStore.setEmailTheme(theme) }
     fun setNavScale(scale: Float) = viewModelScope.launch { settingsDataStore.setNavScale(scale) }
     fun setUndoSendEnabled(enabled: Boolean) = viewModelScope.launch { settingsDataStore.setUndoSendEnabled(enabled) }
     fun setUndoSendWindow(window: UndoSendWindow) = viewModelScope.launch { settingsDataStore.setUndoSendWindow(window) }
@@ -62,10 +60,6 @@ class SettingsViewModel @Inject constructor(
     fun setShowInlineImages(enabled: Boolean) = viewModelScope.launch { settingsDataStore.setShowInlineImages(enabled) }
     fun setShowInlineAttachments(enabled: Boolean) = viewModelScope.launch { settingsDataStore.setShowInlineAttachments(enabled) }
     fun setShowMarkAllRead(enabled: Boolean) = viewModelScope.launch { settingsDataStore.setShowMarkAllRead(enabled) }
-    fun setMonochromeTheme(enabled: Boolean) = viewModelScope.launch { settingsDataStore.setMonochromeTheme(enabled) }
-    fun setCornerStyle(style: com.shrivatsav.monomail.core.data.settings.CornerStyle) = viewModelScope.launch { settingsDataStore.setCornerStyle(style) }
-    fun setSwipeThreshold(threshold: Float) = viewModelScope.launch { settingsDataStore.setSwipeThreshold(threshold) }
-    fun setUse24HourTime(enabled: Boolean) = viewModelScope.launch { settingsDataStore.setUse24HourTime(enabled) }
     fun resetWelcomePrompt() = viewModelScope.launch {
         settingsDataStore.setHasSeenWelcomePrompt(false)
     }

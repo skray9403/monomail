@@ -12,8 +12,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity as LocalDensityComposable
-import androidx.compose.ui.unit.Density
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
@@ -23,7 +21,6 @@ import com.shrivatsav.monomail.core.data.auth.AccountManager
 import com.shrivatsav.monomail.core.data.auth.AuthManager
 import com.shrivatsav.monomail.core.data.repository.EmailRepository
 import com.shrivatsav.monomail.core.data.repository.dismissSyncCompletionNotifications
-import com.shrivatsav.monomail.core.data.settings.FontScale
 import com.shrivatsav.monomail.core.data.settings.SettingsDataStore
 import com.shrivatsav.monomail.core.data.settings.SyncFrequency
 import com.shrivatsav.monomail.ui.navigation.NavGraph
@@ -79,37 +76,21 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val settings by settingsDataStore.settingsFlow.collectAsState()
-            val fontScaleMultiplier = when (settings.fontScale) {
-                FontScale.EXTRA_SMALL -> 0.8f
-                FontScale.SMALL       -> 0.9f
-                FontScale.DEFAULT     -> 1.0f
-                FontScale.LARGE       -> 1.15f
-                FontScale.EXTRA_LARGE -> 1.3f
-            }
-            val density = LocalDensityComposable.current
-            androidx.compose.runtime.CompositionLocalProvider(
-                LocalDensityComposable provides Density(
-                    density = density.density,
-                    fontScale = density.fontScale * fontScaleMultiplier
-                )
+            MonoMailTheme(
+                themeMode = settings.themeMode.name,
+                useSystemFont = settings.useSystemFont,
             ) {
-                MonoMailTheme(
-                    themeMode = settings.themeMode.name,
-                    useSystemFont = settings.useSystemFont,
-                ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        NavGraph(
-                            authManager = authManager,
-                            emailRepository = emailRepository,
-                            settingsDataStore = settingsDataStore,
-                            onContentReady = { isContentReady = true }
-                        )
-                    }
+                Box(modifier = Modifier.fillMaxSize()) {
+                    NavGraph(
+                        authManager = authManager,
+                        emailRepository = emailRepository,
+                        settingsDataStore = settingsDataStore,
+                        onContentReady = { isContentReady = true }
+                    )
                 }
-            // Re-schedule background sync whenever sync frequency changes
+            }
             LaunchedEffect(settings.syncFrequency) {
                 scheduleBackgroundSync(settings.syncFrequency)
-            }
             }
         }
     }
