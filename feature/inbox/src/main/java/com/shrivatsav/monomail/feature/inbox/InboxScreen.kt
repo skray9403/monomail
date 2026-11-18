@@ -239,6 +239,22 @@ fun InboxScreen(
                         unifiedInboxEnabled = unifiedInboxEnabled
                     )
 
+                    // A short feather blends the search header into the scrolling
+                    // content without blurring rows or adding a visible divider.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(16.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    colorStops = arrayOf(
+                                        0.0f to MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.24f),
+                                        1.0f to MaterialTheme.colorScheme.background.copy(alpha = 0.0f),
+                                    )
+                                )
+                            )
+                    )
+
                     SearchFilterBar(
                         filters = searchFilters,
                         onFiltersChanged = { viewModel.updateSearch(it) },
