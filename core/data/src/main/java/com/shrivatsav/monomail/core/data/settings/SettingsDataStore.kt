@@ -55,7 +55,7 @@ data class DockConfig(
         const val MAX_SLOTS = 3
         fun defaults() = DockConfig()
         fun normalized(tabs: List<DockTabId>): DockConfig =
-            DockConfig(tabs.distinct().take(MAX_SLOTS).ifEmpty { defaults().primaryTabs })
+            DockConfig(tabs.filter { it != DockTabId.UNIFIED }.distinct().take(MAX_SLOTS).ifEmpty { defaults().primaryTabs })
     }
 }
 data class EmailTemplate(
@@ -164,8 +164,12 @@ class SettingsDataStore(private val context: Context) {
             val entries = root.asJsonObject.getAsJsonArray("primaryTabs")
                 ?: return DockConfig.defaults()
             val tabs = entries.mapNotNull { entry ->
-                runCatching { DockTabId.valueOf(entry.asString) }.getOrNull()
-            }.distinct().take(DockConfig.MAX_SLOTS)
+                if (!entry.isJsonPrimitive || !entry.asJsonPrimitive.isString) {
+                    null
+                } else {
+                    runCatching { DockTabId.valueOf(entry.asString) }.getOrNull()
+                }
+            }
             DockConfig.normalized(tabs)
         } catch (_: Exception) {
             DockConfig.defaults()
