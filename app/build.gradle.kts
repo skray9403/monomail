@@ -246,6 +246,7 @@ dependencies {
 
     // Navigation
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.navigationevent.compose)
 
     // Auth
     "playstoreImplementation"(libs.androidx.credentials)
