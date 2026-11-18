@@ -51,7 +51,7 @@ internal fun BottomDockBar(
             .fillMaxWidth()
             .height(64.dp),
         shape = RoundedCornerShape(percent = 50),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 1.dp,
         shadowElevation = 5.dp,
