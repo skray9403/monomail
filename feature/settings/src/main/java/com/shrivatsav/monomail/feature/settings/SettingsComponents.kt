@@ -329,14 +329,6 @@ internal fun ThemeMode.displayName() = when (this) {
     ThemeMode.DARK   -> "Dark"
 }
 
-internal fun FontScale.displayName() = when (this) {
-    FontScale.EXTRA_SMALL -> "XS"
-    FontScale.SMALL       -> "Small"
-    FontScale.DEFAULT     -> "Default"
-    FontScale.LARGE       -> "Large"
-    FontScale.EXTRA_LARGE -> "XL"
-}
-
 internal fun SwipeAction.displayName() = when (this) {
     SwipeAction.ARCHIVE     -> "Archive"
     SwipeAction.STAR        -> "Star"
@@ -358,11 +350,6 @@ internal fun SyncFrequency.displayName() = when (this) {
 
 internal fun UndoSendWindow.displayName() = "${seconds}s"
 
-internal fun EmailTheme.displayName() = when (this) {
-    EmailTheme.AUTO     -> "Auto"
-    EmailTheme.ORIGINAL -> "Original"
-}
-
 internal fun NotificationSound.displayName() = when (this) {
     NotificationSound.DEFAULT -> "Default sound"
     NotificationSound.SILENT -> "Silent"
@@ -378,11 +365,6 @@ internal fun NotificationPreview.displayName() = when (this) {
     NotificationPreview.FULL -> "Full content"
     NotificationPreview.PRIVATE -> "Hide on lock screen"
     NotificationPreview.NONE -> "Don't show"
-}
-
-internal fun EmailTheme.description() = when (this) {
-    EmailTheme.AUTO     -> "Adapt simple emails to the app theme; show styled emails as sent"
-    EmailTheme.ORIGINAL -> "Always show the sender's original colors on a light background"
 }
 
 // ── Templates Card ───────────────────────────────────────────────────
