@@ -693,7 +693,9 @@ fun InboxScreen(
                 visible = longPressedThread == null && activeModal == null && !isBulkMode,
                 enter = fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.9f),
                 exit = fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.9f),
-                modifier = Modifier.align(Alignment.BottomCenter)
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
             ) {
                 BottomFabArea(
                     immediateTab = immediateTab,
