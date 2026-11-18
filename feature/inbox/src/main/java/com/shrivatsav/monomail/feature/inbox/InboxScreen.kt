@@ -150,16 +150,6 @@ fun InboxScreen(
         }
     }
 
-    var blurForModal by remember { mutableStateOf(false) }
-    LaunchedEffect(activeModal) {
-        if (activeModal != null) {
-            kotlinx.coroutines.delay(80)
-            blurForModal = true
-        } else {
-            blurForModal = false
-        }
-    }
-
     val isRefreshing = (state as? InboxState.Success)?.isRefreshing == true
     val navBarHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -199,8 +189,11 @@ fun InboxScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // ModalBottomSheet and Material dialogs provide their own scrim.
+            // Keep the inbox sharp beneath them; applying RenderEffect blur here
+            // made account switching look washed out and added unnecessary GPU work.
             val shouldBlur =
-                longPressedThread != null || blurForModal || threadToDelete != null || showWelcomePrompt
+                longPressedThread != null || threadToDelete != null || showWelcomePrompt
 
             Box(
                 modifier = Modifier
@@ -1167,7 +1160,7 @@ private fun BottomFabArea(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = navBarHeight + 8.dp),
+            .padding(bottom = navBarHeight + 12.dp),
         horizontalAlignment = Alignment.End,
     ) {
         Box(
@@ -1199,7 +1192,7 @@ private fun BottomFabArea(
             unifiedInboxEnabled = unifiedInboxEnabled,
             appSettings = appSettings,
             onTabClick = { viewModel.switchTab(it) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         )
     }
 }
