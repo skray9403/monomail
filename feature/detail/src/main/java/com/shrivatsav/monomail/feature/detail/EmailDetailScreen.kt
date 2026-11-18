@@ -12,8 +12,6 @@ import android.webkit.WebView
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
@@ -38,7 +36,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -112,7 +109,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalConfiguration
 import com.shrivatsav.monomail.data.model.EmailAttachmentInfo
 import com.shrivatsav.monomail.data.model.Email
-import com.shrivatsav.monomail.core.data.settings.EmailTheme
 
 import com.shrivatsav.monomail.data.pgp.PgpDecryptionResult
 import com.shrivatsav.monomail.util.normalizeEmailBody
@@ -132,9 +128,7 @@ import java.util.Locale
 
 data class EmailDisplayConfig(
     val isConversationView: Boolean = true,
-    val fontScaleMultiplier: Float = 1f,
     val loadRemoteImages: Boolean = false,
-    val emailTheme: EmailTheme = EmailTheme.AUTO,
     val showInlineImages: Boolean = true,
     val showInlineAttachments: Boolean = true,
     val isDeveloperMode: Boolean = false,
@@ -154,16 +148,13 @@ fun EmailDetailScreen(
 ) {
     // Read settings from ViewModel (consolidated — no direct DataStore collection)
     val isConversationView by viewModel.isConversationView.collectAsState()
-    val fontScaleMultiplier by viewModel.fontScaleMultiplier.collectAsState()
     val loadRemoteImages by viewModel.loadRemoteImages.collectAsState()
-    val emailTheme by viewModel.emailTheme.collectAsState()
     val showInlineImages by viewModel.showInlineImages.collectAsState()
     val showInlineAttachments by viewModel.showInlineAttachments.collectAsState()
     val state by viewModel.state.collectAsState()
     val isStarred by viewModel.isStarred.collectAsState()
     val decryptedBodies by viewModel.decryptedBodies.collectAsState()
     val isDeveloperMode by viewModel.isDeveloperMode.collectAsState()
-    val use24HourTime by viewModel.use24HourTime.collectAsState()
     val currentUserEmail by viewModel.currentUserEmail.collectAsState()
 
     Scaffold(
@@ -240,12 +231,10 @@ fun EmailDetailScreen(
             padding = padding,
             config = EmailDisplayConfig(
                 isConversationView = isConversationView,
-                fontScaleMultiplier = fontScaleMultiplier,
                 loadRemoteImages = loadRemoteImages,
-                emailTheme = emailTheme,
                 showInlineImages = showInlineImages,
                 showInlineAttachments = showInlineAttachments,
-                use24HourTime = use24HourTime,
+                use24HourTime = android.text.format.DateFormat.is24HourFormat(androidx.compose.ui.platform.LocalContext.current),
                 isDeveloperMode = isDeveloperMode,
                 currentUserEmail = currentUserEmail
             ),
@@ -578,6 +567,7 @@ fun ThreadConversationContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ConversationEmailItem(
     email: Email,
@@ -708,8 +698,8 @@ private fun ConversationEmailItem(
         }
         AnimatedVisibility(
             visible = isExpanded,
-            enter = fadeIn(tween(200)) + expandVertically(androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 400f)),
-            exit = fadeOut(tween(150)) + shrinkVertically(androidx.compose.animation.core.spring(dampingRatio = 0.9f, stiffness = 400f))
+            enter = fadeIn(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()),
+            exit = fadeOut(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec())
         ) {
             ConversationEmailBody(email, index, config, decryptedBodies, onFetchAttachment, onNavigateToAttachmentViewer)
         }
@@ -889,12 +879,10 @@ private fun MessageBodyContent(
         LaunchedEffect(
             email.id,
             safeBodyText,
-            config.fontScaleMultiplier,
             showQuotedText,
             config.showInlineImages,
             config.loadRemoteImages,
             showRemoteImages,
-            config.emailTheme,
             useOverviewScaling,
             emailZoomFactor
         ) {
@@ -904,7 +892,6 @@ private fun MessageBodyContent(
                     email,
                     safeBodyText,
                     bodyIsHtml,
-                    config.fontScaleMultiplier,
                     HtmlBuildParams(
                         showQuotedText,
                         config.showInlineImages,
@@ -921,12 +908,11 @@ private fun MessageBodyContent(
         EmailWebViewCard(
             email.id,
             htmlContent,
-            config.emailTheme,
             useOverviewScaling,
             allowRemoteImages = config.loadRemoteImages || showRemoteImages
         )
     } else {
-        val nativeTextSize = (15f * config.fontScaleMultiplier).coerceIn(10f, 28f).sp
+        val nativeTextSize = 15.sp
         SelectionContainer {
             Text(
                 text = safeBodyText,
@@ -1207,11 +1193,55 @@ private fun DeveloperCopyButton(email: Email) {
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun EmailBodyLoadingSkeleton(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = cornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LoadingIndicator()
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    "Loading email",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            repeat(4) { index ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(if (index == 3) 0.62f else 0.94f)
+                        .height(if (index == 0) 14.dp else 10.dp)
+                        .clip(cornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                )
+            }
+            Spacer(Modifier.height(20.dp))
+            repeat(3) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(10.dp)
+                        .clip(cornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun EmailWebViewCard(
     emailId: String,
     htmlContent: String,
-    emailTheme: EmailTheme,
     useOverviewScaling: Boolean,
     allowRemoteImages: Boolean
 ) {
@@ -1223,33 +1253,31 @@ private fun EmailWebViewCard(
     var loadError by remember(emailId, htmlContent, allowRemoteImages, renderGeneration) { mutableStateOf<String?>(null) }
     val alpha by animateFloatAsState(
         targetValue = if (isLoaded) 1f else 0f,
-        animationSpec = tween(300),
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
         label = "WebViewFade"
     )
     var emailContentWebView by remember(emailId, htmlContent, allowRemoteImages, renderGeneration) { mutableStateOf<WebView?>(null) }
     DisposableEffect(emailId, htmlContent, allowRemoteImages, renderGeneration) {
         onDispose { emailContentWebView?.apply { removeAllViews(); destroy() }; emailContentWebView = null }
     }
-    val cardBgColor = if (emailTheme == EmailTheme.ORIGINAL) Color.White else Color.Transparent
-    val useDarkening = when (emailTheme) {
-        EmailTheme.AUTO -> isSystemInDarkTheme()
-        EmailTheme.ORIGINAL -> false
-    }
+    val cardBgColor = Color.Transparent
+    val useDarkening = isSystemInDarkTheme()
     Column {
         if (htmlContent.isBlank()) {
-            Box(
-                modifier = Modifier.fillMaxWidth().height(72.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-            }
+            EmailBodyLoadingSkeleton(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp)
+            )
         } else {
             androidx.compose.runtime.key(emailId, htmlContent, allowRemoteImages, renderGeneration) {
                 val callbackGeneration = renderGeneration
-                AndroidView(
+                Box(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                        .clip(cornerShape(16.dp)).background(cardBgColor, cornerShape(16.dp)).padding(12.dp)
-                        .alpha(alpha),
+                        .heightIn(min = 180.dp)
+                        .clip(cornerShape(16.dp))
+                        .background(cardBgColor, cornerShape(16.dp))
+                ) {
+                    AndroidView(
+                    modifier = Modifier.fillMaxWidth().padding(12.dp).alpha(alpha),
                     factory = { context ->
                         WebView(context).apply {
                             emailContentWebView = this
@@ -1304,14 +1332,18 @@ private fun EmailWebViewCard(
                     webView.settings.useWideViewPort = false
                     webView.isHorizontalScrollBarEnabled = !useOverviewScaling
                     webView.settings.blockNetworkImage = !allowRemoteImages
+                    webView.settings.textZoom = (context.resources.configuration.fontScale * 100f)
+                        .toInt()
+                        .coerceIn(50, 300)
                     if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
                         WebSettingsCompat.setAlgorithmicDarkeningAllowed(webView.settings, useDarkening)
                     }
                     }
                 )
-            }
-            if (!isLoaded && loadError == null) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp))
+                    if (!isLoaded && loadError == null) {
+                        EmailBodyLoadingSkeleton(modifier = Modifier.matchParentSize().padding(12.dp))
+                    }
+                }
             }
             loadError?.let { message ->
                 Row(
@@ -1551,7 +1583,7 @@ private data class HtmlBuildParams(
 )
 
 private fun buildEmailHtml(
-    email: Email, safeBodyText: String, bodyIsHtml: Boolean, fontScaleMultiplier: Float,
+    email: Email, safeBodyText: String, bodyIsHtml: Boolean,
     params: HtmlBuildParams
 ): String {
     val (showQuotedText, showInlineImages, loadRemoteImages, showRemoteImages, useOverviewScaling, emailZoomFactor, textColor, linkColor) = params
@@ -1581,7 +1613,7 @@ private fun buildEmailHtml(
         blockquote { border-left: 3px solid ${linkColor}44; padding: 4px 0 4px 12px !important; margin: 8px 0 !important; background: transparent !important; color: ${textColor}aa; }
     """.trimIndent()
 
-    val fontSize = (15f * fontScaleMultiplier).coerceIn(10f, 28f)
+    val fontSize = 15f
     val responsiveCss = if (useOverviewScaling) {
         """
             html, body { min-width: 0 !important; overflow-x: hidden !important; }
