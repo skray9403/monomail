@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.background
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +54,7 @@ fun SettingsScreen(
 
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
+    val motionScheme = MaterialTheme.motionScheme
 
     if (isTablet) {
         androidx.compose.foundation.layout.Row(
@@ -75,13 +77,13 @@ fun SettingsScreen(
                     targetState = currentSection,
                     transitionSpec = {
                         (
-                            fadeIn(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()) +
+                            fadeIn(animationSpec = motionScheme.fastEffectsSpec()) +
                                 scaleIn(
                                     initialScale = 0.98f,
-                                    animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                                    animationSpec = motionScheme.fastSpatialSpec(),
                                 )
                         ).togetherWith(
-                            fadeOut(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec())
+                            fadeOut(animationSpec = motionScheme.fastEffectsSpec())
                         )
                     },
                     label = "settingsTabletDetail"
@@ -121,25 +123,25 @@ fun SettingsScreen(
                     (
                         slideInHorizontally(
                             initialOffsetX = { width -> width },
-                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
-                        ) + fadeIn(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec())
+                            animationSpec = motionScheme.fastSpatialSpec(),
+                        ) + fadeIn(animationSpec = motionScheme.fastEffectsSpec())
                     ).togetherWith(
                         slideOutHorizontally(
                             targetOffsetX = { width -> -width / 4 },
-                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
-                        ) + fadeOut(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec())
+                            animationSpec = motionScheme.fastSpatialSpec(),
+                        ) + fadeOut(animationSpec = motionScheme.fastEffectsSpec())
                     )
                 } else {
                     (
                         slideInHorizontally(
                             initialOffsetX = { width -> -width / 4 },
-                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
-                        ) + fadeIn(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec())
+                            animationSpec = motionScheme.fastSpatialSpec(),
+                        ) + fadeIn(animationSpec = motionScheme.fastEffectsSpec())
                     ).togetherWith(
                         slideOutHorizontally(
                             targetOffsetX = { width -> width },
-                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
-                        ) + fadeOut(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec())
+                            animationSpec = motionScheme.fastSpatialSpec(),
+                        ) + fadeOut(animationSpec = motionScheme.fastEffectsSpec())
                     )
                 }
             },
@@ -153,7 +155,7 @@ fun SettingsScreen(
                     onNavigateToLegal = onNavigateToLegal,
                 )
             } else {
-                DetailScreen(section)
+                SettingsSectionScreen(section, viewModel, authManager, onNavigateToPgpKeys) { currentSection = null }
             }
         }
     }
