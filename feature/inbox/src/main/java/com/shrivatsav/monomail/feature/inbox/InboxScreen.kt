@@ -488,7 +488,7 @@ fun InboxScreen(
                                         state = listState,
                                         modifier = Modifier
                                             .fillMaxSize(),
-                                        contentPadding = PaddingValues(bottom = 100.dp)
+                                        contentPadding = PaddingValues(bottom = navBarHeight + 112.dp)
                                     ) {
                                         itemsIndexed(
                                             items = displayItems,
@@ -507,13 +507,13 @@ fun InboxScreen(
                                                     com.shrivatsav.monomail.ui.components.SectionHeader(
                                                         label = displayItem.title,
                                                         showTopDivider = false,
-                                                        modifier = Modifier.animateItem().background(MaterialTheme.colorScheme.background)
+                                                        modifier = Modifier.background(MaterialTheme.colorScheme.background)
                                                     )
                                                 }
 
                                                 is InboxDisplayItem.GroupHeader -> {
                                                     GroupHeaderItem(
-                                                        modifier = Modifier.animateItem(),
+                                                        modifier = Modifier,
                                                         groupName = displayItem.groupName,
                                                         count = displayItem.count,
                                                         unreadCount = displayItem.unreadCount,
@@ -555,7 +555,7 @@ fun InboxScreen(
                                                         else -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.SOLO
                                                     }
                                                     SwipeableEmailItem(
-                                                        modifier = Modifier.animateItem(),
+                                                        modifier = Modifier,
                                                         thread = displayItem.thread,
                                                         tabForSwipe = currentTab,
                                                         appSettings = appSettings,
@@ -615,7 +615,7 @@ fun InboxScreen(
                                                             exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut()
                                                         ) {
                                                             SwipeableEmailItem(
-                                                                modifier = Modifier.animateItem(),
+                                                                modifier = Modifier,
                                                                 thread = displayItem.thread,
                                                                 tabForSwipe = currentTab,
                                                                 appSettings = appSettings,
@@ -701,32 +701,25 @@ fun InboxScreen(
                 exit = fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.9f),
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 16.dp)
-                    ) {
-                        BottomFabArea(
-                            immediateTab = immediateTab,
-                            appSettings = appSettings,
-                            unifiedInboxEnabled = unifiedInboxEnabled,
-                            navActions = navActions,
-                            viewModel = viewModel,
-                            navBarHeight = navBarHeight,
-                            onMoveSpamToTrash = {
-                            val hasSpamThreads = currentThreads.isNotEmpty()
-                            if (hasSpamThreads) {
-                                showMoveToTrashDialog = true
-                            } else {
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("No spam to move")
-                                }
+                BottomFabArea(
+                    immediateTab = immediateTab,
+                    appSettings = appSettings,
+                    unifiedInboxEnabled = unifiedInboxEnabled,
+                    navActions = navActions,
+                    viewModel = viewModel,
+                    navBarHeight = navBarHeight,
+                    onMoveSpamToTrash = {
+                        val hasSpamThreads = currentThreads.isNotEmpty()
+                        if (hasSpamThreads) {
+                            showMoveToTrashDialog = true
+                        } else {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("No spam to move")
                             }
-                        },
-                        )
-                    }
+                        }
+                    },
+                )
             }
-
 
             AnimatedVisibility(
                 visible = isBulkMode,
@@ -1171,42 +1164,43 @@ private fun BottomFabArea(
     navBarHeight: Dp,
     onMoveSpamToTrash: () -> Unit,
 ) {
-    val tabForDock = immediateTab
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = navBarHeight + 8.dp)
+            .padding(bottom = navBarHeight + 8.dp),
+        horizontalAlignment = Alignment.End,
     ) {
-        BottomDockBar(
-            currentTab = tabForDock,
-            dockConfig = appSettings.dockConfig,
-            unifiedInboxEnabled = unifiedInboxEnabled,
-            appSettings = appSettings,
-            onTabClick = { viewModel.switchTab(it) },
-            modifier = Modifier.fillMaxWidth()
-        )
         Box(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = 12.dp, top = 12.dp)
+                .fillMaxWidth()
+                .padding(end = 16.dp),
         ) {
             AnimatedContent(
-                targetState = when (immediateTab) {
-                    InboxTab.SPAM -> "spam"
-                    else -> "default"
-                },
+                targetState = if (immediateTab == InboxTab.SPAM) "spam" else "default",
                 label = "FabIconMorph",
+                modifier = Modifier.align(Alignment.CenterEnd),
                 transitionSpec = {
                     (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.85f)) togetherWith
-                            (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.85f))
+                        (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.85f))
                 }
             ) { state ->
                 when (state) {
-                    "spam" -> MoveToTrashFab { onMoveSpamToTrash() }
+                    "spam" -> MoveToTrashFab(onMoveSpamToTrash)
                     else -> ComposeFab(navActions.onCompose)
                 }
             }
         }
+
+        Spacer(Modifier.height(12.dp))
+
+        BottomDockBar(
+            currentTab = immediateTab,
+            dockConfig = appSettings.dockConfig,
+            unifiedInboxEnabled = unifiedInboxEnabled,
+            appSettings = appSettings,
+            onTabClick = { viewModel.switchTab(it) },
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

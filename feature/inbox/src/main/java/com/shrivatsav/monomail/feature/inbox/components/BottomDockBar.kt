@@ -19,7 +19,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.shrivatsav.monomail.core.data.settings.DockConfig
@@ -27,7 +26,8 @@ import com.shrivatsav.monomail.core.data.settings.DockTabId
 import com.shrivatsav.monomail.core.data.settings.AppSettings
 
 /**
- * Standard Material 3 NavigationBar with additional folders in a Material menu.
+ * Standard Material 3 NavigationBar. The overflow popup is attached to the
+ * More icon slot so its anchor is the icon, not the full-width navigation bar.
  */
 @Composable
 internal fun BottomDockBar(
@@ -43,64 +43,64 @@ internal fun BottomDockBar(
     val primaryIds = dockConfig.primaryTabs.take(4)
     val remainingIds = allTabs.filter { it !in primaryIds }
 
-    Box(modifier = modifier.fillMaxWidth()) {
-        NavigationBar(
-            modifier = Modifier.fillMaxWidth(),
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 3.dp,
-        ) {
-            primaryIds.forEach { id ->
-                val tab = id.toInboxTab()
-                NavigationBarItem(
-                    selected = currentTab == tab,
-                    onClick = {
-                        showRemainingTabs = false
-                        onTabClick(tab)
-                    },
-                    icon = { Icon(id.icon(unifiedInboxEnabled), contentDescription = null) },
-                    label = { Text(id.label(unifiedInboxEnabled)) },
-                    alwaysShowLabel = true,
-                )
-            }
-
-            if (remainingIds.isNotEmpty()) {
-                val selectedExtra = remainingIds.any { it.toInboxTab() == currentTab }
-                NavigationBarItem(
-                    selected = selectedExtra,
-                    onClick = { showRemainingTabs = true },
-                    icon = { Icon(Icons.Rounded.MoreHoriz, contentDescription = null) },
-                    label = { Text("More") },
-                    alwaysShowLabel = true,
-                )
-            }
+    NavigationBar(
+        modifier = modifier.fillMaxWidth(),
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 3.dp,
+    ) {
+        primaryIds.forEach { id ->
+            val tab = id.toInboxTab()
+            NavigationBarItem(
+                selected = currentTab == tab,
+                onClick = {
+                    showRemainingTabs = false
+                    onTabClick(tab)
+                },
+                icon = { Icon(id.icon(unifiedInboxEnabled), contentDescription = null) },
+                label = { Text(id.label(unifiedInboxEnabled)) },
+                alwaysShowLabel = true,
+            )
         }
 
-        DropdownMenu(
-            expanded = showRemainingTabs,
-            onDismissRequest = { showRemainingTabs = false },
-            modifier = Modifier.align(Alignment.TopEnd),
-        ) {
-            remainingIds.forEach { id ->
-                val tab = id.toInboxTab()
-                DropdownMenuItem(
-                    text = { Text(id.label(unifiedInboxEnabled)) },
-                    leadingIcon = { Icon(id.icon(unifiedInboxEnabled), contentDescription = null) },
-                    trailingIcon = {
-                        if (currentTab == tab) {
-                            Icon(
-                                Icons.Rounded.Check,
-                                contentDescription = "Selected",
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
+        if (remainingIds.isNotEmpty()) {
+            val selectedExtra = remainingIds.any { it.toInboxTab() == currentTab }
+            NavigationBarItem(
+                selected = selectedExtra,
+                onClick = { showRemainingTabs = true },
+                icon = {
+                    Box {
+                        Icon(Icons.Rounded.MoreHoriz, contentDescription = null)
+                        DropdownMenu(
+                            expanded = showRemainingTabs,
+                            onDismissRequest = { showRemainingTabs = false },
+                        ) {
+                            remainingIds.forEach { id ->
+                                val tab = id.toInboxTab()
+                                DropdownMenuItem(
+                                    text = { Text(id.label(unifiedInboxEnabled)) },
+                                    leadingIcon = { Icon(id.icon(unifiedInboxEnabled), contentDescription = null) },
+                                    trailingIcon = {
+                                        if (currentTab == tab) {
+                                            Icon(
+                                                Icons.Rounded.Check,
+                                                contentDescription = "Selected",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        showRemainingTabs = false
+                                        onTabClick(tab)
+                                    },
+                                )
+                            }
                         }
-                    },
-                    onClick = {
-                        showRemainingTabs = false
-                        onTabClick(tab)
-                    },
-                )
-            }
+                    }
+                },
+                label = { Text("More") },
+                alwaysShowLabel = true,
+            )
         }
     }
 }

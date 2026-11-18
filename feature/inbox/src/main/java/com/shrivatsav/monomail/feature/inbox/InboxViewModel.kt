@@ -435,7 +435,8 @@ class InboxViewModel @Inject constructor(
         currentServerQuery = null
         clearSearch()
         if (_isBulkSelectMode.value) exitBulkSelectMode()
-        refresh()
+        // Each tab is backed by a Room flow, so render its cached rows immediately.
+        // Remote refresh is reserved for startup, foreground polling and pull-to-refresh.
     }
     fun refresh(showLoader: Boolean = true) {
         viewModelScope.launch {

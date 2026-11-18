@@ -51,6 +51,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import com.shrivatsav.monomail.ui.theme.cornerShape
@@ -201,7 +202,7 @@ fun EmailDetailScreen(
                         }
                     }
                     var showMenu by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-                    Box {
+                    Box(modifier = Modifier.wrapContentSize(Alignment.TopEnd)) {
                         IconButton(onClick = { showMenu = true }) {
                             Icon(
                                 imageVector = Icons.Rounded.MoreVert,
@@ -638,7 +639,7 @@ private fun ConversationEmailItem(
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Box {
+                    Box(modifier = Modifier.wrapContentSize(Alignment.TopEnd)) {
                         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(24.dp)) {
                             Icon(
                                 imageVector = Icons.Rounded.MoreVert,
