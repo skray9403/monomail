@@ -11,7 +11,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.material.icons.rounded.Drafts
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Person
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.text.style.TextOverflow
@@ -109,6 +108,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.heightIn
@@ -436,16 +436,32 @@ fun ComposeScreen(
     var showDrafts by remember { mutableStateOf(false) }
     val drafts by viewModel.drafts.collectAsState()
 
+    // Keep the current editor state available to the destination's disposal
+    // callback. AndroidX Navigation Compose owns predictive back for this route;
+    // this callback only persists a draft when the route is actually removed.
+    val latestComposeState by rememberUpdatedState(state)
+    var draftSavedOnManualBack by remember { mutableStateOf(false) }
+    DisposableEffect(viewModel) {
+        onDispose {
+            val finalState = latestComposeState
+            if (!draftSavedOnManualBack && !finalState.isSending && !finalState.isSent) {
+                viewModel.saveDraft()
+            }
+        }
+    }
+
     val handleBack = {
         if (!state.isSending && !state.isSent) {
             viewModel.saveDraft()
+            draftSavedOnManualBack = true
             if (state.to.isNotBlank() || state.subject.isNotBlank() || state.body.isNotBlank()) {
                 android.widget.Toast.makeText(context, "Draft saved", android.widget.Toast.LENGTH_SHORT).show()
             }
+        } else {
+            draftSavedOnManualBack = true
         }
         onBack()
     }
-    BackHandler(onBack = handleBack)
     val contentResolver = context.contentResolver
     var showAttachmentPicker by remember { mutableStateOf(false) }
     val photoVideoLauncher = rememberLauncherForActivityResult(
