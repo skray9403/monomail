@@ -429,9 +429,9 @@ fun ComposeScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val suggestions by viewModel.suggestions.collectAsState()
-    val use24HourTime by viewModel.use24HourTime.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val use24HourTime = android.text.format.DateFormat.is24HourFormat(context)
     val canSend = state.to.isNotBlank()
     val showSentAnimation = remember { mutableStateOf(false) }
     var showDrafts by remember { mutableStateOf(false) }
