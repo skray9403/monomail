@@ -1,7 +1,9 @@
 package com.shrivatsav.monomail.feature.inbox.components
 
 import com.shrivatsav.monomail.feature.inbox.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -51,6 +53,11 @@ internal fun ModalOverlay(
             ModalBottomSheet(
                 onDismissRequest = callbacks.onDismiss,
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                tonalElevation = 0.dp,
+                scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.34f),
             ) {
                 key(activeModal) {
                     ModalContentBody(
