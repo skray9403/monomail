@@ -61,7 +61,7 @@ internal fun BottomDockBar(
                 .fillMaxWidth()
                 .fillMaxHeight()
                 .padding(horizontal = 6.dp, vertical = 6.dp),
-            space = 0.dp,
+            space = 4.dp,
         ) {
             primaryIds.forEachIndexed { index, id ->
                 val tab = id.toInboxTab()
@@ -69,10 +69,7 @@ internal fun BottomDockBar(
                 SegmentedButton(
                     selected = selected,
                     onClick = { onTabClick(tab) },
-                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(
-                        index = index,
-                        count = primaryIds.size,
-                    ),
+                    shape = RoundedCornerShape(percent = 50),
                     modifier = Modifier.weight(1f),
                     colors = androidx.compose.material3.SegmentedButtonDefaults.colors(
                         activeContainerColor = MaterialTheme.colorScheme.primaryContainer,

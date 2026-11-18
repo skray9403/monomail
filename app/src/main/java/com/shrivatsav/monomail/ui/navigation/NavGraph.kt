@@ -306,22 +306,26 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
             slideOutOfContainer(
                 towards = AnimatedContentTransitionScope.SlideDirection.Start,
                 animationSpec = NavSpatialSpec,
+                targetOffset = { fullWidth -> (fullWidth * 0.22f).toInt() },
             ) +
                 scaleOut(
-                    targetScale = 0.88f,
+                    targetScale = 0.92f,
                     transformOrigin = TransformOrigin(0.05f, 0.5f),
                     animationSpec = NavFloatSpec,
-                )
+                ) +
+                fadeOut(animationSpec = motionScheme.fastEffectsSpec())
         } else {
             slideOutOfContainer(
                 towards = AnimatedContentTransitionScope.SlideDirection.End,
                 animationSpec = NavSpatialSpec,
+                targetOffset = { fullWidth -> (fullWidth * 0.22f).toInt() },
             ) +
                 scaleOut(
-                    targetScale = 0.88f,
+                    targetScale = 0.92f,
                     transformOrigin = TransformOrigin(0.95f, 0.5f),
                     animationSpec = NavFloatSpec,
-                )
+                ) +
+                fadeOut(animationSpec = motionScheme.fastEffectsSpec())
         }
     }
     else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
