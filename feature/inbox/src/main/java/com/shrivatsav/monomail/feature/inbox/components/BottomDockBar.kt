@@ -81,7 +81,6 @@ internal fun BottomDockBar(
                     ),
                     border = androidx.compose.material3.SegmentedButtonDefaults.borderStroke(
                         color = androidx.compose.ui.graphics.Color.Transparent,
-                        disabledColor = androidx.compose.ui.graphics.Color.Transparent,
                     ),
                     icon = {
                         if (selected) {
