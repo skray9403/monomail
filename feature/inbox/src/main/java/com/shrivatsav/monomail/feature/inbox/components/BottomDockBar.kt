@@ -2,15 +2,12 @@ package com.shrivatsav.monomail.feature.inbox.components
 
 import com.shrivatsav.monomail.feature.inbox.*
 import com.shrivatsav.monomail.model.InboxTab
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -18,10 +15,6 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -30,12 +23,12 @@ import com.shrivatsav.monomail.core.data.settings.DockTabId
 import com.shrivatsav.monomail.core.data.settings.AppSettings
 
 /**
- * Detached Material 3 NavigationBar dock.
+ * Floating top-level navigation dock.
  *
- * The NavigationBar remains the stock component, but its container is hosted
- * inside a separate rounded Surface so it reads as a floating navigation dock
- * instead of a full-width bottom strip. The More menu remains anchored to its
- * NavigationBarItem and all tab configuration continues to come from DockConfig.
+ * NavigationBar remains the correct semantic component for destinations.
+ * Its container adopts the capsule geometry and elevation language of the
+ * Material 3 Expressive floating toolbar without misusing a contextual toolbar
+ * as app navigation. Secondary mail folders live in the dedicated Folders sheet.
  */
 @Composable
 internal fun BottomDockBar(
@@ -46,18 +39,15 @@ internal fun BottomDockBar(
     onTabClick: (InboxTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var showRemainingTabs by remember { mutableStateOf(false) }
-    val allTabs = DockTabId.entries.filter { it != DockTabId.UNIFIED }
     val primaryIds = dockConfig.primaryTabs.take(4)
-    val remainingIds = allTabs.filter { it !in primaryIds }
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = RoundedCornerShape(percent = 50),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 2.dp,
-        shadowElevation = 6.dp,
+        shadowElevation = 8.dp,
     ) {
         NavigationBar(
             modifier = Modifier.fillMaxWidth(),
@@ -70,52 +60,9 @@ internal fun BottomDockBar(
                 val tab = id.toInboxTab()
                 NavigationBarItem(
                     selected = currentTab == tab,
-                    onClick = {
-                        showRemainingTabs = false
-                        onTabClick(tab)
-                    },
+                    onClick = { onTabClick(tab) },
                     icon = { Icon(id.icon(unifiedInboxEnabled), contentDescription = null) },
                     label = { Text(id.label(unifiedInboxEnabled)) },
-                    alwaysShowLabel = true,
-                )
-            }
-
-            if (remainingIds.isNotEmpty()) {
-                val selectedExtra = remainingIds.any { it.toInboxTab() == currentTab }
-                NavigationBarItem(
-                    selected = selectedExtra,
-                    onClick = { showRemainingTabs = true },
-                    icon = {
-                        Box {
-                            Icon(Icons.Rounded.MoreHoriz, contentDescription = null)
-                            DropdownMenu(
-                                expanded = showRemainingTabs,
-                                onDismissRequest = { showRemainingTabs = false },
-                            ) {
-                                remainingIds.forEach { id ->
-                                    val tab = id.toInboxTab()
-                                    DropdownMenuItem(
-                                        text = { Text(id.label(unifiedInboxEnabled)) },
-                                        leadingIcon = { Icon(id.icon(unifiedInboxEnabled), contentDescription = null) },
-                                        trailingIcon = {
-                                            if (currentTab == tab) {
-                                                Icon(
-                                                    Icons.Rounded.Check,
-                                                    contentDescription = "Selected",
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                )
-                                            }
-                                        },
-                                        onClick = {
-                                            showRemainingTabs = false
-                                            onTabClick(tab)
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    },
-                    label = { Text("More") },
                     alwaysShowLabel = true,
                 )
             }
