@@ -2,12 +2,6 @@ package com.shrivatsav.monomail.feature.settings
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -17,26 +11,24 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.shrivatsav.monomail.ui.theme.MonoSpring
-import com.shrivatsav.monomail.ui.theme.MonoTween
 import androidx.compose.ui.platform.LocalContext
 import com.shrivatsav.monomail.feature.settings.BuildConfig
 
 enum class SettingsSection(val icon: ImageVector, val title: String, val subtitle: String) {
     ACCOUNTS(Icons.Rounded.ManageAccounts, "Accounts", "Manage accounts, providers, connection status"),
-    APPEARANCE(Icons.Rounded.Palette, "Appearance", "Theme, font size, colors"),
+    APPEARANCE(Icons.Rounded.Palette, "Appearance", "Theme and list presentation"),
     INBOX(Icons.Rounded.Inbox, "Inbox", "Threading, grouping, list density, swipe actions"),
     READING(Icons.Rounded.MenuBook, "Reading", "Inline attachments, markdown renderer"),
     PRIVACY(Icons.Rounded.Shield, "Privacy & Security", "PGP encryption keys, remote images"),
     COMPOSE(Icons.AutoMirrored.Rounded.Send, "Compose", "Reply defaults, confirm send, undo send"),
-    NAVIGATION(Icons.Rounded.Explore, "Navigation", "Gestures & actions"),
+    NAVIGATION(Icons.Rounded.Explore, "Navigation", "Dock tabs and mail folders"),
     NOTIFICATIONS(Icons.Rounded.Notifications, "Notifications", "Alerts & sync"),
     DEVELOPER(Icons.Rounded.DeveloperMode, "Developer", "Developer mode & debug tools"),
     SUPPORT(Icons.Rounded.Favorite, "Support", "Donate & community")
@@ -123,8 +115,15 @@ fun SettingsScreen(
                 AnimatedContent(
                     targetState = currentSection,
                     transitionSpec = {
-                        (androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(220)))
-                            .togetherWith(androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(180)))
+                        (
+                            fadeIn(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()) +
+                                scaleIn(
+                                    initialScale = 0.98f,
+                                    animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                                )
+                        ).togetherWith(
+                            fadeOut(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec())
+                        )
                     },
                     label = "settingsTabletDetail"
                 ) { section ->
@@ -160,11 +159,29 @@ fun SettingsScreen(
             transitionSpec = {
                 val isDrill = targetState != null
                 if (isDrill) {
-                    (slideInHorizontally { width -> width } + fadeIn(animationSpec = MonoTween.fadeIn))
-                        .togetherWith(slideOutHorizontally { width -> -width / 4 } + fadeOut(animationSpec = MonoTween.fadeOut))
+                    (
+                        slideInHorizontally(
+                            initialOffsetX = { width -> width },
+                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                        ) + fadeIn(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec())
+                    ).togetherWith(
+                        slideOutHorizontally(
+                            targetOffsetX = { width -> -width / 4 },
+                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                        ) + fadeOut(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec())
+                    )
                 } else {
-                    (slideInHorizontally { width -> -width / 4 } + fadeIn(animationSpec = MonoTween.fadeIn))
-                        .togetherWith(slideOutHorizontally { width -> width } + fadeOut(animationSpec = MonoTween.fadeOut))
+                    (
+                        slideInHorizontally(
+                            initialOffsetX = { width -> -width / 4 },
+                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                        ) + fadeIn(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec())
+                    ).togetherWith(
+                        slideOutHorizontally(
+                            targetOffsetX = { width -> width },
+                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                        ) + fadeOut(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec())
+                    )
                 }
             },
             label = "settingsNav"
@@ -185,7 +202,7 @@ fun SettingsScreen(
 
 // ── HUB SCREEN ───────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SettingsHubScreen(
     viewModel: SettingsViewModel,
@@ -194,47 +211,96 @@ private fun SettingsHubScreen(
     onNavigateToLegal: (String) -> Unit,
     onNavigateToLicensing: () -> Unit = {},
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val buildFlavorName = if (com.shrivatsav.monomail.feature.settings.BuildConfig.IS_GITHUB_BUILD) "GitHub" else "Play Store"
-    val buildTypeName = if (com.shrivatsav.monomail.feature.settings.BuildConfig.DEBUG) "Debug" else "Release"
+    val context = LocalContext.current
+    val buildFlavorName = if (BuildConfig.IS_GITHUB_BUILD) "GitHub" else "Play Store"
+    val buildTypeName = if (BuildConfig.DEBUG) "Debug" else "Release"
     val versionName = remember {
         try {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0"
-        } catch (_: Exception) { "1.0.0" }
+        } catch (_: Exception) {
+            "1.0.0"
+        }
     }
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val settings by viewModel.settings.collectAsState()
     var devTapCount by remember { mutableIntStateOf(0) }
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = MaterialTheme.colorScheme.surface,
         contentWindowInsets = WindowInsets(
             top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-            bottom = 0.dp
+            bottom = 0.dp,
         ),
         topBar = {
-            SettingsDetailTopBar(title = "Settings", onNavigateBack = onNavigateBack)
-        }
+            LargeFlexibleTopAppBar(
+                title = {
+                    Text(
+                        "Settings",
+                        style = MaterialTheme.typography.headlineLarge,
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "Back",
+                        )
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+                colors = TopAppBarDefaults.largeTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                ),
+            )
+        },
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Spacer(Modifier.height(4.dp))
-
-            SettingsSection.entries.filter { it != SettingsSection.DEVELOPER || settings.isDeveloperMode }.forEach { section ->
-                CategoryCard(
-                    icon = section.icon,
-                    title = section.title,
-                    subtitle = section.subtitle,
-                    onClick = { onSectionClick(section) }
-                )
+            SettingsGroupLabel("Accounts & Cloud")
+            SettingsGroupSurface {
+                SettingsHubItem(SettingsSection.ACCOUNTS) { onSectionClick(it) }
             }
 
-            SettingsCard {
+            SettingsGroupLabel("Mail & Display")
+            SettingsGroupSurface {
+                SettingsHubItem(SettingsSection.APPEARANCE) { onSectionClick(it) }
+                SettingsGroupDivider()
+                SettingsHubItem(SettingsSection.INBOX) { onSectionClick(it) }
+                SettingsGroupDivider()
+                SettingsHubItem(SettingsSection.READING) { onSectionClick(it) }
+            }
+
+            SettingsGroupLabel("Interactions & Compose")
+            SettingsGroupSurface {
+                SettingsHubItem(SettingsSection.NAVIGATION) { onSectionClick(it) }
+                SettingsGroupDivider()
+                SettingsHubItem(SettingsSection.COMPOSE) { onSectionClick(it) }
+            }
+
+            SettingsGroupLabel("Security & Alerts")
+            SettingsGroupSurface {
+                SettingsHubItem(SettingsSection.PRIVACY) { onSectionClick(it) }
+                SettingsGroupDivider()
+                SettingsHubItem(SettingsSection.NOTIFICATIONS) { onSectionClick(it) }
+            }
+
+            SettingsGroupLabel("App & System")
+            SettingsGroupSurface {
+                SettingsHubItem(SettingsSection.SUPPORT) { onSectionClick(it) }
+                if (settings.isDeveloperMode) {
+                    SettingsGroupDivider()
+                    SettingsHubItem(SettingsSection.DEVELOPER) { onSectionClick(it) }
+                }
+                SettingsGroupDivider()
                 InfoRow(
                     icon = Icons.Rounded.Info,
                     title = "Version",
@@ -245,46 +311,128 @@ private fun SettingsHubScreen(
                             if (devTapCount >= 3) {
                                 viewModel.setDeveloperMode(true)
                                 devTapCount = 0
-                                android.widget.Toast.makeText(context, "Developer Mode unlocked!", android.widget.Toast.LENGTH_SHORT).show()
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Developer Mode unlocked!",
+                                    android.widget.Toast.LENGTH_SHORT,
+                                ).show()
                             }
                         }
-                    }
+                    },
                 )
-                CardDivider()
+                SettingsGroupDivider()
                 InfoRow(
                     icon = Icons.Rounded.Language,
                     title = "Website",
                     value = "",
-                    onClick = { uriHandler.openUri("https://monomail.millosaurs.me") }
+                    onClick = { uriHandler.openUri("https://monomail.millosaurs.me") },
                 )
-                CardDivider()
+                SettingsGroupDivider()
                 InfoRow(
                     icon = Icons.Rounded.PrivacyTip,
                     title = "Privacy Policy",
                     value = "",
-                    onClick = { onNavigateToLegal("privacy") }
+                    onClick = { onNavigateToLegal("privacy") },
                 )
-                CardDivider()
+                SettingsGroupDivider()
                 InfoRow(
                     icon = Icons.Rounded.Gavel,
                     title = "Terms of Service",
                     value = "",
-                    onClick = { onNavigateToLegal("tos") }
+                    onClick = { onNavigateToLegal("tos") },
                 )
             }
-            Spacer(Modifier.height(24.dp))
 
-            Box(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
                 Text(
-                    "Made with \u2764\uFE0F",
+                    "Made with ❤️",
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 )
             }
         }
     }
 }
+
+@Composable
+private fun SettingsGroupLabel(label: String) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 4.dp),
+    )
+}
+
+@Composable
+private fun SettingsGroupSurface(content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        content = { Column(content = content) },
+    )
+}
+
+@Composable
+private fun SettingsGroupDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 72.dp),
+        thickness = 0.5.dp,
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+    )
+}
+
+@Composable
+private fun SettingsHubItem(
+    section: SettingsSection,
+    onClick: (SettingsSection) -> Unit,
+) {
+    ListItem(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = androidx.compose.ui.semantics.Role.Button) { onClick(section) },
+        leadingContent = {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = section.icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        },
+        headlineContent = {
+            Text(section.title, style = MaterialTheme.typography.bodyLarge)
+        },
+        supportingContent = {
+            Text(
+                section.subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        trailingContent = {
+            Icon(
+                Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -396,67 +544,3 @@ internal fun DeveloperSettingsScreen(
     }
 }
 
-@Composable
-private fun CategoryCard(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val cardScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.97f else 1f,
-        animationSpec = MonoSpring.bouncy(),
-        label = "cardScale"
-    )
-
-    Surface(
-        onClick = onClick,
-        interactionSource = interactionSource,
-        shape = cornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        tonalElevation = 0.dp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .graphicsLayer(
-                scaleX = cardScale,
-                scaleY = cardScale
-            )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 18.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            Icon(
-                imageVector = Icons.Rounded.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                modifier = Modifier.size(22.dp)
-            )
-        }
-    }
-}
