@@ -318,30 +318,38 @@ fun InboxScreen(
                             val density = LocalDensity.current
                             val collapseThresholdPx = with(density) { 32.dp.toPx() }
                             val expandThresholdPx = with(density) { 48.dp.toPx() }
-                            var accumulatedDownScroll by remember { mutableFloatStateOf(0f) }
-                            var accumulatedUpScroll by remember { mutableFloatStateOf(0f) }
 
                             val isAtTop by remember {
                                 derivedStateOf {
                                     listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
                                 }
                             }
+                            // Use primitive accumulators inside the remember block to prevent
+                            // triggering Compose snapshot mutations on every touch motion event
                             val nestedScrollConnection = remember {
                                 object : NestedScrollConnection {
+                                    private var accumulatedDown = 0f
+                                    private var accumulatedUp = 0f
+
+                                    fun reset() {
+                                        accumulatedDown = 0f
+                                        accumulatedUp = 0f
+                                    }
+
                                     override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                                         val dy = available.y
                                         if (dy < 0f) {
                                             // Finger dragging up / list scrolling down deeper into inbox
-                                            accumulatedDownScroll += -dy
-                                            accumulatedUpScroll = 0f
-                                            if (accumulatedDownScroll > collapseThresholdPx && !dockController.isScrolling) {
+                                            accumulatedDown += -dy
+                                            accumulatedUp = 0f
+                                            if (accumulatedDown > collapseThresholdPx && !dockController.isScrolling) {
                                                 dockController.isScrolling = true
                                             }
                                         } else if (dy > 0f) {
                                             // Finger dragging down / list scrolling up toward top
-                                            accumulatedUpScroll += dy
-                                            accumulatedDownScroll = 0f
-                                            if (accumulatedUpScroll > expandThresholdPx && dockController.isScrolling) {
+                                            accumulatedUp += dy
+                                            accumulatedDown = 0f
+                                            if (accumulatedUp > expandThresholdPx && dockController.isScrolling) {
                                                 dockController.isScrolling = false
                                             }
                                         }
@@ -352,8 +360,7 @@ fun InboxScreen(
                             LaunchedEffect(isAtTop) {
                                 if (isAtTop) {
                                     dockController.isScrolling = false
-                                    accumulatedDownScroll = 0f
-                                    accumulatedUpScroll = 0f
+                                    nestedScrollConnection.reset()
                                 }
                             }
                             val shouldLoadMore by remember {
@@ -366,11 +373,15 @@ fun InboxScreen(
                             LaunchedEffect(Unit) {
                                 snapshotFlow { shouldLoadMore }.collect { if (it) viewModel.loadMore() }
                             }
-                            LaunchedEffect(listState, currentTab) {
-                                snapshotFlow {
-                                    listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
-                                }.collect { (index, offset) ->
-                                    viewModel.saveScrollState(currentTab, index, offset)
+                            // Save scroll position only on tab disposal rather than firing
+                            // allocations and StateFlow updates on every single pixel delta
+                            DisposableEffect(currentTab) {
+                                onDispose {
+                                    viewModel.saveScrollState(
+                                        currentTab,
+                                        listState.firstVisibleItemIndex,
+                                        listState.firstVisibleItemScrollOffset
+                                    )
                                 }
                             }
                             val threadsToDisplay = if (isSearchActive) searchResults else s.threads
@@ -410,6 +421,17 @@ fun InboxScreen(
                                 }
                             }
                             val searchFeatherColor = MaterialTheme.colorScheme.background
+                            val searchFeatherBrush = remember(searchFeatherColor) {
+                                Brush.verticalGradient(
+                                    colorStops = arrayOf(
+                                        0.0f to searchFeatherColor.copy(alpha = 0.96f),
+                                        0.45f to searchFeatherColor.copy(alpha = 0.72f),
+                                        1.0f to searchFeatherColor.copy(alpha = 0.0f),
+                                    ),
+                                    startY = 0f,
+                                    endY = with(density) { 30.dp.toPx() },
+                                )
+                            }
                             PullToRefreshBox(
                                 isRefreshing = s.isRefreshing,
                                 onRefresh = { viewModel.refresh() },
@@ -422,15 +444,7 @@ fun InboxScreen(
                                         drawContent()
                                         val featherHeight = 30.dp.toPx()
                                         drawRect(
-                                            brush = Brush.verticalGradient(
-                                                colorStops = arrayOf(
-                                                    0.0f to searchFeatherColor.copy(alpha = 0.96f),
-                                                    0.45f to searchFeatherColor.copy(alpha = 0.72f),
-                                                    1.0f to searchFeatherColor.copy(alpha = 0.0f),
-                                                ),
-                                                startY = 0f,
-                                                endY = featherHeight,
-                                            ),
+                                            brush = searchFeatherBrush,
                                             size = Size(size.width, featherHeight),
                                         )
                                     },
@@ -575,14 +589,13 @@ fun InboxScreen(
                                                         label = displayItem.title,
                                                         showTopDivider = false,
                                                         modifier = Modifier
-                                                            .animateItem()
                                                             .background(MaterialTheme.colorScheme.background)
                                                     )
                                                 }
 
                                                 is InboxDisplayItem.GroupHeader -> {
                                                     GroupHeaderItem(
-                                                        modifier = Modifier.animateItem(),
+                                                        modifier = Modifier,
                                                         groupName = displayItem.groupName,
                                                         count = displayItem.count,
                                                         unreadCount = displayItem.unreadCount,
@@ -624,7 +637,7 @@ fun InboxScreen(
                                                         else -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.SOLO
                                                     }
                                                     SwipeableEmailItem(
-                                                        modifier = Modifier.animateItem(),
+                                                        modifier = Modifier,
                                                         thread = displayItem.thread,
                                                         tabForSwipe = currentTab,
                                                         appSettings = appSettings,
@@ -677,7 +690,7 @@ fun InboxScreen(
                                                         nextUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.TOP
                                                         else -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.SOLO
                                                     }
-                                                    Column(modifier = Modifier.animateItem()) {
+                                                    Column(modifier = Modifier) {
                                                         AnimatedVisibility(
                                                             visible = displayItem.isVisible,
                                                             enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(),

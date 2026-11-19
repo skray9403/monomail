@@ -116,7 +116,7 @@ internal fun ExpressivePersistentDock(
         targetValue = if (isScrolling) 1f else 0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow
+            stiffness = Spring.StiffnessMedium
         ),
         label = "dockCollapseFraction"
     )
@@ -134,11 +134,11 @@ internal fun ExpressivePersistentDock(
 
     val springDp = spring<androidx.compose.ui.unit.Dp>(
         dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = Spring.StiffnessMediumLow
+        stiffness = Spring.StiffnessMedium
     )
     val springFloat = spring<Float>(
         dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = Spring.StiffnessMediumLow
+        stiffness = Spring.StiffnessMedium
     )
 
     val animatedDockWidth by animateDpAsState(
@@ -180,10 +180,10 @@ internal fun ExpressivePersistentDock(
                 .graphicsLayer {
                     shape = RoundedCornerShape(percent = 50)
                     clip = false
-                    shadowElevation = 10.dp.toPx()
+                    shadowElevation = 6.dp.toPx()
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        ambientShadowColor = Color.Black.copy(alpha = 0.22f)
-                        spotShadowColor = Color.Black.copy(alpha = 0.32f)
+                        ambientShadowColor = Color.Black.copy(alpha = 0.10f)
+                        spotShadowColor = Color.Black.copy(alpha = 0.16f)
                     }
                 },
             shape = RoundedCornerShape(percent = 50),
@@ -253,10 +253,10 @@ internal fun ExpressivePersistentDock(
                         scaleY = scale
                         shape = CircleShape
                         clip = false
-                        shadowElevation = (10.dp * animatedFabAlpha).toPx()
+                        shadowElevation = (6.dp * animatedFabAlpha).toPx()
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                            ambientShadowColor = Color.Black.copy(alpha = 0.22f * animatedFabAlpha)
-                            spotShadowColor = Color.Black.copy(alpha = 0.32f * animatedFabAlpha)
+                            ambientShadowColor = Color.Black.copy(alpha = 0.10f * animatedFabAlpha)
+                            spotShadowColor = Color.Black.copy(alpha = 0.16f * animatedFabAlpha)
                         }
                     },
                 shape = CircleShape,
