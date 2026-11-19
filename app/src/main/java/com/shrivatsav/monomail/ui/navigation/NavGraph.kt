@@ -136,7 +136,6 @@ private fun openLegalUrl(context: android.content.Context, type: String) {
     try { context.startActivity(intent) } catch (e: Exception) { android.util.Log.w("NavGraph", "Failed to open legal URL", e) }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ReauthDialog(
     authManager: AuthManager,
@@ -231,7 +230,6 @@ private fun routeType(route: String?): String = when {
     else -> ""
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.slideInForRoute(
     motionScheme: MotionScheme
 ): EnterTransition = when (routeType(targetState.destination.route)) {
@@ -252,7 +250,6 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
     else -> fadeIn(animationSpec = motionScheme.fastEffectsSpec())
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.slideOutForRoute(
     motionScheme: MotionScheme
 ): ExitTransition = when (routeType(targetState.destination.route)) {
@@ -268,6 +265,7 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
         )
     else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
 }
+
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable

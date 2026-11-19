@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - skray9403-patch-1
+      - '**'
 
 # Cancel obsolete builds when a newer commit is pushed to the same branch.
 # This avoids compiling several stale APKs in parallel during rapid UI iteration.

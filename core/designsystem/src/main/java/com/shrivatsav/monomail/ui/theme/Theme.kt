@@ -2,7 +2,6 @@ package com.shrivatsav.monomail.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.darkColorScheme
@@ -108,7 +107,6 @@ object MonoMailTheme {
         @Composable get() = LocalMonoMailExtendedColors.current
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MonoMailTheme(
     themeMode: String = "SYSTEM",
