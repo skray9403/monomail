@@ -241,6 +241,7 @@ private fun SettingsHubScreen(
             )
         },
     ) { padding ->
+        var searchQuery by remember { mutableStateOf("") }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -249,10 +250,94 @@ private fun SettingsHubScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            SettingsGroupLabel("Accounts & Cloud")
-            SettingsGroupSurface {
-                SettingsHubItem(SettingsSection.ACCOUNTS) { onSectionClick(it) }
+            // Expressive search bar matching floating pill geometry
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(percent = 50),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                tonalElevation = 1.dp,
+                shadowElevation = 3.dp,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Search,
+                        contentDescription = "Search settings",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (searchQuery.isEmpty()) {
+                            Text(
+                                text = "Search settings",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            singleLine = true,
+                            cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(24.dp)) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "Clear search",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
+
+            if (searchQuery.isNotBlank()) {
+                val filtered = remember(searchQuery) {
+                    SettingsSection.entries.filter {
+                        it.title.contains(searchQuery, ignoreCase = true) ||
+                            it.subtitle.contains(searchQuery, ignoreCase = true)
+                    }
+                }
+                SettingsGroupLabel("Matching Settings")
+                SettingsGroupSurface {
+                    if (filtered.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No settings found for \"$searchQuery\"",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        filtered.forEachIndexed { idx, section ->
+                            if (idx > 0) SettingsGroupDivider()
+                            SettingsHubItem(section) { onSectionClick(it) }
+                        }
+                    }
+                }
+            } else {
+                SettingsGroupLabel("Accounts & Cloud")
+                SettingsGroupSurface {
+                    SettingsHubItem(SettingsSection.ACCOUNTS) { onSectionClick(it) }
+                }
 
             SettingsGroupLabel("Mail & Display")
             SettingsGroupSurface {
@@ -325,6 +410,7 @@ private fun SettingsHubScreen(
                     value = "",
                     onClick = { onNavigateToLegal("tos") },
                 )
+            }
             }
 
             Box(

@@ -526,13 +526,15 @@ fun InboxScreen(
                                                     com.shrivatsav.monomail.ui.components.SectionHeader(
                                                         label = displayItem.title,
                                                         showTopDivider = false,
-                                                        modifier = Modifier.background(MaterialTheme.colorScheme.background)
+                                                        modifier = Modifier
+                                                            .animateItem()
+                                                            .background(MaterialTheme.colorScheme.background)
                                                     )
                                                 }
 
                                                 is InboxDisplayItem.GroupHeader -> {
                                                     GroupHeaderItem(
-                                                        modifier = Modifier,
+                                                        modifier = Modifier.animateItem(),
                                                         groupName = displayItem.groupName,
                                                         count = displayItem.count,
                                                         unreadCount = displayItem.unreadCount,
@@ -574,7 +576,7 @@ fun InboxScreen(
                                                         else -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.SOLO
                                                     }
                                                     SwipeableEmailItem(
-                                                        modifier = Modifier,
+                                                        modifier = Modifier.animateItem(),
                                                         thread = displayItem.thread,
                                                         tabForSwipe = currentTab,
                                                         appSettings = appSettings,
@@ -627,7 +629,7 @@ fun InboxScreen(
                                                         nextUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.TOP
                                                         else -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.SOLO
                                                     }
-                                                    Column {
+                                                    Column(modifier = Modifier.animateItem()) {
                                                         AnimatedVisibility(
                                                             visible = displayItem.isVisible,
                                                             enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(),

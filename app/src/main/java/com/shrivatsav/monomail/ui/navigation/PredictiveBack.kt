@@ -9,10 +9,12 @@ import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideOut
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -42,17 +44,19 @@ import kotlin.math.roundToInt
 /*
  * Edge-aware predictive back for full-screen "card" destinations.
  *
- * Numbers follow Android's published predictive-back spec for full-screen surfaces:
- *   exit scale 100% -> 90%, max x-shift = (width / 20) - 8dp, entering screen 110% -> 100%.
- * Everything is a plain tween so Navigation's seekable transition maps gesture progress
- * to motion predictably, and the commit animation continues from wherever the finger left off.
- * Tune the constants below against the Android 17 Settings app side by side.
+ * True 1:1 match with Android 15/16/17 Settings app:
+ *   - Current card shrinks (100% -> 90%), rounds corners (0dp -> 28dp), elevates with
+ *     subtle drop shadow, and on commit slides completely off-screen in the gesture direction.
+ *   - The underlying screen is recessed spatially behind at 94% scale with a dark scrim,
+ *     and smoothly scales UP (94% -> 100%) while the scrim fades out to 0%.
+ * Plain tweens allow Navigation Compose's SeekableTransitionState to map touch seek progress
+ * 1:1 without nonlinear spring bounce during finger dragging.
  */
-private const val BackMs = 300
-private const val FadeStartMs = 180          // card stays opaque until ~60% of the timeline
+private const val BackMs = 320
+private const val FadeStartMs = 260          // card stays physically opaque until ~80% off-screen
 private const val ExitScale = 0.90f
-private const val RevealStartScale = 1.10f   // screen underneath settles 110% -> 100%
-private const val RevealDim = 0.32f          // scrim over the screen underneath, fades as you commit
+private const val RevealStartScale = 0.94f   // screen underneath scales UP from depth: 94% -> 100%
+private const val RevealDim = 0.28f          // scrim over the screen underneath, fades as you commit
 private val CardRadius = 28.dp
 private val CardElevation = 8.dp
 private val BackEasing = LinearOutSlowInEasing
@@ -76,22 +80,23 @@ internal fun TrackBackSwipeEdge() {
 }
 
 /**
- * Card leaving: shrinks to 90%, drifts away from the finger's edge (swipe from the right edge
- * moves it left, from the left edge moves it right), then fades out late in the timeline.
+ * Card leaving: shrinks to 90%, tracks touch displacement across the full width,
+ * and slides cleanly off the screen on commit (matching Android Settings).
  */
 internal fun backCardExit(density: Float): ExitTransition =
-    slideOut(tween(BackMs, easing = BackEasing)) { size ->
-        val shift = (size.width / 20f - 8f * density).coerceAtLeast(0f)
-        // Read inside the lambda: re-evaluated while animating, so no stale edge.
-        val dir = if (BackSwipe.edge == NavigationEvent.EDGE_RIGHT) -1f else 1f
-        IntOffset((dir * shift).roundToInt(), 0)
-    } +
+    slideOutHorizontally(
+        animationSpec = tween(BackMs, easing = BackEasing),
+        targetOffsetX = { width ->
+            if (BackSwipe.edge == NavigationEvent.EDGE_RIGHT) -width else width
+        }
+    ) +
         scaleOut(tween(BackMs, easing = BackEasing), targetScale = ExitScale) +
         fadeOut(tween(BackMs - FadeStartMs, delayMillis = FadeStartMs, easing = LinearEasing))
 
-/** Screen underneath: settles from slightly zoomed-in to 100% as the card leaves. */
+/** Screen underneath: settles from recessed depth (94%) up to 100% as the card leaves. */
 internal fun backRevealEnter(): EnterTransition =
-    scaleIn(tween(BackMs, easing = BackEasing), initialScale = RevealStartScale)
+    scaleIn(tween(BackMs, easing = BackEasing), initialScale = RevealStartScale) +
+        fadeIn(tween(BackMs, easing = BackEasing), initialAlpha = 0.90f)
 
 /**
  * Darkens the screen being revealed, lightening as the gesture progresses. Only draws when this
@@ -115,8 +120,8 @@ internal fun AnimatedContentScope.revealDimModifier(navController: NavController
 }
 
 /**
- * Rounded, elevated surface that is square and shadowless at rest, and only rounds while the
- * destination is entering/exiting. Replaces the permanent shadow + 28dp clip on every screen.
+ * Rounded, elevated surface that is square and shadowless at rest, and dynamically animates
+ * corners (0dp -> 28dp) and elevation (0dp -> 8dp) strictly while navigating or seeking back.
  */
 @Composable
 internal fun AnimatedContentScope.BackCardSurface(
@@ -127,15 +132,20 @@ internal fun AnimatedContentScope.BackCardSurface(
         transitionSpec = { tween(BackMs, easing = BackEasing) },
         label = "backCardRadius",
     ) { if (it == EnterExitState.Visible) 0.dp else CardRadius }
+    val elevation by transition.animateDp(
+        transitionSpec = { tween(BackMs, easing = BackEasing) },
+        label = "backCardElevation",
+    ) { if (it == EnterExitState.Visible) 0.dp else CardElevation }
     val reveal = revealDimModifier(navController)
     Box(
         modifier = Modifier
             .fillMaxSize()
             .graphicsLayer {
                 val r = radius
+                val elev = elevation
                 shape = RoundedCornerShape(r)
                 clip = r > 0.dp
-                shadowElevation = if (r > 0.dp) CardElevation.toPx() else 0f
+                shadowElevation = elev.toPx()
             }
             .background(MaterialTheme.colorScheme.background)
             .then(reveal),

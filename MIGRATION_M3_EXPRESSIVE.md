@@ -89,6 +89,27 @@ For maintainers touching Monomail after this migration:
 
 ### Solution Architecture (`PredictiveBack.kt`)
 * **Dynamic Swipe Edge Tracking:** `TrackBackSwipeEdge()` reads `NavigationEventTransitionState.InProgress` to determine gesture direction (`EDGE_LEFT` vs `EDGE_RIGHT`).
-* **Directional Drift & Delayed Fade (`backCardExit`):** Exiting cards shrink from $100\% \rightarrow 90\%$ and drift with the swipe direction, remaining 100% opaque for the first 60% of the gesture before fading late.
-* **Parallax Depth & Dimming (`backRevealEnter` & `revealDimModifier`):** Revealed screens settle from $110\% \rightarrow 100\%$ scale and fade out a $32\%$ black scrim, providing spatial depth without lateral jumps.
+* **Directional Drift & Delayed Fade (`backCardExit`):** Exiting cards shrink from $100\% \rightarrow 90\%$ and track the finger across the display, remaining fully opaque until the final $20\%$ of travel before sliding completely off-screen on commit.
+* **Recessed Depth & Dimming (`backRevealEnter` & `revealDimModifier`):** True 1:1 parity with Android 15/16/17 Settings app: the revealed screen sits recessed in background depth at $94\%$ scale with a $28\%$ dark scrim, scaling **UP** from $94\% \rightarrow 100\%$ as the card is peeled away.
 * **Zero-Cost Rest State (`BackCardSurface`):** Animates corner radius from $0\text{dp}$ at rest to $28\text{dp}$ during transit, with `graphicsLayer` elevation active strictly while moving. Fully addresses resting screen clipping and shadow overdraw.
+
+---
+
+## 6. Container Morphing & Expressive List Fluidity
+
+### A. 1:1 Android Settings Predictive Back Parity
+* **The Problem:** The initial predictive back implementation inverted the Z-axis by starting the underlying screen at $110\%$ scale and shrinking down. Additionally, the popped screen only shifted $46\text{dp}$ before dissolving into thin air like a phantom, rather than sliding off the display like a physical sheet.
+* **The Fix:**
+  1. `RevealStartScale = 0.94f`: The underlying screen begins recessed behind the top card at $94\%$ scale and smoothly scales UP to $100\%$ while its dark scrim dissolves.
+  2. Full-width `slideOutHorizontally`: When the gesture is committed, the card slides all the way off the display in the swipe direction (`+width` or `-width`), matching the physical motion of Google Pixel Settings.
+  3. `FadeStartMs = 260ms` of $320\text{ms}$: The card remains solid and physical throughout touch tracking, fading only at the very edge of the viewport.
+
+### B. List Item Fluidity (`Modifier.animateItem()`)
+* **The Problem:** Archived, deleted, or bulk-managed emails snapped their row heights abruptly, and expanding/collapsing smart groups caused visual jumpiness.
+* **The Fix:** Integrated `Modifier.animateItem()` on all `LazyColumn` items in `InboxScreen.kt` (`SectionHeader`, `GroupHeaderItem`, `SwipeableEmailItem`, and nested thread columns). Row removals, additions, and rearrangements now animate fluidly with Material 3 Expressive spring physics.
+
+### C. Floating Action Dock Container Morphing
+* **The Problem:** The home screen featured an expressive floating pill dock (`BottomDockBar`), but entering an email thread relegated Reply and Forward to the bottom of long email threads, losing visual continuity.
+* **The Solution:**
+  1. **Email Detail Screen:** Added a floating bottom action dock (`Surface` with $64\text{dp}$ height, $50\%$ pill radius, and `surfaceContainerHigh`) housing instant **Reply** and **Forward** buttons. Because its spatial location, dimensions, elevation, and background match `BottomDockBar` identically, the bottom dock visually morphs between Inbox navigation tabs and email action controls.
+  2. **Settings Screen:** Added a matching floating search pill container ($56\text{dp}$ height, $50\%$ pill radius, `surfaceContainerHigh`) at the top of `SettingsHubScreen` providing real-time settings section search and filtering.
