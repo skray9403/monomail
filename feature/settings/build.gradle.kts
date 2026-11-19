@@ -9,6 +9,7 @@ android {
     namespace = "com.shrivatsav.monomail.feature.settings"
     compileSdk = 37
 
+    compileSdkMinor = 1
     defaultConfig {
         minSdk = 26
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
