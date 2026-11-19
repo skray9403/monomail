@@ -3,6 +3,7 @@ package com.shrivatsav.monomail.feature.compose
 import com.shrivatsav.monomail.core.network.provider.SendAsAlias
 import com.shrivatsav.monomail.core.data.repository.EmailContact
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.CapturedAnimatedVisibility
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -50,6 +51,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.TextButton
 import android.webkit.WebView
 import android.webkit.WebSettings
@@ -110,6 +113,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.heightIn
@@ -158,6 +162,8 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.collect
 
 private fun resolveAttachmentMimeType(contentResolver: android.content.ContentResolver, uri: Uri, name: String): String {
     var mimeType = contentResolver.getType(uri) ?: "application/octet-stream"
@@ -632,7 +638,7 @@ fun ComposeScreen(
                 onToggleFromDropdown = { viewModel.toggleFromDropdown() },
                 onDismissFromDropdown = { viewModel.dismissFromDropdown() }
             )
-            AnimatedVisibility(visible = showCcBcc) {
+            CapturedAnimatedVisibility(visible = showCcBcc, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
                 CcBccFields(
                     cc = state.cc,
                     bcc = state.bcc,
@@ -656,7 +662,7 @@ fun ComposeScreen(
                 color = MaterialTheme.colorScheme.outlineVariant,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
-            AnimatedVisibility(visible = state.attachments.isNotEmpty()) {
+            CapturedAnimatedVisibility(visible = state.attachments.isNotEmpty(), enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
                 LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -717,11 +723,32 @@ private fun ComposeTextField(
     singleLine: Boolean = true,
     minHeight: Int = 0
 ) {
+    val fieldState = rememberTextFieldState(initialText = value)
+    val currentExternalValue by rememberUpdatedState(value)
+    val onValueChangeLatest by rememberUpdatedState(onValueChange)
+
+    // Keep TextFieldState as the IME editing source of truth while syncing edits
+    // to the existing ViewModel string API. External draft/recipient changes are
+    // applied without resetting the cursor on ordinary keystrokes.
+    LaunchedEffect(fieldState) {
+        snapshotFlow { fieldState.text.toString() }
+            .drop(1)
+            .collect { editedText ->
+                if (editedText != currentExternalValue) {
+                    onValueChangeLatest(editedText)
+                }
+            }
+    }
+    LaunchedEffect(value) {
+        if (fieldState.text.toString() != value) {
+            fieldState.setTextAndPlaceCursorAtEnd(value)
+        }
+    }
+
     TextField(
-        value = value,
-        onValueChange = onValueChange,
+        state = fieldState,
         enabled = enabled,
-        singleLine = singleLine,
+        lineLimits = if (singleLine) TextFieldLineLimits.SingleLine else TextFieldLineLimits.Default,
         textStyle = textStyle,
         placeholder = { Text(label) },
         modifier = Modifier
