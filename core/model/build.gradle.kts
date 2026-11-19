@@ -6,6 +6,7 @@ android {
     namespace = "com.shrivatsav.monomail.core.model"
     compileSdk = 37
 
+    compileSdkMinor = 1
     defaultConfig {
         minSdk = 26
     }
