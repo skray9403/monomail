@@ -76,3 +76,19 @@ For maintainers touching Monomail after this migration:
 3. **Future UI Enhancements to Leverage:**
    * **Native Progressive Blur:** The mail detail screen and reading view can now use `Modifier.blur` with `BlurRadiusSpec.verticalGradient` directly, replacing manual gradient overlays.
    * **Segmented Lists:** Settings rows can adopt `SegmentedListItem` with `ListItemDefaults.segmentedShapes` for modern rounded card grouping.
+
+---
+
+## 5. Edge-Aware Predictive Back Navigation & Card Surface Overhaul
+
+### Problem Addressed
+1. **Asymmetric Pop Jump:** Popping a drill screen used `slideIntoContainer(Start)`, causing the underlying screen (Inbox) to teleport from the left edge instead of resting underneath.
+2. **Missing Compose Pop:** Popping the compose sheet fell into `else -> fadeIn()`, snapping unexpectedly.
+3. **Permanent 28dp Screen Clipping & Shadow:** Every destination permanently wrapped itself in `.shadow(8.dp).clip(28.dp)`, cutting display corners at rest and burning GPU cycles on static full-screen shadow compositing.
+4. **Spring Seek Inconsistency:** Seeking gestures with physics springs caused non-linear progress tracking.
+
+### Solution Architecture (`PredictiveBack.kt`)
+* **Dynamic Swipe Edge Tracking:** `TrackBackSwipeEdge()` reads `NavigationEventTransitionState.InProgress` to determine gesture direction (`EDGE_LEFT` vs `EDGE_RIGHT`).
+* **Directional Drift & Delayed Fade (`backCardExit`):** Exiting cards shrink from $100\% \rightarrow 90\%$ and drift with the swipe direction, remaining 100% opaque for the first 60% of the gesture before fading late.
+* **Parallax Depth & Dimming (`backRevealEnter` & `revealDimModifier`):** Revealed screens settle from $110\% \rightarrow 100\%$ scale and fade out a $32\%$ black scrim, providing spatial depth without lateral jumps.
+* **Zero-Cost Rest State (`BackCardSurface`):** Animates corner radius from $0\text{dp}$ at rest to $28\text{dp}$ during transit, with `graphicsLayer` elevation active strictly while moving. Fully addresses resting screen clipping and shadow overdraw.

@@ -278,6 +278,8 @@ fun NavGraph(
     val navController = rememberNavController()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val motionScheme = MaterialTheme.motionScheme
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    TrackBackSwipeEdge()
 
     // Navigation Compose owns the system predictive-back gesture, progress,
     // cancellation and completion. Avoid a second gesture observer here.
@@ -325,23 +327,15 @@ fun NavGraph(
             // same motion continuously and can reverse it when the gesture is cancelled.
             // initialState is the screen being popped (the outgoing destination).
             popEnterTransition = {
-                if (routeType(initialState.destination.route) == "drill") {
-                    slideIntoContainer(
-                        AnimatedContentTransitionScope.SlideDirection.Start,
-                        animationSpec = NavSpatialSpec,
-                    )
-                } else {
-                    fadeIn(animationSpec = motionScheme.fastEffectsSpec())
+                when (routeType(initialState.destination.route)) {
+                    "drill", "compose" -> backRevealEnter()
+                    else -> fadeIn(animationSpec = motionScheme.fastEffectsSpec())
                 }
             },
             popExitTransition = {
-                if (routeType(initialState.destination.route) == "drill") {
-                    slideOutOfContainer(
-                        AnimatedContentTransitionScope.SlideDirection.End,
-                        animationSpec = NavSpatialSpec,
-                    )
-                } else {
-                    fadeOut(animationSpec = motionScheme.fastEffectsSpec())
+                when (routeType(initialState.destination.route)) {
+                    "drill", "compose" -> backCardExit(density)
+                    else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
                 }
             },
         ) {
@@ -392,7 +386,7 @@ fun NavGraph(
                 )
             }
             composable(Screen.Inbox.route) {
-                Box(modifier = Modifier.fillMaxSize()) {
+                Box(modifier = Modifier.fillMaxSize().then(revealDimModifier(navController))) {
                     val vm: InboxViewModel = hiltViewModel()
                     val inboxScope = androidx.compose.runtime.rememberCoroutineScope()
                     val activeAccount by authManager.activeAccountFlow.collectAsState(initial = authManager.currentUser)
@@ -538,13 +532,7 @@ fun NavGraph(
                 }
             }
             composable(Screen.Settings.route) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp), clip = false)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(MaterialTheme.colorScheme.background)
-                ) {
+                BackCardSurface(navController) {
                     val settingsViewModel: SettingsViewModel = hiltViewModel()
                     val ctx = LocalContext.current
                     SettingsScreen(
@@ -568,13 +556,7 @@ fun NavGraph(
                 route = Screen.SettingsSection.route,
                 arguments = listOf(navArgument("section") { type = NavType.StringType })
             ) { backStackEntry ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp), clip = false)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(MaterialTheme.colorScheme.background)
-                ) {
+                BackCardSurface(navController) {
                     val sectionName = backStackEntry.arguments?.getString("section")
                     val section = remember(sectionName) {
                         com.shrivatsav.monomail.feature.settings.SettingsSection.entries.find {
@@ -605,13 +587,7 @@ fun NavGraph(
             }
 
             composable(Screen.PgpKeys.route) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp), clip = false)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(MaterialTheme.colorScheme.background)
-                ) {
+                BackCardSurface(navController) {
                     PgpKeyManagementScreen(
                         onNavigateBack = { navController.popBackStack() }
                     )
@@ -621,13 +597,7 @@ fun NavGraph(
                 route = Screen.Legal.route,
                 arguments = listOf(navArgument("type") { type = NavType.StringType })
             ) { backStackEntry ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp), clip = false)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(MaterialTheme.colorScheme.background)
-                ) {
+                BackCardSurface(navController) {
                     val type = backStackEntry.arguments?.getString("type") ?: "privacy"
                     com.shrivatsav.monomail.feature.settings.LegalScreen(
                         type = type,
@@ -643,13 +613,7 @@ fun NavGraph(
                     navArgument("focusedId") { type = NavType.StringType; nullable = true; defaultValue = null }
                 )
             ) { _ ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp), clip = false)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(MaterialTheme.colorScheme.background)
-                ) {
+                BackCardSurface(navController) {
                     val vm: EmailDetailViewModel = hiltViewModel()
                     EmailDetailScreen(
                         viewModel = vm,
@@ -714,20 +678,16 @@ fun NavGraph(
                     val intent = backStackEntry.arguments?.getParcelable(androidx.navigation.NavController.KEY_DEEP_LINK_INTENT) as? Intent
                     if (intent != null) applyComposeIntent(intent, context, vm)
                 }
-                ComposeScreen(
-                    viewModel = vm,
-                    onBack = { navController.popBackStack() },
-                    onSent = { navController.popBackStack() }
-                )
+                BackCardSurface(navController) {
+                    ComposeScreen(
+                        viewModel = vm,
+                        onBack = { navController.popBackStack() },
+                        onSent = { navController.popBackStack() }
+                    )
+                }
             }
             composable(Screen.Scheduled.route) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp), clip = false)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(MaterialTheme.colorScheme.background)
-                ) {
+                BackCardSurface(navController) {
                     val vm: ScheduledMessagesViewModel = hiltViewModel()
 
                     ScheduledMessagesScreen(
@@ -760,13 +720,7 @@ fun NavGraph(
                     navArgument("name") { type = NavType.StringType; defaultValue = "attachment" }
                 )
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp), clip = false)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(MaterialTheme.colorScheme.background)
-                ) {
+                BackCardSurface(navController) {
                     AttachmentViewerScreen(
                         onBack = { navController.popBackStack() }
                     )
