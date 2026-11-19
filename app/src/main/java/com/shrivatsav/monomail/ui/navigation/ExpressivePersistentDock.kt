@@ -8,6 +8,7 @@ package com.shrivatsav.monomail.ui.navigation
 import android.os.Build
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -21,6 +22,9 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -58,15 +62,15 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
@@ -145,8 +149,10 @@ internal fun ExpressivePersistentDock(
             AnimatedContent(
                 targetState = dockController.mode,
                 transitionSpec = {
-                    (fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) + scaleIn(spring(stiffness = Spring.StiffnessMediumLow), initialScale = 0.92f))
-                        .togetherWith(fadeOut(spring(stiffness = Spring.StiffnessMediumLow)) + scaleOut(spring(stiffness = Spring.StiffnessMediumLow), targetScale = 0.92f))
+                    // Sequence outgoing exit (fast 80ms fade/scale) followed by incoming entrance (delay 80ms)
+                    // so outgoing and incoming screens never draw on top of each other inside the dock container
+                    (fadeIn(tween(140, delayMillis = 80)) + scaleIn(tween(140, delayMillis = 80), initialScale = 0.94f))
+                        .togetherWith(fadeOut(tween(80)) + scaleOut(tween(80), targetScale = 0.94f))
                 },
                 label = "dockModeTransition"
             ) { mode ->
@@ -221,61 +227,93 @@ internal fun ExpressivePersistentDock(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InboxDockContent(
     isCollapsed: Boolean,
     selectedIndex: Int,
     onTabSelected: (Int) -> Unit,
 ) {
-    val tabs = listOf(
-        Triple(0, Icons.Rounded.Inbox, "Inbox"),
-        Triple(1, Icons.AutoMirrored.Rounded.Send, "Sent"),
-        Triple(2, Icons.Rounded.Archive, "Archived")
-    )
+    val tabs = remember {
+        listOf(
+            Triple(0, Icons.Rounded.Inbox, "Inbox"),
+            Triple(1, Icons.AutoMirrored.Rounded.Send, "Sent"),
+            Triple(2, Icons.Rounded.Archive, "Archived")
+        )
+    }
 
-    SingleChoiceSegmentedButtonRow(
+    Row(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        space = 4.dp,
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         tabs.forEach { (index, icon, label) ->
             val selected = selectedIndex == index
-            SegmentedButton(
-                selected = selected,
-                onClick = { onTabSelected(index) },
-                shape = RoundedCornerShape(percent = 50),
-                modifier = Modifier.weight(1f),
-                colors = SegmentedButtonDefaults.colors(
-                    activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    inactiveContainerColor = Color.Transparent,
-                    inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                border = SegmentedButtonDefaults.borderStroke(Color.Transparent),
-                icon = {
+            val animatedBgColor by animateColorAsState(
+                targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                animationSpec = tween(180),
+                label = "tabBg_$index"
+            )
+            val animatedContentColor by animateColorAsState(
+                targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                animationSpec = tween(180),
+                label = "tabContent_$index"
+            )
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(animatedBgColor)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(bounded = true)
+                    ) { onTabSelected(index) },
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(horizontal = if (isCollapsed) 0.dp else 6.dp)
+                ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = label,
+                        tint = animatedContentColor,
                         modifier = Modifier.size(20.dp)
                     )
-                },
-                label = {
                     AnimatedVisibility(
                         visible = !isCollapsed,
-                        enter = fadeIn(tween(140, delayMillis = 80)) + expandHorizontally(),
-                        exit = fadeOut(tween(90)) + shrinkHorizontally()
-                    ) {
-                        Text(
-                            text = label,
-                            maxLines = 1,
-                            softWrap = false,
-                            style = MaterialTheme.typography.labelMedium
+                        enter = fadeIn(tween(140, delayMillis = 60)) + expandHorizontally(
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
+                        ),
+                        exit = fadeOut(tween(80)) + shrinkHorizontally(
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
                         )
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = label,
+                                maxLines = 1,
+                                softWrap = false,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                                ),
+                                color = animatedContentColor
+                            )
+                        }
                     }
                 }
-            )
+            }
         }
     }
 }

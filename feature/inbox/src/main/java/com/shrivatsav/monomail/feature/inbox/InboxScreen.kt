@@ -58,6 +58,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
@@ -314,6 +315,12 @@ fun InboxScreen(
                                 initialFirstVisibleItemScrollOffset = savedPos.second
                             )
                             val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
+                            val density = LocalDensity.current
+                            val collapseThresholdPx = with(density) { 32.dp.toPx() }
+                            val expandThresholdPx = with(density) { 48.dp.toPx() }
+                            var accumulatedDownScroll by remember { mutableFloatStateOf(0f) }
+                            var accumulatedUpScroll by remember { mutableFloatStateOf(0f) }
+
                             val isAtTop by remember {
                                 derivedStateOf {
                                     listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
@@ -323,12 +330,20 @@ fun InboxScreen(
                                 object : NestedScrollConnection {
                                     override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                                         val dy = available.y
-                                        if (dy < -8f) {
-                                            // Scrolling down (reading deeper) -> collapse dock to compact pill
-                                            dockController.isScrolling = true
-                                        } else if (dy > 8f) {
-                                            // Scrolling up (returning toward top) -> expand dock to full tabs
-                                            dockController.isScrolling = false
+                                        if (dy < 0f) {
+                                            // Finger dragging up / list scrolling down deeper into inbox
+                                            accumulatedDownScroll += -dy
+                                            accumulatedUpScroll = 0f
+                                            if (accumulatedDownScroll > collapseThresholdPx && !dockController.isScrolling) {
+                                                dockController.isScrolling = true
+                                            }
+                                        } else if (dy > 0f) {
+                                            // Finger dragging down / list scrolling up toward top
+                                            accumulatedUpScroll += dy
+                                            accumulatedDownScroll = 0f
+                                            if (accumulatedUpScroll > expandThresholdPx && dockController.isScrolling) {
+                                                dockController.isScrolling = false
+                                            }
                                         }
                                         return Offset.Zero
                                     }
@@ -337,6 +352,8 @@ fun InboxScreen(
                             LaunchedEffect(isAtTop) {
                                 if (isAtTop) {
                                     dockController.isScrolling = false
+                                    accumulatedDownScroll = 0f
+                                    accumulatedUpScroll = 0f
                                 }
                             }
                             val shouldLoadMore by remember {
@@ -784,6 +801,7 @@ fun InboxScreen(
                     InboxTab.ARCHIVED -> 2
                     else -> 0
                 }
+                dockController.isScrolling = false
             }
             LaunchedEffect(Unit) {
                 dockController.onTabSelected = { index ->
