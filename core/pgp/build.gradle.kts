@@ -10,7 +10,7 @@ android {
     namespace = "com.shrivatsav.monomail.core.pgp"
     compileSdk = 37
 
-    compileSdkMinor = 1
+    compileSdkMinor = 2
     defaultConfig {
         minSdk = 26
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
