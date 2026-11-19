@@ -44,7 +44,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
@@ -310,12 +314,28 @@ fun InboxScreen(
                                 initialFirstVisibleItemScrollOffset = savedPos.second
                             )
                             val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
-                            val isListScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
-                            LaunchedEffect(isListScrolling) {
-                                if (isListScrolling) {
-                                    dockController.isScrolling = true
-                                } else {
-                                    kotlinx.coroutines.delay(300L)
+                            val isAtTop by remember {
+                                derivedStateOf {
+                                    listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+                                }
+                            }
+                            val nestedScrollConnection = remember {
+                                object : NestedScrollConnection {
+                                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                                        val dy = available.y
+                                        if (dy < -8f) {
+                                            // Scrolling down (reading deeper) -> collapse dock to compact pill
+                                            dockController.isScrolling = true
+                                        } else if (dy > 8f) {
+                                            // Scrolling up (returning toward top) -> expand dock to full tabs
+                                            dockController.isScrolling = false
+                                        }
+                                        return Offset.Zero
+                                    }
+                                }
+                            }
+                            LaunchedEffect(isAtTop) {
+                                if (isAtTop) {
                                     dockController.isScrolling = false
                                 }
                             }
@@ -516,7 +536,8 @@ fun InboxScreen(
                                     LazyColumn(
                                         state = listState,
                                         modifier = Modifier
-                                            .fillMaxSize(),
+                                            .fillMaxSize()
+                                            .nestedScroll(nestedScrollConnection),
                                         contentPadding = PaddingValues(bottom = navBarHeight + 112.dp)
                                     ) {
                                         itemsIndexed(

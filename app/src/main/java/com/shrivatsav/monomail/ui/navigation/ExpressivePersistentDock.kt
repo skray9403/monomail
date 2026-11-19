@@ -189,8 +189,8 @@ internal fun ExpressivePersistentDock(
         // Compose FAB (only on Inbox when not scrolling)
         AnimatedVisibility(
             visible = dockController.mode == DockMode.INBOX && !isCollapsed,
-            enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) + scaleIn(spring(stiffness = Spring.StiffnessMediumLow), initialScale = 0.8f),
-            exit = fadeOut(spring(stiffness = Spring.StiffnessMediumLow)) + scaleOut(spring(stiffness = Spring.StiffnessMediumLow), targetScale = 0.8f)
+            enter = fadeIn(tween(160, delayMillis = 80)) + scaleIn(spring(stiffness = Spring.StiffnessMediumLow), initialScale = 0.8f),
+            exit = fadeOut(tween(90)) + scaleOut(spring(stiffness = Spring.StiffnessMediumLow), targetScale = 0.8f)
         ) {
             FilledIconButton(
                 onClick = onComposeClick,
@@ -262,7 +262,11 @@ private fun InboxDockContent(
                     )
                 },
                 label = {
-                    if (!isCollapsed) {
+                    AnimatedVisibility(
+                        visible = !isCollapsed,
+                        enter = fadeIn(tween(140, delayMillis = 80)) + expandHorizontally(),
+                        exit = fadeOut(tween(90)) + shrinkHorizontally()
+                    ) {
                         Text(
                             text = label,
                             maxLines = 1,

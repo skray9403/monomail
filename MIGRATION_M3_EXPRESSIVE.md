@@ -119,11 +119,12 @@ For maintainers touching Monomail after this migration:
      - All sub-settings (`"settings/{section}"`) and viewers $\to$ `DockMode.HIDDEN`
      - Automatically resets `dockController.isScrolling = false` on any non-inbox route so returning to Inbox always presents a clean resting state.
   2. **Eliminated Inline Duplicate Bar:** Removed the duplicate inline Reply/Forward buttons from `EmailDetailScreen.kt`, replacing them with comfortable scrolling clearance spacer ($100\text{dp}$). Exactly one dock is rendered.
-  3. **Glitch-Free Scroll Hysteresis, FAB Collapse & Clean Pill:**
-     - In `InboxScreen.kt`, added a $300\text{ms}$ debounce on scroll completion, preventing any flickering or bounce during active reading.
-     - In `ExpressivePersistentDock.kt`, when `isCollapsed` is true, the Compose FAB smoothly scales down and fades away (`visible = mode == INBOX && !isCollapsed`).
-     - The row uses `Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)`, smoothly centering the compact $180\text{dp}$ pill during scrolling with zero layout snapping or jump.
-     - When collapsed, segmented tab labels are `{}` (empty), rendering pure centered 20dp icons without any text clipping (`box`, `ent`, `chived`).
+  3. **Directional Scroll Hysteresis & Smooth Tab Label Morphing:**
+     - Replaced unstable `isScrollInProgress` timer polling with a directional `NestedScrollConnection` on the inbox `LazyColumn`:
+       * Scrolling down ($dy < -8\text{f}$, reading deeper) collapses the dock into the compact $180\text{dp}$ pill and **stays collapsed** throughout reading so content never vibrates or re-expands mid-scroll.
+       * Scrolling up ($dy > 8\text{f}$, navigating back) or reaching the top of the list (`isAtTop`) immediately and smoothly expands the dock back to full width.
+     - In `ExpressivePersistentDock.kt`, wrapped tab labels in `AnimatedVisibility` with `fadeIn(delay = 80ms) + expandHorizontally()` on enter and `fadeOut(90ms) + shrinkHorizontally()` on exit. Text gracefully slides out from/into the icon after the container width has adapted, completely eliminating clipping and layout jitter.
+     - In `ExpressivePersistentDock.kt`, the Compose FAB fades and scales out during scroll collapse (`visible = mode == INBOX && !isCollapsed`), while `Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)` perfectly centers the compact pill.
   4. **Diffused Ambient Elevation Shadow:**
      - Elevated to $10\text{dp}$ with `graphicsLayer` ambient shadow ($0.22$ alpha) and spot shadow ($0.32$ alpha) on Android P+, creating Google's signature soft floating bloom.
      - Corner radius upgraded to $32\text{dp}$ (`ShapeDefaults.ExtraLarge`) for seamless parity with Google's native system predictive back cards.
