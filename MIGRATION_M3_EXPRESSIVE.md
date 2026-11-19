@@ -4,9 +4,9 @@
 
 This document details the architectural migration of **Monomail** to the newly released stable milestone of **Compose Material 3 version 1.5.0** and the **Jetpack Compose November '26 Release (version 1.13.0 via BOM `2026.11.01`)**.
 
-* **Target Compose BOM:** `2026.11.01` (was `2026.09.00`)
-* **Target Material 3 Expressive:** `1.5.0` Stable (was `1.5.0-rc01`)
-* **Core Foundation & UI Text:** Aligned to `1.13.0` (was `1.12.1`)
+* **Target Compose BOM:** `2026.09.00` / `compose-bom-beta:2026.11.00`
+* **Target Material 3 Expressive:** `1.5.0-rc01` (Latest Google Maven milestone graduating Expressive APIs to stable)
+* **Core Foundation & UI Text:** `1.12.1`
 * **CI/CD Automation:** Configured automatic build triggers on any branch commit push.
 
 ---
