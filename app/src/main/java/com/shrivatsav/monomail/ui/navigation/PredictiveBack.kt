@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -43,19 +44,19 @@ import kotlin.math.roundToInt
 /*
  * Edge-aware predictive back for full-screen "card" destinations.
  *
- * True 1:1 match with Android 15/16/17 Settings app:
- *   - Current card shrinks (100% -> 90%), rounds corners (0dp -> 28dp), elevates with
- *     subtle diffused drop shadow, and drifts slightly with touch (24dp) while remaining
- *     centered and fully visible as a floating card preview.
- *   - The underlying screen is recessed spatially behind at 94% scale with a dark scrim,
- *     and smoothly scales UP (94% -> 100%) while the scrim fades out to 0%.
+ * True 1:1 match with Google Android System & Files/Settings predictive back:
+ *   - The underlying (background) screen sits recessed at small scale (0.90f) with 28dp
+ *     rounded corners and dark scrim, smoothly scaling UP (90% -> 100%) while un-rounding.
+ *   - The foreground card shrinks (100% -> 90%), rounds corners (0dp -> 28dp), elevates
+ *     with diffused drop shadow, and drifts slightly with touch (24dp) while remaining
+ *     centered as a floating card preview.
  * Plain tweens allow Navigation Compose's SeekableTransitionState to map touch seek progress
  * 1:1 without nonlinear spring bounce during finger dragging.
  */
 private const val BackMs = 320
 private const val FadeStartMs = 260          // card stays physically opaque until ~80% through gesture
 private const val ExitScale = 0.90f
-private const val RevealStartScale = 0.94f   // screen underneath scales UP from depth: 94% -> 100%
+private const val RevealStartScale = 0.90f   // background page starts small at 90% and scales UP
 private const val RevealDim = 0.28f          // scrim over the screen underneath, fades as you commit
 private val CardRadius = 28.dp
 private val CardElevation = 8.dp
@@ -91,14 +92,22 @@ internal fun backCardExit(density: Float): ExitTransition {
             if (BackSwipe.edge == NavigationEvent.EDGE_RIGHT) -driftPx else driftPx
         }
     ) +
-        scaleOut(tween(BackMs, easing = BackEasing), targetScale = ExitScale) +
+        scaleOut(
+            animationSpec = tween(BackMs, easing = BackEasing),
+            targetScale = ExitScale,
+            transformOrigin = TransformOrigin(0.5f, 0.5f)
+        ) +
         fadeOut(tween(BackMs - FadeStartMs, delayMillis = FadeStartMs, easing = LinearEasing))
 }
 
-/** Screen underneath: settles from recessed depth (94%) up to 100% as the card leaves. */
+/** Screen underneath: settles from small recessed depth (90%) up to 100% as the card leaves. */
 internal fun backRevealEnter(): EnterTransition =
-    scaleIn(tween(BackMs, easing = BackEasing), initialScale = RevealStartScale) +
-        fadeIn(tween(BackMs, easing = BackEasing), initialAlpha = 0.90f)
+    scaleIn(
+        animationSpec = tween(BackMs, easing = BackEasing),
+        initialScale = RevealStartScale,
+        transformOrigin = TransformOrigin(0.5f, 0.5f)
+    ) +
+        fadeIn(tween(BackMs, easing = BackEasing), initialAlpha = 0.85f)
 
 /**
  * Darkens the screen being revealed, lightening as the gesture progresses. Only draws when this

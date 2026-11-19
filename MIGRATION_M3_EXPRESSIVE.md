@@ -97,26 +97,29 @@ For maintainers touching Monomail after this migration:
 
 ## 6. Container Morphing & Expressive List Fluidity
 
-### A. True 1:1 Android Settings Predictive Back Parity
-* **The Problem:** The previous implementation used `slideOutHorizontally { width }`. In Navigation Compose's seekable transition, dragging the thumb halfway across the screen immediately translated the card by $40-50\%$ of the screen width ($\approx 450\text{px}$ offscreen). This cut the card in half, sliced off its rounded corners, and broke the floating card illusion seen in Android 15/16/17 Settings.
+### A. True 1:1 Google Android Predictive Back Parity (Small Background Scaling Up)
+* **The Problem:** The user noted with real-device screenshots that in Google's official implementation (Files/Settings), the background page is visibly small and scales up with rounded corners, while the foreground card shrinks, rounds its corners, and previews the back transition. Previously, the Inbox was not wrapped in `BackCardSurface`, so it lacked rounded corners, and the scale factor did not make the background card prominent enough.
 * **The Fix:**
-  1. **Subtle Finger Drift (`driftPx = 24dp`):** In `backCardExit`, replaced full-width slide with a subtle $24\text{dp}$ touch-tracking drift in the swipe direction (`targetOffsetX = { (if (BackSwipe.edge == NavigationEvent.EDGE_RIGHT) -driftPx else driftPx) }`). The card remains comfortably centered in the viewport as a floating preview with all four $28\text{dp}$ rounded corners and elevation shadow fully visible.
-  2. **Recessed Parent Depth (`RevealStartScale = 0.94f`):** The underlying screen sits recessed at $94\%$ scale with a $28\%$ dark scrim, scaling smoothly **UP** to $100\%$ while its scrim clears as the gesture progresses.
-  3. **Diffused Ambient & Spot Shadow:** On API 28+, `BackCardSurface` specifies `ambientShadowColor = Color.Black.copy(0.20f)` and `spotShadowColor = Color.Black.copy(0.35f)` for soft, deep elevation during the gesture.
-  4. **Delayed Fade (`FadeStartMs = 260ms` of $320\text{ms}$):** The card remains solid and opaque throughout touch seeking, fading only upon release if committed.
+  1. **Background Screen Small & Scaling Up (`RevealStartScale = 0.90f`):** Updated `backRevealEnter()` with `initialScale = 0.90f` and centered `TransformOrigin(0.5f, 0.5f)`. When peeking back, the background page starts small at $90\%$ scale with $28\text{dp}$ rounded corners and dark scrim, and smoothly scales **UP** to $100\%$ while its scrim clears and corners square out.
+  2. **Universal `BackCardSurface`:** Wrapped `Screen.Inbox` in `BackCardSurface(navController)` alongside all drill destinations. Every screen participates symmetrically as a card with $28\text{dp}$ radius and $8\text{dp}$ drop shadow during gesture transitions.
+  3. **Subtle Finger Drift (`driftPx = 24dp`):** In `backCardExit`, replaced full-width slide with a $24\text{dp}$ touch-tracking drift in the swipe direction (`targetOffsetX = { (if (BackSwipe.edge == NavigationEvent.EDGE_RIGHT) -driftPx else driftPx) }`). The card remains comfortably centered in the viewport as a floating preview with all four corners visible.
 
 ### B. Single Persistent Floating Dock & Cross-Screen Morphing
-* **The Problem:** Previously, `InboxScreen`, `EmailDetailScreen`, and `ComposeScreen` each declared their own local bottom bars within their respective `Scaffold` composables. During predictive back gestures, Navigation Compose draws both the exiting and entering destinations simultaneously, causing both bottom bars to be visible at once (overlapping duplicate pills).
-* **The Solution Architecture (`ExpressivePersistentDock` & `FloatingDockController`):**
-  1. **Hoisted Outside NavHost:** Moved the dock to the application root in `NavGraph.kt` above `NavHost`. Exactly **ONE** dock instance exists in the window tree at all times, making bottom bar duplication physically impossible during back gestures.
-  2. **Expressive Contextual Morphing:** Controlled via `FloatingDockController`, the dock smoothly morphs across screen modes using Material 3 Expressive spring physics (`Spring.DampingRatioNoBouncy`, `Spring.StiffnessMediumLow`):
-     - **Inbox Mode:** Displays 3 segmented tabs (`Inbox`, `Sent`, `Archived`) alongside a floating Compose FAB (`[ ✏ ]`).
-     - **Thread Mode (Email Detail):** Morphs into dual action pills (`[ ↩ Reply ]` filled button and `[ ➡ Forward ]` outlined button).
-     - **Compose Mode:** Morphs into attachment actions (`[ 📎 Attach ]`, `[ 📄 Drafts ]`, `[ 🚀 Send ]`).
-     - **Settings Mode:** Morphs into an interactive search bar pill (`[ 🔍 Search settings... ]`) with live filtering and auto-IME keyboard elevation.
-     - **Hidden Mode:** Fades and collapses for auth/viewer screens.
-  3. **Scroll-Collapse (Google Messages Aesthetic):** In `InboxScreen`, `listState.isScrollInProgress` drives `dockController.isScrolling`. While scrolling, text labels hide via `AnimatedVisibility` and the pill dynamically collapses to an ultra-compact icon-only pill ($200\text{dp}$ width) via `animateDpAsState` springs, expanding back to full width when scrolling settles.
-  4. **Diffused Elevation Shadow:** Emulates the soft, diffused floating toolbar shadows of Google Messages using dual-layer `ambientShadowColor` (0.18f alpha) and `spotShadowColor` (0.28f alpha) in `graphicsLayer` with a subtle $1\text{dp}$ outline.
+* **The Problem:**
+  1. **Two Floating Bars in Email Detail:** An inline Reply/Forward row was present inside the email `LazyColumn` item block in addition to the global floating dock, creating overlapping double bars at the bottom of emails.
+  2. **Settings Showing Inbox Tabs:** Individual child screens (`InboxScreen`, `SettingsScreen`) competed to write to `dockController.mode` via `LaunchedEffect`/`DisposableEffect`. When navigating from Inbox to Settings, `InboxScreen`'s exit recomposition re-fired and overwrote the mode back to `INBOX`.
+  3. **Glitching & Text Truncation (`box`, `ent`, `chived`):** During inbox scrolling, `isScrollInProgress` toggled rapidly on micro-finger pauses, while `SegmentedButton` clipped its labels during width animations.
+* **The Architectural Resolution:**
+  1. **Centralized Route-Driven Mode in `NavGraph.kt`:** Completely removed `dockController.mode = ...` from all child screens. `NavGraph.kt` determines `activeDockMode` directly from `navController.currentBackStackEntry`:
+     - `"inbox"` $\to$ `DockMode.INBOX`
+     - `"thread/..."` $\to$ `DockMode.THREAD`
+     - `"compose"` $\to$ `DockMode.COMPOSE`
+     - `"settings"` (hub only) $\to$ `DockMode.SETTINGS`
+     - All sub-settings (`"settings/{section}"`) and viewers $\to$ `DockMode.HIDDEN`
+  2. **Eliminated Inline Duplicate Bar:** Removed the duplicate inline Reply/Forward buttons from `EmailDetailScreen.kt`, replacing them with comfortable scrolling clearance spacer ($100\text{dp}$). Exactly one dock is rendered.
+  3. **Glitch-Free Scroll Hysteresis & Clean Collapsed Pill:**
+     - In `InboxScreen.kt`, added a $300\text{ms}$ debounce on scroll completion, preventing any flickering or bounce during active reading.
+     - In `ExpressivePersistentDock.kt`, when `isCollapsed` is true, the label is omitted (`{}`), allowing `SegmentedButton` to center the pure icon in a compact $180\text{dp}$ pill. Text is only rendered when expanded, permanently eliminating clipped text (`box`, `ent`, `chived`).
 
 ### C. List Item Fluidity (`Modifier.animateItem()`)
 * **The Problem:** Archived, deleted, or bulk-managed emails snapped their row heights abruptly, and expanding/collapsing smart groups caused visual jumpiness.

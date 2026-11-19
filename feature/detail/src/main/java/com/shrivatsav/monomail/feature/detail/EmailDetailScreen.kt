@@ -231,7 +231,6 @@ fun EmailDetailScreen(
     ) { padding ->
         val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
         androidx.compose.runtime.DisposableEffect(state) {
-            dockController.mode = com.shrivatsav.monomail.ui.components.DockMode.THREAD
             val latestEmail = (state as? EmailDetailState.Success)?.emails?.lastOrNull()
             if (latestEmail != null) {
                 dockController.onReplyAction = {
@@ -529,60 +528,7 @@ fun ThreadConversationContent(
         }
 
         item {
-            Column {
-                Spacer(modifier = Modifier.height(24.dp))
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.padding(horizontal = 24.dp)
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp)
-                        .padding(bottom = 40.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Button(
-                        onClick = onReply,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp),
-                        shape = cornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.onBackground,
-                            contentColor = MaterialTheme.colorScheme.background
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.Reply,
-                            contentDescription = "Reply",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Reply", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                    }
-                    OutlinedButton(
-                        onClick = onForward,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp),
-                        shape = cornerShape(16.dp),
-                        border = BorderStroke(
-                            1.dp,
-                            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f)
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.Forward,
-                            contentDescription = "Forward",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Forward", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.height(100.dp))
         }
     }
 }

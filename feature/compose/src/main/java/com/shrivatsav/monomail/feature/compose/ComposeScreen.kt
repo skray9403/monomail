@@ -544,7 +544,6 @@ fun ComposeScreen(
     }
     val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
     androidx.compose.runtime.DisposableEffect(canSend, state.isSending) {
-        dockController.mode = com.shrivatsav.monomail.ui.components.DockMode.COMPOSE
         dockController.canSend = canSend
         dockController.isSending = state.isSending
         dockController.onAttachAction = { showAttachmentPicker = true }

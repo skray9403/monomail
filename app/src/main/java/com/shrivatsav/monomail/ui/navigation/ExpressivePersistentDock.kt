@@ -103,7 +103,7 @@ internal fun ExpressivePersistentDock(
     // Expressive dynamic width with spring physics
     val dockWidth by animateDpAsState(
         targetValue = when {
-            dockController.mode == DockMode.INBOX && isCollapsed -> 200.dp
+            dockController.mode == DockMode.INBOX && isCollapsed -> 180.dp
             dockController.mode == DockMode.INBOX -> (screenWidth - 32.dp) - 76.dp // Subtract horizontal margins and FAB width
             else -> screenWidth - 32.dp
         },
@@ -262,17 +262,12 @@ private fun InboxDockContent(
                     )
                 },
                 label = {
-                    // Expressive scroll collapse: hide text during scroll, show on idle
-                    AnimatedVisibility(
-                        visible = !isCollapsed,
-                        enter = fadeIn() + expandHorizontally(),
-                        exit = fadeOut() + shrinkHorizontally()
-                    ) {
+                    if (!isCollapsed) {
                         Text(
                             text = label,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.labelLarge
+                            softWrap = false,
+                            style = MaterialTheme.typography.labelMedium
                         )
                     }
                 }

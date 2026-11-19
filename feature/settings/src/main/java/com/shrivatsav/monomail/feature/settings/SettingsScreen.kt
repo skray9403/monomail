@@ -243,7 +243,6 @@ private fun SettingsHubScreen(
     ) { padding ->
         val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
         androidx.compose.runtime.DisposableEffect(Unit) {
-            dockController.mode = com.shrivatsav.monomail.ui.components.DockMode.SETTINGS
             dockController.onSettingsQueryChange = { dockController.settingsQuery = it }
             onDispose {
                 dockController.settingsQuery = ""

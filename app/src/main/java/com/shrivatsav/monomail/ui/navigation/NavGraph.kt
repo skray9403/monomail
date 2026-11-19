@@ -322,15 +322,14 @@ fun NavGraph(
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
 
-    LaunchedEffect(currentRoute) {
-        dockController.mode = when {
-            currentRoute == Screen.Inbox.route -> DockMode.INBOX
-            currentRoute?.startsWith("thread") == true -> DockMode.THREAD
-            currentRoute?.startsWith("compose") == true -> DockMode.COMPOSE
-            currentRoute?.startsWith("settings") == true -> DockMode.SETTINGS
-            else -> DockMode.HIDDEN
-        }
+    val activeDockMode = when {
+        currentRoute == Screen.Inbox.route -> DockMode.INBOX
+        currentRoute?.startsWith("thread") == true -> DockMode.THREAD
+        currentRoute?.startsWith("compose") == true -> DockMode.COMPOSE
+        currentRoute == Screen.Settings.route -> DockMode.SETTINGS
+        else -> DockMode.HIDDEN
     }
+    dockController.mode = activeDockMode
 
     CompositionLocalProvider(LocalFloatingDockController provides dockController) {
         Box(
@@ -409,7 +408,7 @@ fun NavGraph(
                 )
             }
             composable(Screen.Inbox.route) {
-                Box(modifier = Modifier.fillMaxSize().then(revealDimModifier(navController))) {
+                BackCardSurface(navController) {
                     val vm: InboxViewModel = hiltViewModel()
                     val inboxScope = androidx.compose.runtime.rememberCoroutineScope()
                     val activeAccount by authManager.activeAccountFlow.collectAsState(initial = authManager.currentUser)
