@@ -98,7 +98,7 @@ android {
     namespace = "com.shrivatsav.monomail"
     compileSdk = 37
 
-    compileSdkMinor = 1
+    compileSdkMinor = 2
     defaultConfig {
         applicationId = "com.shrivatsav.monomail"
         minSdk = 26
@@ -224,7 +224,7 @@ androidComponents {
 
 dependencies {
     // Compose BOM
-    implementation(platform(libs.androidx.compose.bom))
+    implementation(platform("androidx.compose:compose-bom-alpha:2026.11.00"))
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
