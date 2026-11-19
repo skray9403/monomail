@@ -309,6 +309,11 @@ fun InboxScreen(
                                 initialFirstVisibleItemIndex = savedPos.first,
                                 initialFirstVisibleItemScrollOffset = savedPos.second
                             )
+                            val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
+                            val isListScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
+                            LaunchedEffect(isListScrolling) {
+                                dockController.isScrolling = isListScrolling
+                            }
                             val shouldLoadMore by remember {
                                 derivedStateOf {
                                     val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -747,10 +752,6 @@ fun InboxScreen(
 
             // Coordinate with the single persistent floating dock outside NavHost
             val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
-            val isListScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
-            LaunchedEffect(isListScrolling) {
-                dockController.isScrolling = isListScrolling
-            }
             LaunchedEffect(immediateTab) {
                 dockController.mode = com.shrivatsav.monomail.ui.components.DockMode.INBOX
                 dockController.selectedTabIndex = when (immediateTab) {
