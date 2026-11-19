@@ -12,6 +12,7 @@ import android.webkit.WebView
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.CapturedAnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
@@ -698,7 +699,7 @@ private fun ConversationEmailItem(
                 onNavigateToAttachmentViewer = onNavigateToAttachmentViewer
             )
         }
-        AnimatedVisibility(
+        CapturedAnimatedVisibility(
             visible = isExpanded,
             enter = fadeIn(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()),
             exit = fadeOut(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec())
