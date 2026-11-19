@@ -45,21 +45,21 @@ import kotlin.math.roundToInt
  * Edge-aware predictive back for full-screen "card" destinations.
  *
  * True 1:1 match with Google Android System & Files/Settings predictive back:
- *   - The underlying (background) screen sits recessed at small scale (0.90f) with 28dp
- *     rounded corners and dark scrim, smoothly scaling UP (90% -> 100%) while un-rounding.
+ *   - The underlying (background) screen sits recessed at small scale (0.92f) with 28dp
+ *     rounded corners, cleanly scaling UP (92% -> 100%) as the user completes the gesture.
  *   - The foreground card shrinks (100% -> 90%), rounds corners (0dp -> 28dp), elevates
- *     with diffused drop shadow, and drifts slightly with touch (24dp) while remaining
- *     centered as a floating card preview.
+ *     with diffused drop shadow, and slides smoothly with touch gesture (following finger
+ *     towards the swipe direction, exiting completely on commit).
  * Plain tweens allow Navigation Compose's SeekableTransitionState to map touch seek progress
  * 1:1 without nonlinear spring bounce during finger dragging.
  */
 private const val BackMs = 320
 private const val FadeStartMs = 260          // card stays physically opaque until ~80% through gesture
 private const val ExitScale = 0.90f
-private const val RevealStartScale = 0.90f   // background page starts small at 90% and scales UP
-private const val RevealDim = 0.25f          // scrim over the screen underneath, fades as you commit
-private val CardRadius = 32.dp
-private val CardElevation = 10.dp
+private const val RevealStartScale = 0.92f   // background page starts small at 92% and scales UP
+private const val RevealDim = 0.06f          // very light subtle tint so background stays crisp
+private val CardRadius = 28.dp
+private val CardElevation = 12.dp
 private val BackEasing = LinearOutSlowInEasing
 
 /** Edge the current/last back gesture started from. Read lazily by the slide lambda each frame. */
@@ -81,15 +81,14 @@ internal fun TrackBackSwipeEdge() {
 }
 
 /**
- * Card leaving: shrinks to 90%, tracks touch displacement with a subtle drift (24dp),
- * remaining centered as a floating card preview with all 4 rounded corners visible.
+ * Card leaving: shrinks to 90%, tracks touch displacement with horizontal slide in swipe direction,
+ * and slides off screen on commit just like Google Files and Android System settings.
  */
-internal fun backCardExit(density: Float): ExitTransition {
-    val driftPx = (24f * density).roundToInt()
+internal fun backCardExit(density: Float = 1f): ExitTransition {
     return slideOutHorizontally(
         animationSpec = tween(BackMs, easing = BackEasing),
-        targetOffsetX = { _ ->
-            if (BackSwipe.edge == NavigationEvent.EDGE_RIGHT) -driftPx else driftPx
+        targetOffsetX = { fullWidth ->
+            if (BackSwipe.edge == NavigationEvent.EDGE_RIGHT) -fullWidth else fullWidth
         }
     ) +
         scaleOut(
@@ -100,14 +99,14 @@ internal fun backCardExit(density: Float): ExitTransition {
         fadeOut(tween(BackMs - FadeStartMs, delayMillis = FadeStartMs, easing = LinearEasing))
 }
 
-/** Screen underneath: settles from small recessed depth (90%) up to 100% as the card leaves. */
+/** Screen underneath: settles from small recessed depth (92%) up to 100% as the card leaves. */
 internal fun backRevealEnter(): EnterTransition =
     scaleIn(
         animationSpec = tween(BackMs, easing = BackEasing),
         initialScale = RevealStartScale,
         transformOrigin = TransformOrigin(0.5f, 0.5f)
     ) +
-        fadeIn(tween(BackMs, easing = BackEasing), initialAlpha = 0.85f)
+        fadeIn(tween(BackMs, easing = BackEasing), initialAlpha = 0.95f)
 
 /**
  * Darkens the screen being revealed, lightening as the gesture progresses. Only draws when this

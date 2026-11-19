@@ -102,14 +102,18 @@ internal fun ExpressivePersistentDock(
 ) {
     if (dockController.mode == DockMode.HIDDEN) return
 
-    val isCollapsed = dockController.isScrolling
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val isInboxMode = dockController.mode == DockMode.INBOX
+    val isScrolling = isInboxMode && dockController.isScrolling
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+
+    val expandedDockWidth = (screenWidth - 32.dp) - 76.dp
+    val collapsedDockWidth = 180.dp
+    val fullScreenWidth = screenWidth - 32.dp
 
     // Unified collapse progress (0f = full tabs + FAB at rest, 1f = compact icon pill while scrolling)
-    // Synchronizes dock width, FAB width, FAB spacing, and text alpha on the EXACT same spring physics
+    // Synchronizes text alpha and tab spacing strictly for Inbox tab contents
     val collapseFraction by animateFloatAsState(
-        targetValue = if (isInboxMode && isCollapsed) 1f else 0f,
+        targetValue = if (isScrolling) 1f else 0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow
@@ -117,29 +121,49 @@ internal fun ExpressivePersistentDock(
         label = "dockCollapseFraction"
     )
 
-    val expandedDockWidth = (screenWidth - 32.dp) - 76.dp
-    val collapsedDockWidth = 180.dp
-    val fullScreenWidth = screenWidth - 32.dp
-
-    val dockWidth = if (isInboxMode) {
-        expandedDockWidth + (collapsedDockWidth - expandedDockWidth) * collapseFraction
-    } else {
-        fullScreenWidth
+    // Animated container dimensions across BOTH scroll collapse and route morphing
+    val targetDockWidth = when {
+        !isInboxMode -> fullScreenWidth
+        isScrolling -> collapsedDockWidth
+        else -> expandedDockWidth
     }
 
-    val fabWidth = if (isInboxMode) {
-        64.dp * (1f - collapseFraction)
-    } else {
-        0.dp
-    }
+    val targetFabWidth = if (isInboxMode && !isScrolling) 64.dp else 0.dp
+    val targetFabSpacing = if (isInboxMode && !isScrolling) 12.dp else 0.dp
+    val targetFabAlpha = if (isInboxMode && !isScrolling) 1f else 0f
 
-    val fabSpacing = if (isInboxMode) {
-        12.dp * (1f - collapseFraction)
-    } else {
-        0.dp
-    }
+    val springDp = spring<androidx.compose.ui.unit.Dp>(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = Spring.StiffnessMediumLow
+    )
+    val springFloat = spring<Float>(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = Spring.StiffnessMediumLow
+    )
 
-    val fabAlpha = (1f - collapseFraction * 2.5f).coerceIn(0f, 1f)
+    val animatedDockWidth by animateDpAsState(
+        targetValue = targetDockWidth,
+        animationSpec = springDp,
+        label = "dockWidth"
+    )
+
+    val animatedFabWidth by animateDpAsState(
+        targetValue = targetFabWidth,
+        animationSpec = springDp,
+        label = "fabWidth"
+    )
+
+    val animatedFabSpacing by animateDpAsState(
+        targetValue = targetFabSpacing,
+        animationSpec = springDp,
+        label = "fabSpacing"
+    )
+
+    val animatedFabAlpha by animateFloatAsState(
+        targetValue = targetFabAlpha,
+        animationSpec = springFloat,
+        label = "fabAlpha"
+    )
 
     Row(
         modifier = modifier
@@ -151,7 +175,7 @@ internal fun ExpressivePersistentDock(
         // Floating pill container with Google Messages diffused elevation
         Surface(
             modifier = Modifier
-                .width(dockWidth)
+                .width(animatedDockWidth)
                 .height(64.dp)
                 .graphicsLayer {
                     shape = RoundedCornerShape(percent = 50)
@@ -216,22 +240,23 @@ internal fun ExpressivePersistentDock(
         }
 
         // Compose FAB (synchronized with identical spring physics, continuous width & alpha)
-        if (fabWidth > 0.5.dp) {
-            Spacer(Modifier.width(fabSpacing))
+        if (animatedFabWidth > 0.5.dp) {
+            Spacer(Modifier.width(animatedFabSpacing))
             FilledIconButton(
                 onClick = onComposeClick,
                 modifier = Modifier
-                    .size(fabWidth)
+                    .size(animatedFabWidth)
                     .graphicsLayer {
-                        alpha = fabAlpha
-                        scaleX = (0.5f + 0.5f * (1f - collapseFraction)).coerceIn(0f, 1f)
-                        scaleY = scaleX
+                        alpha = animatedFabAlpha
+                        val scale = (animatedFabWidth / 64.dp).coerceIn(0f, 1f)
+                        scaleX = scale
+                        scaleY = scale
                         shape = CircleShape
                         clip = false
-                        shadowElevation = (10.dp * (1f - collapseFraction)).toPx()
+                        shadowElevation = (10.dp * animatedFabAlpha).toPx()
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                            ambientShadowColor = Color.Black.copy(alpha = 0.22f * (1f - collapseFraction))
-                            spotShadowColor = Color.Black.copy(alpha = 0.32f * (1f - collapseFraction))
+                            ambientShadowColor = Color.Black.copy(alpha = 0.22f * animatedFabAlpha)
+                            spotShadowColor = Color.Black.copy(alpha = 0.32f * animatedFabAlpha)
                         }
                     },
                 shape = CircleShape,
@@ -240,7 +265,7 @@ internal fun ExpressivePersistentDock(
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             ) {
-                if (fabAlpha > 0.15f) {
+                if (animatedFabAlpha > 0.15f && animatedFabWidth > 24.dp) {
                     Icon(
                         imageVector = Icons.Rounded.Edit,
                         contentDescription = "Compose",
