@@ -12,6 +12,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
@@ -103,26 +104,48 @@ internal fun ExpressivePersistentDock(
 
     val isCollapsed = dockController.isScrolling
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val isInboxMode = dockController.mode == DockMode.INBOX
 
-    // Expressive dynamic width with spring physics
-    val dockWidth by animateDpAsState(
-        targetValue = when {
-            dockController.mode == DockMode.INBOX && isCollapsed -> 180.dp
-            dockController.mode == DockMode.INBOX -> (screenWidth - 32.dp) - 76.dp // Subtract horizontal margins and FAB width
-            else -> screenWidth - 32.dp
-        },
+    // Unified collapse progress (0f = full tabs + FAB at rest, 1f = compact icon pill while scrolling)
+    // Synchronizes dock width, FAB width, FAB spacing, and text alpha on the EXACT same spring physics
+    val collapseFraction by animateFloatAsState(
+        targetValue = if (isInboxMode && isCollapsed) 1f else 0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow
         ),
-        label = "expressiveDockWidth"
+        label = "dockCollapseFraction"
     )
+
+    val expandedDockWidth = (screenWidth - 32.dp) - 76.dp
+    val collapsedDockWidth = 180.dp
+    val fullScreenWidth = screenWidth - 32.dp
+
+    val dockWidth = if (isInboxMode) {
+        expandedDockWidth + (collapsedDockWidth - expandedDockWidth) * collapseFraction
+    } else {
+        fullScreenWidth
+    }
+
+    val fabWidth = if (isInboxMode) {
+        64.dp * (1f - collapseFraction)
+    } else {
+        0.dp
+    }
+
+    val fabSpacing = if (isInboxMode) {
+        12.dp * (1f - collapseFraction)
+    } else {
+        0.dp
+    }
+
+    val fabAlpha = (1f - collapseFraction * 2.5f).coerceIn(0f, 1f)
 
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+        horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Floating pill container with Google Messages diffused elevation
@@ -159,7 +182,7 @@ internal fun ExpressivePersistentDock(
                 when (mode) {
                     DockMode.INBOX -> {
                         InboxDockContent(
-                            isCollapsed = isCollapsed,
+                            collapseFraction = collapseFraction,
                             selectedIndex = dockController.selectedTabIndex,
                             onTabSelected = dockController.onTabSelected
                         )
@@ -192,23 +215,23 @@ internal fun ExpressivePersistentDock(
             }
         }
 
-        // Compose FAB (only on Inbox when not scrolling)
-        AnimatedVisibility(
-            visible = dockController.mode == DockMode.INBOX && !isCollapsed,
-            enter = fadeIn(tween(160, delayMillis = 80)) + scaleIn(spring(stiffness = Spring.StiffnessMediumLow), initialScale = 0.8f),
-            exit = fadeOut(tween(90)) + scaleOut(spring(stiffness = Spring.StiffnessMediumLow), targetScale = 0.8f)
-        ) {
+        // Compose FAB (synchronized with identical spring physics, continuous width & alpha)
+        if (fabWidth > 0.5.dp) {
+            Spacer(Modifier.width(fabSpacing))
             FilledIconButton(
                 onClick = onComposeClick,
                 modifier = Modifier
-                    .size(64.dp)
+                    .size(fabWidth)
                     .graphicsLayer {
+                        alpha = fabAlpha
+                        scaleX = (0.5f + 0.5f * (1f - collapseFraction)).coerceIn(0f, 1f)
+                        scaleY = scaleX
                         shape = CircleShape
                         clip = false
-                        shadowElevation = 10.dp.toPx()
+                        shadowElevation = (10.dp * (1f - collapseFraction)).toPx()
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                            ambientShadowColor = Color.Black.copy(alpha = 0.22f)
-                            spotShadowColor = Color.Black.copy(alpha = 0.32f)
+                            ambientShadowColor = Color.Black.copy(alpha = 0.22f * (1f - collapseFraction))
+                            spotShadowColor = Color.Black.copy(alpha = 0.32f * (1f - collapseFraction))
                         }
                     },
                 shape = CircleShape,
@@ -217,11 +240,13 @@ internal fun ExpressivePersistentDock(
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.Edit,
-                    contentDescription = "Compose",
-                    modifier = Modifier.size(24.dp)
-                )
+                if (fabAlpha > 0.15f) {
+                    Icon(
+                        imageVector = Icons.Rounded.Edit,
+                        contentDescription = "Compose",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
     }
@@ -229,7 +254,7 @@ internal fun ExpressivePersistentDock(
 
 @Composable
 private fun InboxDockContent(
-    isCollapsed: Boolean,
+    collapseFraction: Float,
     selectedIndex: Int,
     onTabSelected: (Int) -> Unit,
 ) {
@@ -240,6 +265,9 @@ private fun InboxDockContent(
             Triple(2, Icons.Rounded.Archive, "Archived")
         )
     }
+
+    // Text alpha drops quickly as soon as collapse starts, and only fades in once container is wide
+    val textAlpha = (1f - collapseFraction * 2.5f).coerceIn(0f, 1f)
 
     Row(
         modifier = Modifier
@@ -275,8 +303,7 @@ private fun InboxDockContent(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(horizontal = if (isCollapsed) 0.dp else 6.dp)
+                    horizontalArrangement = Arrangement.Center
                 ) {
                     Icon(
                         imageVector = icon,
@@ -284,33 +311,18 @@ private fun InboxDockContent(
                         tint = animatedContentColor,
                         modifier = Modifier.size(20.dp)
                     )
-                    AnimatedVisibility(
-                        visible = !isCollapsed,
-                        enter = fadeIn(tween(140, delayMillis = 60)) + expandHorizontally(
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioNoBouncy,
-                                stiffness = Spring.StiffnessMediumLow
-                            )
-                        ),
-                        exit = fadeOut(tween(80)) + shrinkHorizontally(
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioNoBouncy,
-                                stiffness = Spring.StiffnessMediumLow
-                            )
+                    if (textAlpha > 0.01f) {
+                        Spacer(Modifier.width((6.dp * (1f - collapseFraction)).coerceAtLeast(0.dp)))
+                        Text(
+                            text = label,
+                            maxLines = 1,
+                            softWrap = false,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                            ),
+                            color = animatedContentColor.copy(alpha = animatedContentColor.alpha * textAlpha),
+                            modifier = Modifier.graphicsLayer { alpha = textAlpha }
                         )
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = label,
-                                maxLines = 1,
-                                softWrap = false,
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
-                                ),
-                                color = animatedContentColor
-                            )
-                        }
                     }
                 }
             }
