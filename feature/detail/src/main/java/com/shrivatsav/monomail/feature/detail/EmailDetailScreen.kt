@@ -253,7 +253,7 @@ fun EmailDetailScreen(
                             Button(
                                 onClick = {
                                     onReply(
-                                        latestEmail.senderEmail,
+                                        latestEmail.fromEmail,
                                         latestEmail.subject,
                                         latestEmail.body,
                                         latestEmail.threadId,
