@@ -57,9 +57,9 @@ private const val BackMs = 320
 private const val FadeStartMs = 260          // card stays physically opaque until ~80% through gesture
 private const val ExitScale = 0.90f
 private const val RevealStartScale = 0.90f   // background page starts small at 90% and scales UP
-private const val RevealDim = 0.28f          // scrim over the screen underneath, fades as you commit
-private val CardRadius = 28.dp
-private val CardElevation = 8.dp
+private const val RevealDim = 0.25f          // scrim over the screen underneath, fades as you commit
+private val CardRadius = 32.dp
+private val CardElevation = 10.dp
 private val BackEasing = LinearOutSlowInEasing
 
 /** Edge the current/last back gesture started from. Read lazily by the slide lambda each frame. */

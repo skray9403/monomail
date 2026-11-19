@@ -330,6 +330,9 @@ fun NavGraph(
         else -> DockMode.HIDDEN
     }
     dockController.mode = activeDockMode
+    if (activeDockMode != DockMode.INBOX) {
+        dockController.isScrolling = false
+    }
 
     CompositionLocalProvider(LocalFloatingDockController provides dockController) {
         Box(

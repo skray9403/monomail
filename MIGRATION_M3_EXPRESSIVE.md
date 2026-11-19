@@ -109,6 +109,7 @@ For maintainers touching Monomail after this migration:
   1. **Two Floating Bars in Email Detail:** An inline Reply/Forward row was present inside the email `LazyColumn` item block in addition to the global floating dock, creating overlapping double bars at the bottom of emails.
   2. **Settings Showing Inbox Tabs:** Individual child screens (`InboxScreen`, `SettingsScreen`) competed to write to `dockController.mode` via `LaunchedEffect`/`DisposableEffect`. When navigating from Inbox to Settings, `InboxScreen`'s exit recomposition re-fired and overwrote the mode back to `INBOX`.
   3. **Glitching & Text Truncation (`box`, `ent`, `chived`):** During inbox scrolling, `isScrollInProgress` toggled rapidly on micro-finger pauses, while `SegmentedButton` clipped its labels during width animations.
+  4. **Compose FAB Layout Shift on Scroll:** The Compose FAB previously remained visible at 64dp while the dock shrank to 180dp, causing an asymmetrical offset and awkward centering during list reading.
 * **The Architectural Resolution:**
   1. **Centralized Route-Driven Mode in `NavGraph.kt`:** Completely removed `dockController.mode = ...` from all child screens. `NavGraph.kt` determines `activeDockMode` directly from `navController.currentBackStackEntry`:
      - `"inbox"` $\to$ `DockMode.INBOX`
@@ -116,10 +117,16 @@ For maintainers touching Monomail after this migration:
      - `"compose"` $\to$ `DockMode.COMPOSE`
      - `"settings"` (hub only) $\to$ `DockMode.SETTINGS`
      - All sub-settings (`"settings/{section}"`) and viewers $\to$ `DockMode.HIDDEN`
+     - Automatically resets `dockController.isScrolling = false` on any non-inbox route so returning to Inbox always presents a clean resting state.
   2. **Eliminated Inline Duplicate Bar:** Removed the duplicate inline Reply/Forward buttons from `EmailDetailScreen.kt`, replacing them with comfortable scrolling clearance spacer ($100\text{dp}$). Exactly one dock is rendered.
-  3. **Glitch-Free Scroll Hysteresis & Clean Collapsed Pill:**
+  3. **Glitch-Free Scroll Hysteresis, FAB Collapse & Clean Pill:**
      - In `InboxScreen.kt`, added a $300\text{ms}$ debounce on scroll completion, preventing any flickering or bounce during active reading.
-     - In `ExpressivePersistentDock.kt`, when `isCollapsed` is true, the label is omitted (`{}`), allowing `SegmentedButton` to center the pure icon in a compact $180\text{dp}$ pill. Text is only rendered when expanded, permanently eliminating clipped text (`box`, `ent`, `chived`).
+     - In `ExpressivePersistentDock.kt`, when `isCollapsed` is true, the Compose FAB smoothly scales down and fades away (`visible = mode == INBOX && !isCollapsed`).
+     - The row uses `Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)`, smoothly centering the compact $180\text{dp}$ pill during scrolling with zero layout snapping or jump.
+     - When collapsed, segmented tab labels are `{}` (empty), rendering pure centered 20dp icons without any text clipping (`box`, `ent`, `chived`).
+  4. **Diffused Ambient Elevation Shadow:**
+     - Elevated to $10\text{dp}$ with `graphicsLayer` ambient shadow ($0.22$ alpha) and spot shadow ($0.32$ alpha) on Android P+, creating Google's signature soft floating bloom.
+     - Corner radius upgraded to $32\text{dp}$ (`ShapeDefaults.ExtraLarge`) for seamless parity with Google's native system predictive back cards.
 
 ### C. List Item Fluidity (`Modifier.animateItem()`)
 * **The Problem:** Archived, deleted, or bulk-managed emails snapped their row heights abruptly, and expanding/collapsing smart groups caused visual jumpiness.

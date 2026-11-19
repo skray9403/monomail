@@ -118,7 +118,7 @@ internal fun ExpressivePersistentDock(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        horizontalArrangement = if (isCollapsed && dockController.mode == DockMode.INBOX) Arrangement.Center else Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Floating pill container with Google Messages diffused elevation
@@ -129,10 +129,10 @@ internal fun ExpressivePersistentDock(
                 .graphicsLayer {
                     shape = RoundedCornerShape(percent = 50)
                     clip = false
-                    shadowElevation = 8.dp.toPx()
+                    shadowElevation = 10.dp.toPx()
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        ambientShadowColor = Color.Black.copy(alpha = 0.18f)
-                        spotShadowColor = Color.Black.copy(alpha = 0.28f)
+                        ambientShadowColor = Color.Black.copy(alpha = 0.22f)
+                        spotShadowColor = Color.Black.copy(alpha = 0.32f)
                     }
                 },
             shape = RoundedCornerShape(percent = 50),
@@ -186,9 +186,9 @@ internal fun ExpressivePersistentDock(
             }
         }
 
-        // Compose FAB (only on Inbox)
+        // Compose FAB (only on Inbox when not scrolling)
         AnimatedVisibility(
-            visible = dockController.mode == DockMode.INBOX,
+            visible = dockController.mode == DockMode.INBOX && !isCollapsed,
             enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) + scaleIn(spring(stiffness = Spring.StiffnessMediumLow), initialScale = 0.8f),
             exit = fadeOut(spring(stiffness = Spring.StiffnessMediumLow)) + scaleOut(spring(stiffness = Spring.StiffnessMediumLow), targetScale = 0.8f)
         ) {
@@ -199,10 +199,10 @@ internal fun ExpressivePersistentDock(
                     .graphicsLayer {
                         shape = CircleShape
                         clip = false
-                        shadowElevation = 8.dp.toPx()
+                        shadowElevation = 10.dp.toPx()
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                            ambientShadowColor = Color.Black.copy(alpha = 0.18f)
-                            spotShadowColor = Color.Black.copy(alpha = 0.28f)
+                            ambientShadowColor = Color.Black.copy(alpha = 0.22f)
+                            spotShadowColor = Color.Black.copy(alpha = 0.32f)
                         }
                     },
                 shape = CircleShape,
