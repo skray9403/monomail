@@ -1,9 +1,9 @@
-package com.shrivatsav.monomail.ui.navigation
-
 @file:OptIn(
     androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
     androidx.compose.material3.ExperimentalMaterial3Api::class
 )
+
+package com.shrivatsav.monomail.ui.navigation
 
 import android.os.Build
 import androidx.compose.animation.AnimatedContent
@@ -331,6 +331,7 @@ private fun ThreadDockContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ComposeDockContent(
     canSend: Boolean,
