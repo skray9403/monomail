@@ -745,32 +745,29 @@ fun InboxScreen(
                     )
             )
 
-            AnimatedVisibility(
-                visible = longPressedThread == null && activeModal == null && !isBulkMode,
-                enter = fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.9f),
-                exit = fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.9f),
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-            ) {
-                BottomFabArea(
-                    immediateTab = immediateTab,
-                    appSettings = appSettings,
-                    unifiedInboxEnabled = unifiedInboxEnabled,
-                    navActions = navActions,
-                    viewModel = viewModel,
-                    navBarHeight = navBarHeight,
-                    onMoveSpamToTrash = {
-                        val hasSpamThreads = currentThreads.isNotEmpty()
-                        if (hasSpamThreads) {
-                            showMoveToTrashDialog = true
-                        } else {
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("No spam to move")
-                            }
-                        }
-                    },
-                )
+            // Coordinate with the single persistent floating dock outside NavHost
+            val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
+            val isListScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
+            LaunchedEffect(isListScrolling) {
+                dockController.isScrolling = isListScrolling
+            }
+            LaunchedEffect(immediateTab) {
+                dockController.mode = com.shrivatsav.monomail.ui.components.DockMode.INBOX
+                dockController.selectedTabIndex = when (immediateTab) {
+                    InboxTab.SENT -> 1
+                    InboxTab.ARCHIVED -> 2
+                    else -> 0
+                }
+            }
+            LaunchedEffect(Unit) {
+                dockController.onTabSelected = { index ->
+                    val tab = when (index) {
+                        1 -> InboxTab.SENT
+                        2 -> InboxTab.ARCHIVED
+                        else -> InboxTab.INBOX
+                    }
+                    viewModel.switchTab(tab)
+                }
             }
 
             AnimatedVisibility(

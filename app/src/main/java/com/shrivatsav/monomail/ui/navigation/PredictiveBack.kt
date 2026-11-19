@@ -1,5 +1,6 @@
 package com.shrivatsav.monomail.ui.navigation
 
+import android.os.Build
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
@@ -13,7 +14,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideOut
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -30,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavBackStackEntry
@@ -46,14 +45,15 @@ import kotlin.math.roundToInt
  *
  * True 1:1 match with Android 15/16/17 Settings app:
  *   - Current card shrinks (100% -> 90%), rounds corners (0dp -> 28dp), elevates with
- *     subtle drop shadow, and on commit slides completely off-screen in the gesture direction.
+ *     subtle diffused drop shadow, and drifts slightly with touch (24dp) while remaining
+ *     centered and fully visible as a floating card preview.
  *   - The underlying screen is recessed spatially behind at 94% scale with a dark scrim,
  *     and smoothly scales UP (94% -> 100%) while the scrim fades out to 0%.
  * Plain tweens allow Navigation Compose's SeekableTransitionState to map touch seek progress
  * 1:1 without nonlinear spring bounce during finger dragging.
  */
 private const val BackMs = 320
-private const val FadeStartMs = 260          // card stays physically opaque until ~80% off-screen
+private const val FadeStartMs = 260          // card stays physically opaque until ~80% through gesture
 private const val ExitScale = 0.90f
 private const val RevealStartScale = 0.94f   // screen underneath scales UP from depth: 94% -> 100%
 private const val RevealDim = 0.28f          // scrim over the screen underneath, fades as you commit
@@ -80,18 +80,20 @@ internal fun TrackBackSwipeEdge() {
 }
 
 /**
- * Card leaving: shrinks to 90%, tracks touch displacement across the full width,
- * and slides cleanly off the screen on commit (matching Android Settings).
+ * Card leaving: shrinks to 90%, tracks touch displacement with a subtle drift (24dp),
+ * remaining centered as a floating card preview with all 4 rounded corners visible.
  */
-internal fun backCardExit(density: Float): ExitTransition =
-    slideOutHorizontally(
+internal fun backCardExit(density: Float): ExitTransition {
+    val driftPx = (24f * density).roundToInt()
+    return slideOutHorizontally(
         animationSpec = tween(BackMs, easing = BackEasing),
-        targetOffsetX = { width ->
-            if (BackSwipe.edge == NavigationEvent.EDGE_RIGHT) -width else width
+        targetOffsetX = { _ ->
+            if (BackSwipe.edge == NavigationEvent.EDGE_RIGHT) -driftPx else driftPx
         }
     ) +
         scaleOut(tween(BackMs, easing = BackEasing), targetScale = ExitScale) +
         fadeOut(tween(BackMs - FadeStartMs, delayMillis = FadeStartMs, easing = LinearEasing))
+}
 
 /** Screen underneath: settles from recessed depth (94%) up to 100% as the card leaves. */
 internal fun backRevealEnter(): EnterTransition =
@@ -146,9 +148,13 @@ internal fun AnimatedContentScope.BackCardSurface(
                 shape = RoundedCornerShape(r)
                 clip = r > 0.dp
                 shadowElevation = elev.toPx()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    ambientShadowColor = Color.Black.copy(alpha = 0.20f)
+                    spotShadowColor = Color.Black.copy(alpha = 0.35f)
+                }
             }
             .background(MaterialTheme.colorScheme.background)
             .then(reveal),
-        content = content,
+        content = content
     )
 }

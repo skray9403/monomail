@@ -227,88 +227,25 @@ fun EmailDetailScreen(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             )
-        },
-        bottomBar = {
-            if (state is EmailDetailState.Success) {
-                val latestEmail = (state as EmailDetailState.Success).emails.lastOrNull()
-                if (latestEmail != null) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 16.dp)
-                            .height(64.dp),
-                        shape = RoundedCornerShape(percent = 50),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f),
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        tonalElevation = 1.dp,
-                        shadowElevation = 5.dp,
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Button(
-                                onClick = {
-                                    onReply(
-                                        latestEmail.fromEmail,
-                                        latestEmail.subject,
-                                        latestEmail.body,
-                                        latestEmail.threadId,
-                                        latestEmail.id
-                                    )
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                                shape = RoundedCornerShape(percent = 50),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.Reply,
-                                    contentDescription = "Reply",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Reply", style = MaterialTheme.typography.labelLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    onForward(
-                                        latestEmail.subject,
-                                        latestEmail.body,
-                                        latestEmail.threadId,
-                                        latestEmail.id
-                                    )
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                                shape = RoundedCornerShape(percent = 50),
-                                border = BorderStroke(
-                                    1.dp,
-                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.Forward,
-                                    contentDescription = "Forward",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Forward", style = MaterialTheme.typography.labelLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-                            }
-                        }
-                    }
-                }
-            }
         }
     ) { padding ->
+        val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
+        androidx.compose.runtime.DisposableEffect(state) {
+            dockController.mode = com.shrivatsav.monomail.ui.components.DockMode.THREAD
+            val latestEmail = (state as? EmailDetailState.Success)?.emails?.lastOrNull()
+            if (latestEmail != null) {
+                dockController.onReplyAction = {
+                    onReply(latestEmail.fromEmail, latestEmail.subject, latestEmail.body, latestEmail.threadId, latestEmail.id)
+                }
+                dockController.onForwardAction = {
+                    onForward(latestEmail.subject, latestEmail.body, latestEmail.threadId, latestEmail.id)
+                }
+            }
+            onDispose {
+                dockController.onReplyAction = null
+                dockController.onForwardAction = null
+            }
+        }
         DetailContent(
             state = state,
             padding = padding,

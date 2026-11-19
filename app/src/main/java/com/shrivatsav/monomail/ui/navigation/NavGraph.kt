@@ -37,6 +37,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.shrivatsav.monomail.ui.components.FloatingDockController
+import com.shrivatsav.monomail.ui.components.LocalFloatingDockController
+import com.shrivatsav.monomail.ui.components.DockMode
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -310,12 +318,27 @@ fun NavGraph(
         else -> Screen.SignIn.route
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        ReauthDialog(authManager, navController, scope)
+    val dockController = remember { FloatingDockController() }
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStackEntry?.destination?.route
+
+    LaunchedEffect(currentRoute) {
+        dockController.mode = when {
+            currentRoute == Screen.Inbox.route -> DockMode.INBOX
+            currentRoute?.startsWith("thread") == true -> DockMode.THREAD
+            currentRoute?.startsWith("compose") == true -> DockMode.COMPOSE
+            currentRoute?.startsWith("settings") == true -> DockMode.SETTINGS
+            else -> DockMode.HIDDEN
+        }
+    }
+
+    CompositionLocalProvider(LocalFloatingDockController provides dockController) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            ReauthDialog(authManager, navController, scope)
 
         NavHost(
             navController = navController,
@@ -727,7 +750,20 @@ fun NavGraph(
                 }
             }
         }
+
+        ExpressivePersistentDock(
+            dockController = dockController,
+            onComposeClick = {
+                navController.navigate(Screen.Compose.createRoute()) { launchSingleTop = true }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(bottom = 12.dp)
+        )
     }
+}
 }
 
 /**

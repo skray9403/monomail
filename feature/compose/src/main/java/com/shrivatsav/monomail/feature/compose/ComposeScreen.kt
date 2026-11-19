@@ -542,6 +542,21 @@ fun ComposeScreen(
             }
         )
     }
+    val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
+    androidx.compose.runtime.DisposableEffect(canSend, state.isSending) {
+        dockController.mode = com.shrivatsav.monomail.ui.components.DockMode.COMPOSE
+        dockController.canSend = canSend
+        dockController.isSending = state.isSending
+        dockController.onAttachAction = { showAttachmentPicker = true }
+        dockController.onDraftsAction = { showDrafts = true }
+        dockController.onSendAction = { viewModel.send() }
+        onDispose {
+            dockController.onAttachAction = null
+            dockController.onDraftsAction = null
+            dockController.onSendAction = null
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -576,16 +591,6 @@ fun ComposeScreen(
                 )
             )
         },
-        bottomBar = {
-            ComposeBottomBar(
-                isSending = state.isSending,
-                isSent = state.isSent,
-                canSend = canSend,
-                onAttach = { showAttachmentPicker = true },
-                onDraftsClick = { showDrafts = true },
-                onSend = { viewModel.send() }
-            )
-        },
         snackbarHost = {
             SnackbarHost(hostState = snackbarHostState) {
                 Snackbar(
@@ -604,6 +609,7 @@ fun ComposeScreen(
                 .padding(padding)
                 .imePadding()
                 .verticalScroll(rememberScrollState())
+                .padding(bottom = 96.dp)
         ) {
             ComposeTextField(
                 value = state.to,
