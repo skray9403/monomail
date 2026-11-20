@@ -3,8 +3,8 @@ name: Build Playstore Debug
 on:
   workflow_dispatch:
   push:
-    branches:
-      - '**'
+    branches-ignore:
+      - 'experiment/clock-mail-expressive-app'
 
 # Cancel obsolete builds when a newer commit is pushed to the same branch.
 # This avoids compiling several stale APKs in parallel during rapid UI iteration.
