@@ -1213,17 +1213,17 @@ private fun EmailWebViewCard(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var pendingLink by remember(emailId) { mutableStateOf<Uri?>(null) }
-    var renderGeneration by remember(emailId, htmlContent, allowRemoteImages) { mutableStateOf(0) }
-    var rendererRetryCount by remember(emailId, htmlContent, allowRemoteImages) { mutableStateOf(0) }
-    var isLoaded by remember(emailId, htmlContent, allowRemoteImages, renderGeneration) { mutableStateOf(false) }
-    var loadError by remember(emailId, htmlContent, allowRemoteImages, renderGeneration) { mutableStateOf<String?>(null) }
+    var renderGeneration by remember(emailId, allowRemoteImages) { mutableStateOf(0) }
+    var rendererRetryCount by remember(emailId, allowRemoteImages) { mutableStateOf(0) }
+    var isLoaded by remember(emailId, allowRemoteImages, renderGeneration) { mutableStateOf(false) }
+    var loadError by remember(emailId, allowRemoteImages, renderGeneration) { mutableStateOf<String?>(null) }
     val alpha by animateFloatAsState(
         targetValue = if (isLoaded) 1f else 0f,
         animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
         label = "WebViewFade"
     )
-    var emailContentWebView by remember(emailId, htmlContent, allowRemoteImages, renderGeneration) { mutableStateOf<WebView?>(null) }
-    DisposableEffect(emailId, htmlContent, allowRemoteImages, renderGeneration) {
+    var emailContentWebView by remember(emailId, allowRemoteImages, renderGeneration) { mutableStateOf<WebView?>(null) }
+    DisposableEffect(emailId, allowRemoteImages, renderGeneration) {
         onDispose { emailContentWebView?.apply { removeAllViews(); destroy() }; emailContentWebView = null }
     }
     val cardBgColor = Color.Transparent
@@ -1231,14 +1231,14 @@ private fun EmailWebViewCard(
     Column {
         if (htmlContent.isBlank()) {
             EmailBodyLoadingSkeleton(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 450.dp)
+                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp)
             )
         } else {
-            androidx.compose.runtime.key(emailId, htmlContent, allowRemoteImages, renderGeneration) {
+            androidx.compose.runtime.key(emailId, allowRemoteImages, renderGeneration) {
                 val callbackGeneration = renderGeneration
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                        .heightIn(min = 450.dp)
+                        .heightIn(min = 120.dp)
                         .clip(cornerShape(16.dp))
                         .background(cardBgColor, cornerShape(16.dp))
                 ) {
@@ -1696,22 +1696,33 @@ private fun ImageAttachmentCard(
     onFetchAttachment: suspend (String, String) -> ByteArray?,
     onNavigateToAttachmentViewer: (messageId: String, attachmentId: String, mimeType: String, name: String) -> Unit = { _, _, _, _ -> }
 ) {
-    var imageBytes by remember { androidx.compose.runtime.mutableStateOf<ByteArray?>(null) }
-    androidx.compose.runtime.LaunchedEffect(attachment.id) {
-        imageBytes = try {
+    var decodedBitmap by remember(attachment.id) {
+        mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)
+    }
+    var isLoaded by remember(attachment.id) { mutableStateOf(false) }
+
+    LaunchedEffect(attachment.id) {
+        val bytes = try {
             onFetchAttachment(attachment.messageId, attachment.id)
         } catch (e: Exception) {
             android.util.Log.e("EmailDetailScreen", "Failed to fetch image attachment ${attachment.id}", e)
             null
         }
+        decodedBitmap = if (bytes != null) {
+            withContext(Dispatchers.Default) {
+                val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
+                android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)?.asImageBitmap()
+            }
+        } else null
+        isLoaded = true
     }
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .clickable {
-                if (imageBytes != null) {
+            .clickable(enabled = decodedBitmap != null) {
+                if (decodedBitmap != null) {
                     onNavigateToAttachmentViewer(attachment.messageId, attachment.id, attachment.mimeType, attachment.name)
                 }
             }
@@ -1720,15 +1731,10 @@ private fun ImageAttachmentCard(
             modifier = Modifier.fillMaxWidth(),
             contentAlignment = Alignment.Center
         ) {
-            val bytes = imageBytes
-            if (bytes != null) {
-                val opts = android.graphics.BitmapFactory.Options().apply {
-                    inSampleSize = 2
-                }
-                val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
-                if (bitmap != null) {
+            val bitmap = decodedBitmap
+            if (bitmap != null) {
                     androidx.compose.foundation.Image(
-                        bitmap = bitmap.asImageBitmap(),
+                        bitmap = bitmap,
                         contentDescription = attachment.name,
                         modifier = Modifier
                             .fillMaxWidth()
