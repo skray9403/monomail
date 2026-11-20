@@ -25,6 +25,11 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android SDK platform
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platforms;android-37"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
