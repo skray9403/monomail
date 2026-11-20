@@ -267,51 +267,6 @@ private fun BulkSelectionContent(bulkSelection: BulkSelectionState) {
 }
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun SearchInputContent(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onServerSearch: (String) -> Unit,
-    actions: SearchBarActions,
-    display: SearchDisplayState,
-    onFocusChange: ((Boolean) -> Unit)? = null,
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    LaunchedEffect(interactionSource) {
-        interactionSource.interactions.collect { interaction ->
-            when (interaction) {
-                is FocusInteraction.Focus -> onFocusChange?.invoke(true)
-                is FocusInteraction.Unfocus -> onFocusChange?.invoke(false)
-            }
-        }
-    }
-    SearchBarDefaults.InputField(
-        query = query,
-        onQueryChange = onQueryChange,
-        onSearch = { onServerSearch(query) },
-        expanded = false,
-        onExpandedChange = {},
-        interactionSource = interactionSource,
-        placeholder = {
-            Text(
-                if (display.isRefreshing) "Syncing..." else if (display.unifiedInboxEnabled) "Search all accounts..." else "Search in mail",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-            )
-        },
-        leadingIcon = {
-            if (display.isRefreshing) {
-                LoadingIndicator(modifier = Modifier.size(40.dp), color = MaterialTheme.colorScheme.onSurface)
-            } else {
-                Icon(
-                    painter = painterResource(com.shrivatsav.monomail.feature.inbox.R.drawable.ic_monomail_mark),
-                    contentDescription = "Monomail",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        },
-        trailingIcon = { SearchTrailingIcon(actions, display) }
-    )
-}
 
 @Composable
 private fun SearchTrailingIcon(actions: SearchBarActions, display: SearchDisplayState) {
