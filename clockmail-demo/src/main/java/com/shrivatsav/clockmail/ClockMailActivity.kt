@@ -79,7 +79,6 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -110,7 +109,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -185,7 +183,6 @@ private fun ClockMailApp() {
         when {
             composing -> composing = false
             selected != null -> selected = null
-            searchOpen -> { searchOpen = false; query = "" }
             searchOpen -> { searchOpen = false; query = "" }
             settingsOpen -> settingsOpen = false
             destination == MailDestination.FOLDERS -> destination = MailDestination.INBOX
