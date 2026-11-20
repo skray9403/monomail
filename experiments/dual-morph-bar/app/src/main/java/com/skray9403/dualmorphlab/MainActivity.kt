@@ -122,12 +122,14 @@ private fun DualMorphLabApp() {
                 ): androidx.compose.ui.geometry.Offset {
                     val delta = consumed.y
                     if (delta < 0f) {
+                        if (scrollAccumulator < 0f) scrollAccumulator = 0f
                         scrollAccumulator += -delta
                         if (scrollAccumulator >= 28f) {
                             isScrolling = true
                             scrollAccumulator = 0f
                         }
                     } else if (delta > 0f) {
+                        if (scrollAccumulator > 0f) scrollAccumulator = 0f
                         scrollAccumulator -= delta
                         if (scrollAccumulator <= -28f) {
                             isScrolling = false
@@ -321,11 +323,8 @@ private fun MonoMailDock(
         // Never remove the FAB from composition. It morphs into Delete.
         FilledIconButton(
             onClick = { if (selectionMode) onDelete() },
-            modifier = Modifier.size(64.dp).graphicsLayer {
+            modifier = Modifier.width(fabWidth).height(64.dp).graphicsLayer {
                 alpha = fabAlpha
-                val scale = (fabWidth / 64.dp).coerceIn(0f, 1f)
-                scaleX = scale
-                scaleY = scale
                 shape = CircleShape
                 clip = false
                 shadowElevation = (6.dp * fabAlpha).toPx()
