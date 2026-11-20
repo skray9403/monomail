@@ -73,6 +73,10 @@ fun EmailItem(
     modifier: Modifier = Modifier
 ) {
     val isUnread = !thread.isRead
+    val senderDisplayName = remember(thread.from) { displayName(thread.from) }
+    val timestamp = remember(thread.date, is24HourTime) {
+        formatTimestamp(thread.date, is24HourTime)
+    }
     val haptics = LocalHapticFeedback.current
     val rowClick = if (selection.isBulkMode) selection.onRangeSelect else onClick
     val rowLongClick = if (selection.isBulkMode) selection.onSelectToggle else {
@@ -110,7 +114,7 @@ fun EmailItem(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = displayName(thread.from),
+                    text = senderDisplayName,
                     modifier = Modifier.weight(1f, fill = false),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = if (isUnread) FontWeight.Bold else FontWeight.Medium,
@@ -132,7 +136,8 @@ fun EmailItem(
                     text = thread.subject,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (isUnread) FontWeight.SemiBold else FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (isUnread) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -149,7 +154,7 @@ fun EmailItem(
         },
         trailingContent = {
             Text(
-                text = formatTimestamp(thread.date, is24HourTime),
+                text = timestamp,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = if (isUnread) FontWeight.SemiBold else FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -158,7 +163,7 @@ fun EmailItem(
         },
         colors = ListItemDefaults.colors(
             containerColor = if (isUnread) {
-                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.38f)
+                MaterialTheme.colorScheme.surfaceContainerLow
             } else {
                 Color.Transparent
             }

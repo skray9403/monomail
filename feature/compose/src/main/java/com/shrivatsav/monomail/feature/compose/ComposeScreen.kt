@@ -77,6 +77,8 @@ import androidx.compose.material.icons.rounded.FormatUnderlined
 import androidx.compose.material.icons.automirrored.rounded.FormatListBulleted
 import androidx.compose.material.icons.rounded.FormatListNumbered
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -157,6 +159,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private fun resolveAttachmentMimeType(contentResolver: android.content.ContentResolver, uri: Uri, name: String): String {
@@ -542,20 +545,6 @@ fun ComposeScreen(
             }
         )
     }
-    val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
-    androidx.compose.runtime.DisposableEffect(canSend, state.isSending) {
-        dockController.canSend = canSend
-        dockController.isSending = state.isSending
-        dockController.onAttachAction = { showAttachmentPicker = true }
-        dockController.onDraftsAction = { showDrafts = true }
-        dockController.onSendAction = { viewModel.send() }
-        onDispose {
-            dockController.onAttachAction = null
-            dockController.onDraftsAction = null
-            dockController.onSendAction = null
-        }
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -590,6 +579,29 @@ fun ComposeScreen(
                 )
             )
         },
+        bottomBar = {
+            BottomAppBar(modifier = Modifier.imePadding()) {
+                IconButton(onClick = { showDrafts = true }, enabled = !state.isSending) {
+                    Icon(Icons.Rounded.Drafts, contentDescription = "Open drafts")
+                }
+                IconButton(onClick = { showAttachmentPicker = true }, enabled = !state.isSending) {
+                    Icon(Icons.Rounded.AttachFile, contentDescription = "Add attachment")
+                }
+                Spacer(Modifier.weight(1f))
+                Button(
+                    onClick = { viewModel.send() },
+                    enabled = canSend && !state.isSending,
+                ) {
+                    if (state.isSending) {
+                        LoadingIndicator(Modifier.size(20.dp))
+                    } else {
+                        Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Send")
+                    }
+                }
+            }
+        },
         snackbarHost = {
             SnackbarHost(hostState = snackbarHostState) {
                 Snackbar(
@@ -608,7 +620,6 @@ fun ComposeScreen(
                 .padding(padding)
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 96.dp)
         ) {
             ComposeTextField(
                 value = state.to,
@@ -1076,6 +1087,11 @@ private fun ComposeBodyEditor(
     initialBody: String,
     onBodyChanged: (String) -> Unit
 ) {
+    var editorReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(360L) // allow nav slide-up transition to settle before Chromium init
+        editorReady = true
+    }
     var bodyWebView by remember { mutableStateOf<WebView?>(null) }
     DisposableEffect(Unit) {
         onDispose {
@@ -1095,65 +1111,75 @@ private fun ComposeBodyEditor(
         formattingState = FormattingState(isBold, isItalic, isUnderline, isBullet, isNumber, isQuote),
         modifier = Modifier.padding(horizontal = 12.dp)
     )
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = 150.dp)
-            .padding(horizontal = 4.dp)
-    ) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
-                val fmtCallback = { json: String ->
-                    mainHandler.post {
-                        try {
-                            val o = org.json.JSONObject(json)
-                            isBold = o.optBoolean("bold")
-                            isItalic = o.optBoolean("italic")
-                            isUnderline = o.optBoolean("underline")
-                            isBullet = o.optBoolean("bullet")
-                            isNumber = o.optBoolean("number")
-                            isQuote = o.optBoolean("quote")
-                        } catch (e: Exception) { android.util.Log.w("ComposeScreen", "Failed to parse format state", e) }
+    if (editorReady) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = 150.dp)
+                .padding(horizontal = 4.dp)
+        ) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+                    val fmtCallback = { json: String ->
+                        mainHandler.post {
+                            try {
+                                val o = org.json.JSONObject(json)
+                                isBold = o.optBoolean("bold")
+                                isItalic = o.optBoolean("italic")
+                                isUnderline = o.optBoolean("underline")
+                                isBullet = o.optBoolean("bullet")
+                                isNumber = o.optBoolean("number")
+                                isQuote = o.optBoolean("quote")
+                            } catch (e: Exception) { android.util.Log.w("ComposeScreen", "Failed to parse format state", e) }
+                        }
                     }
-                }
-                WebView(ctx).apply {
-                    setBackgroundColor(Color.TRANSPARENT)
-                    settings.javaScriptEnabled = true
-                    settings.cacheMode = WebSettings.LOAD_NO_CACHE
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    addJavascriptInterface(object {
-                        @JavascriptInterface
-                        fun onBodyChanged(html: String) { onBodyChanged(html) }
-                        @JavascriptInterface
-                        fun onFormatStateChanged(json: String) { fmtCallback(json) }
-                    }, "Android")
-                    val html = buildString {
-                        append("""<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>
+                    WebView(ctx).apply {
+                        setBackgroundColor(Color.TRANSPARENT)
+                        settings.javaScriptEnabled = true
+                        settings.cacheMode = WebSettings.LOAD_NO_CACHE
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        addJavascriptInterface(object {
+                            @JavascriptInterface
+                            fun onBodyChanged(html: String) { onBodyChanged(html) }
+                            @JavascriptInterface
+                            fun onFormatStateChanged(json: String) { fmtCallback(json) }
+                        }, "Android")
+                        val html = buildString {
+                            append("""<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>
                             body{font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;font-size:15px;line-height:1.6;margin:12px 16px;padding:0;color:$bodyTextColor;background:transparent;min-height:280px;word-break:break-word;overflow-wrap:break-word;}
                         </style></head><body contenteditable="true">""")
-                        if (initialBody.isNotEmpty()) append(initialBody)
-                        append("""</body></html>""")
-                    }
-                    loadDataWithBaseURL(null, html.trimIndent(), "text/html", "UTF-8", null)
-                    setWebViewClient(object : android.webkit.WebViewClient() {
-                        override fun onPageFinished(view: WebView, url: String) {
-                            view.evaluateJavascript("""
+                            if (initialBody.isNotEmpty()) append(initialBody)
+                            append("""</body></html>""")
+                        }
+                        loadDataWithBaseURL(null, html.trimIndent(), "text/html", "UTF-8", null)
+                        setWebViewClient(object : android.webkit.WebViewClient() {
+                            override fun onPageFinished(view: WebView, url: String) {
+                                view.evaluateJavascript("""
                                 function reportFmt(){Android.onFormatStateChanged(JSON.stringify({bold:document.queryCommandState('bold'),italic:document.queryCommandState('italic'),underline:document.queryCommandState('underline'),bullet:document.queryCommandState('insertUnorderedList'),number:document.queryCommandState('insertOrderedList'),quote:document.queryCommandState('formatBlock')=='blockquote'}));}
                                 document.body.addEventListener('input',function(){Android.onBodyChanged(document.body.innerHTML);reportFmt();});
                                 document.body.addEventListener('mouseup',reportFmt);
                                 document.body.addEventListener('keyup',reportFmt);
                                 setTimeout(reportFmt,200);
                             """.trimIndent(), null)
-                        }
-                    })
-                    bodyWebView = this
+                            }
+                        })
+                        bodyWebView = this
+                    }
                 }
-            }
+            )
+        }
+    } else {
+        // Placeholder shown during nav transition — same size, no content
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = 150.dp)
+                .padding(horizontal = 4.dp)
         )
     }
 }

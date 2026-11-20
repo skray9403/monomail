@@ -38,13 +38,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.navigation.compose.currentBackStackEntryAsState
-import com.shrivatsav.monomail.ui.components.FloatingDockController
-import com.shrivatsav.monomail.ui.components.LocalFloatingDockController
-import com.shrivatsav.monomail.ui.components.DockMode
+import com.shrivatsav.monomail.ui.components.AppNavigationState
+import com.shrivatsav.monomail.ui.components.LocalAppNavigationState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -299,34 +296,12 @@ fun NavGraph(
         else -> Screen.SignIn.route
     }
 
-    val dockController = remember { FloatingDockController() }
+    val appNavigationState = remember { AppNavigationState() }
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
 
-    val activeDockMode = when {
-        currentRoute == Screen.Inbox.route -> DockMode.INBOX
-        currentRoute?.startsWith("thread") == true -> DockMode.THREAD
-        currentRoute?.startsWith("compose") == true -> DockMode.COMPOSE
-        currentRoute?.startsWith("settings") == true -> {
-            val sectionName = currentRoute.substringAfter("settings/", "").takeIf { it.isNotEmpty() }
-            dockController.settingsTitle = sectionName?.replaceFirstChar { it.uppercase() } ?: "Settings"
-            DockMode.SETTINGS
-        }
-        else -> DockMode.HIDDEN
-    }
-    dockController.mode = activeDockMode
-    dockController.onBackClick = { navController.popBackStack() }
-    if (activeDockMode != DockMode.INBOX && activeDockMode != DockMode.SETTINGS) {
-        dockController.isScrolling = false
-        dockController.isSearchActive = false
-    }
-
-    CompositionLocalProvider(LocalFloatingDockController provides dockController) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-        ) {
+    CompositionLocalProvider(LocalAppNavigationState provides appNavigationState) {
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             ReauthDialog(authManager, navController, scope)
 
         NavHost(
@@ -545,8 +520,6 @@ fun NavGraph(
                 }
             }
             composable(Screen.Settings.route) {
-                dockController.settingsTitle = "Settings"
-                dockController.onBackClick = { navController.popBackStack() }
                 BackCardSurface(navController) {
                     val settingsViewModel: SettingsViewModel = hiltViewModel()
                     val ctx = LocalContext.current
@@ -571,10 +544,6 @@ fun NavGraph(
                 route = Screen.SettingsSection.route,
                 arguments = listOf(navArgument("section") { type = NavType.StringType })
             ) { backStackEntry ->
-                val sectionName = backStackEntry.arguments?.getString("section")
-                val formattedTitle = sectionName?.replaceFirstChar { it.uppercase() } ?: "Settings"
-                dockController.settingsTitle = formattedTitle
-                dockController.onBackClick = { navController.popBackStack() }
                 BackCardSurface(navController) {
                     val sectionName = backStackEntry.arguments?.getString("section")
                     val section = remember(sectionName) {
@@ -747,17 +716,16 @@ fun NavGraph(
             }
         }
 
-        ExpressivePersistentDock(
-            dockController = dockController,
-            onComposeClick = {
-                navController.navigate(Screen.Compose.createRoute()) { launchSingleTop = true }
-            },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .imePadding()
-                .padding(bottom = 20.dp)
-        )
+        if (currentRoute == Screen.Inbox.route) {
+            StockInboxNavigationBar(
+                selectedIndex = appNavigationState.selectedTabIndex,
+                onTabSelected = { appNavigationState.onTabSelected(it) },
+                onCompose = {
+                    navController.navigate(Screen.Compose.createRoute()) { launchSingleTop = true }
+                },
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
     }
 }
 }

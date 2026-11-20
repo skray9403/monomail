@@ -85,6 +85,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -119,7 +120,6 @@ import com.shrivatsav.monomail.util.stripUnsafeHtml
 import com.shrivatsav.monomail.util.blockRemoteImageSources
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
-import com.shrivatsav.monomail.ui.theme.MonoTween
 
 import androidx.compose.material3.ModalBottomSheet
 import kotlinx.coroutines.Dispatchers
@@ -149,6 +149,7 @@ fun EmailDetailScreen(
     onFetchAttachment: suspend (String, String) -> ByteArray? = { _, _ -> null },
     onNavigateToAttachmentViewer: (messageId: String, attachmentId: String, mimeType: String, name: String) -> Unit = { _, _, _, _ -> }
 ) {
+    val motionScheme = MaterialTheme.motionScheme
     // Read settings from ViewModel (consolidated — no direct DataStore collection)
     val isConversationView by viewModel.isConversationView.collectAsState()
     val loadRemoteImages by viewModel.loadRemoteImages.collectAsState()
@@ -183,8 +184,8 @@ fun EmailDetailScreen(
                         AnimatedContent(
                             targetState = isStarred,
                             transitionSpec = {
-                                (fadeIn(MonoTween.fadeIn) + scaleIn(MonoTween.fadeIn)) togetherWith
-                                        (fadeOut(MonoTween.fadeOut) + scaleOut(MonoTween.fadeOut))
+                                (fadeIn(motionScheme.fastEffectsSpec()) + scaleIn(motionScheme.fastSpatialSpec())) togetherWith
+                                        (fadeOut(motionScheme.fastEffectsSpec()) + scaleOut(motionScheme.fastSpatialSpec()))
                             },
                             label = "starToggle"
                         ) { starred ->
@@ -227,24 +228,44 @@ fun EmailDetailScreen(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             )
-        }
-    ) { padding ->
-        val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
-        androidx.compose.runtime.DisposableEffect(state) {
+        },
+        bottomBar = {
             val latestEmail = (state as? EmailDetailState.Success)?.emails?.lastOrNull()
             if (latestEmail != null) {
-                dockController.onReplyAction = {
-                    onReply(latestEmail.fromEmail, latestEmail.subject, latestEmail.body, latestEmail.threadId, latestEmail.id)
+                BottomAppBar {
+                    TextButton(
+                        onClick = {
+                            onReply(
+                                latestEmail.fromEmail,
+                                latestEmail.subject,
+                                latestEmail.body,
+                                latestEmail.threadId,
+                                latestEmail.id,
+                            )
+                        }
+                    ) {
+                        Icon(Icons.AutoMirrored.Rounded.Reply, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Reply")
+                    }
+                    TextButton(
+                        onClick = {
+                            onForward(
+                                latestEmail.subject,
+                                latestEmail.body,
+                                latestEmail.threadId,
+                                latestEmail.id,
+                            )
+                        }
+                    ) {
+                        Icon(Icons.AutoMirrored.Rounded.Forward, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Forward")
+                    }
                 }
-                dockController.onForwardAction = {
-                    onForward(latestEmail.subject, latestEmail.body, latestEmail.threadId, latestEmail.id)
-                }
-            }
-            onDispose {
-                dockController.onReplyAction = null
-                dockController.onForwardAction = null
             }
         }
+    ) { padding ->
         DetailContent(
             state = state,
             padding = padding,

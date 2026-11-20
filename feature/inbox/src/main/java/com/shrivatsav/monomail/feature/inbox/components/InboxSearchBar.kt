@@ -144,7 +144,7 @@ internal fun InboxSearchBar(
                             Text(
                                 if (display.isRefreshing) "Syncing..." else if (display.unifiedInboxEnabled) "Search all accounts..." else "Search in mail",
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         leadingIcon = {
@@ -259,7 +259,7 @@ private fun BulkSelectionContent(bulkSelection: BulkSelectionState) {
                 ) { Text("Deselect all") }
             }
             Spacer(Modifier.width(4.dp))
-            IconButton(onClick = bulkSelection.onDone, modifier = Modifier.size(40.dp)) {
+            IconButton(onClick = bulkSelection.onDone, modifier = Modifier.size(48.dp)) {
                 Icon(Icons.Rounded.Close, contentDescription = "Done", tint = MaterialTheme.colorScheme.onSurface)
             }
         }
@@ -267,6 +267,7 @@ private fun BulkSelectionContent(bulkSelection: BulkSelectionState) {
 }
 @Composable
 private fun SearchTrailingIcon(actions: SearchBarActions, display: SearchDisplayState) {
+    var showActions by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
         if (actions.scheduledCount > 0) {
             BadgedBox(badge = {
@@ -274,23 +275,29 @@ private fun SearchTrailingIcon(actions: SearchBarActions, display: SearchDisplay
                     Text(if (actions.scheduledCount > 99) "99+" else actions.scheduledCount.toString(), style = MaterialTheme.typography.labelSmall)
                 }
             }) {
-                IconButton(onClick = actions.onScheduledClick, modifier = Modifier.size(40.dp)) {
-                    Icon(Icons.Rounded.CalendarMonth, contentDescription = "Scheduled", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(25.dp))
+                IconButton(onClick = actions.onScheduledClick, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Rounded.CalendarMonth, contentDescription = "Scheduled", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(25.dp))
                 }
             }
         }
-        if (actions.showMarkAllRead) {
-            IconButton(onClick = actions.onMarkAllRead, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Rounded.CheckCircle, contentDescription = "Mark all as read", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(25.dp))
+        Box {
+            IconButton(onClick = { showActions = true }, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.Rounded.MoreVert, contentDescription = "More inbox actions")
             }
-        }
-        IconButton(onClick = actions.onOpenFolders, modifier = Modifier.size(40.dp)) {
-            Icon(
-                imageVector = Icons.Rounded.FolderOpen,
-                contentDescription = "Mail folders",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
-                modifier = Modifier.size(24.dp)
-            )
+            DropdownMenu(expanded = showActions, onDismissRequest = { showActions = false }) {
+                if (actions.showMarkAllRead) {
+                    DropdownMenuItem(
+                        text = { Text("Mark all as read") },
+                        leadingIcon = { Icon(Icons.Rounded.CheckCircle, contentDescription = null) },
+                        onClick = { showActions = false; actions.onMarkAllRead() },
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text("Mail folders") },
+                    leadingIcon = { Icon(Icons.Rounded.FolderOpen, contentDescription = null) },
+                    onClick = { showActions = false; actions.onOpenFolders() },
+                )
+            }
         }
         if (display.unifiedInboxEnabled && display.accounts.size > 1) {
             StackedAccountAvatars(accounts = display.accounts, onClick = actions.onOpenProfile)
@@ -316,7 +323,7 @@ private fun StackedAccountAvatars(
 
     Box(
         modifier = modifier
-            .size(30.dp)
+            .size(48.dp)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -386,7 +393,7 @@ private fun AvatarButton(
 
     Box(
         modifier = modifier
-            .size(34.dp)
+            .size(48.dp)
             .clip(CircleShape)
             .pointerInput(userProfile) {
                 if (onCycleAccount != null) {

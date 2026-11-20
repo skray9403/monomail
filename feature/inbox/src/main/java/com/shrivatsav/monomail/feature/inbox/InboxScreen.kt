@@ -40,6 +40,7 @@ import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
@@ -47,11 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
@@ -117,41 +114,8 @@ fun InboxScreen(
     val sentListState = rememberLazyListState()
     val archivedListState = rememberLazyListState()
     val otherListState = rememberLazyListState()
-    val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
+    val appNavigationState = com.shrivatsav.monomail.ui.components.LocalAppNavigationState.current
     val coroutineScope = rememberCoroutineScope()
-    val density = LocalDensity.current
-    val collapseThresholdPx = with(density) { 32.dp.toPx() }
-    val expandThresholdPx = with(density) { 48.dp.toPx() }
-
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            private var accumulatedDown = 0f
-            private var accumulatedUp = 0f
-
-            fun reset() {
-                accumulatedDown = 0f
-                accumulatedUp = 0f
-            }
-
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                val dy = available.y
-                if (dy < 0f) {
-                    accumulatedDown += -dy
-                    accumulatedUp = 0f
-                    if (accumulatedDown > collapseThresholdPx && !dockController.isScrolling) {
-                        dockController.isScrolling = true
-                    }
-                } else if (dy > 0f) {
-                    accumulatedUp += dy
-                    accumulatedDown = 0f
-                    if (accumulatedUp > expandThresholdPx && dockController.isScrolling) {
-                        dockController.isScrolling = false
-                    }
-                }
-                return Offset.Zero
-            }
-        }
-    }
     var showBackfillDialog by remember { mutableStateOf(false) }
 
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
@@ -214,34 +178,27 @@ fun InboxScreen(
         }
     }
 
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.currentPage + pagerState.currentPageOffsetFraction }
-            .collect { pos ->
-                dockController.continuousTabPosition = pos
-            }
-    }
-
     LaunchedEffect(pagerState.currentPage) {
         val targetTab = primaryTabs[pagerState.currentPage]
         if (immediateTab != targetTab) {
             viewModel.switchTab(targetTab)
         }
-        dockController.selectedTabIndex = pagerState.currentPage
+        appNavigationState.selectedTabIndex = pagerState.currentPage
     }
     LaunchedEffect(immediateTab) {
         val targetIdx = primaryTabs.indexOf(immediateTab)
         if (targetIdx >= 0 && targetIdx != pagerState.currentPage) {
             pagerState.animateScrollToPage(targetIdx)
         }
-        dockController.selectedTabIndex = if (targetIdx >= 0) targetIdx else 0
-        dockController.isScrolling = false
+        appNavigationState.selectedTabIndex = if (targetIdx >= 0) targetIdx else 0
     }
     val motionScheme = MaterialTheme.motionScheme
 
-    LaunchedEffect(Unit) {
-        dockController.onTabSelected = { targetIdx ->
+    val latestImmediateTab by rememberUpdatedState(immediateTab)
+    DisposableEffect(pagerState, viewModel) {
+        appNavigationState.onTabSelected = { targetIdx ->
             val targetTab = primaryTabs.getOrNull(targetIdx) ?: InboxTab.INBOX
-            if (immediateTab != targetTab) {
+            if (latestImmediateTab != targetTab) {
                 viewModel.switchTab(targetTab)
             }
             coroutineScope.launch {
@@ -255,11 +212,7 @@ fun InboxScreen(
                 }
             }
         }
-    }
-
-    LaunchedEffect(isSearchExpanded, isSearchFocused, isSearchActive, searchFilters.query) {
-        dockController.isSearchActive =
-            isSearchExpanded || isSearchFocused || isSearchActive || searchFilters.query.isNotEmpty()
+        onDispose { appNavigationState.onTabSelected = {} }
     }
 
     LaunchedEffect(isSearchActive, isSearchExpanded) {
@@ -457,7 +410,6 @@ fun InboxScreen(
                                         isBulkMode = isBulkMode,
                                         selectedThreadIds = selectedThreadIds,
                                         navBarHeight = navBarHeight,
-                                        nestedScrollConnection = nestedScrollConnection,
                                         is24HourTime = is24HourTime,
                                         onEmailClick = { accId, tId, mId -> navActions.onEmailClick(accId, tId, mId) },
                                         onLongClick = { thread ->
@@ -486,7 +438,6 @@ fun InboxScreen(
                                     isBulkMode = isBulkMode,
                                     selectedThreadIds = selectedThreadIds,
                                     navBarHeight = navBarHeight,
-                                    nestedScrollConnection = nestedScrollConnection,
                                     is24HourTime = is24HourTime,
                                     onEmailClick = { accId, tId, mId -> navActions.onEmailClick(accId, tId, mId) },
                                     onLongClick = { thread ->
@@ -597,10 +548,11 @@ fun InboxScreen(
 
     // ── Welcome to Monomail modal ────────────────────────────────────
 
-    com.shrivatsav.monomail.ui.components.MaterialDialog(
-        visible = showWelcomePrompt,
-        onDismiss = { viewModel.dismissWelcomePrompt() }
-    ) {
+    if (showWelcomePrompt) {
+        BasicAlertDialog(
+            onDismissRequest = { viewModel.dismissWelcomePrompt() },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
         Surface(
             shape = cornerShape(28.dp),
             color = MaterialTheme.colorScheme.background,
@@ -847,6 +799,7 @@ fun InboxScreen(
             }
         }
     }
+    }
 
 
     // Performance warning dialog for adding 4th+ account (github/polling builds only — playstore uses push)
@@ -955,7 +908,6 @@ private fun InboxTabList(
     isBulkMode: Boolean,
     selectedThreadIds: Set<String>,
     navBarHeight: Dp,
-    nestedScrollConnection: NestedScrollConnection,
     is24HourTime: Boolean,
     onEmailClick: (String, String, String?) -> Unit,
     onLongClick: (EmailThread) -> Unit,
@@ -1175,9 +1127,7 @@ private fun InboxTabList(
             val itemKeyFn = { it: InboxDisplayItem -> it.key }
             LazyColumn(
                 state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .nestedScroll(nestedScrollConnection),
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = navBarHeight + 112.dp)
             ) {
                 itemsIndexed(

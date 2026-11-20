@@ -28,7 +28,6 @@ import com.shrivatsav.monomail.ui.components.IllustrationType
 import com.shrivatsav.monomail.ui.components.MonoIllustration
 import com.shrivatsav.monomail.ui.components.TooltipIconButton
 import com.shrivatsav.monomail.ui.theme.MonoOpacity
-import com.shrivatsav.monomail.ui.theme.MonoSpring
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -185,12 +184,13 @@ private fun PagerControls(currentPage: Int, onPrev: () -> Unit, onNext: () -> Un
 
 @Composable
 private fun PageIndicatorDots(currentPage: Int) {
+    val motionScheme = MaterialTheme.motionScheme
     Row(modifier = Modifier.padding(bottom = 24.dp), horizontalArrangement = Arrangement.Center) {
         repeat(TOTAL_PAGES) { index ->
             val selected = currentPage == index
             val width by animateDpAsState(
                 targetValue = if (selected) 24.dp else 8.dp,
-                animationSpec = MonoSpring.bouncy(),
+                animationSpec = motionScheme.defaultSpatialSpec(),
                 label = "indicatorWidth"
             )
             Box(

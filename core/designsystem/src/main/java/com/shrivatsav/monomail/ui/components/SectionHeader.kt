@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import com.shrivatsav.monomail.ui.theme.cornerShape
+import androidx.compose.material3.Badge
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -18,6 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.shrivatsav.monomail.ui.theme.MonoOpacity
+import com.shrivatsav.monomail.ui.theme.MonoMailTheme
+import com.shrivatsav.monomail.ui.theme.ThemePreviews
+import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
 fun SectionHeader(
@@ -42,24 +45,47 @@ fun SectionHeader(
         ) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = MonoOpacity.secondary)
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
             if (count != null && count > 0) {
                 Spacer(modifier = Modifier.width(8.dp))
-                Surface(
-                    shape = cornerShape(4.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh
+                Badge(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 ) {
                     Text(
                         text = count.toString(),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = MonoOpacity.tertiary),
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                     )
                 }
             }
+        }
+    }
+}
+
+@ThemePreviews
+@Composable
+private fun SectionHeaderPreview() {
+    MonoMailTheme {
+        Surface {
+            SectionHeader(label = "Primary Inbox", count = 4)
+        }
+    }
+}
+
+@Preview(
+    name = "Section Header - Tablet",
+    device = "spec:width=1280dp,height=800dp,dpi=240",
+    showBackground = true,
+)
+@Composable
+private fun SectionHeaderTabletPreview() {
+    MonoMailTheme {
+        Surface {
+            SectionHeader(label = "Folders")
         }
     }
 }

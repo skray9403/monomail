@@ -35,7 +35,6 @@ import androidx.compose.ui.unit.sp
 import com.shrivatsav.monomail.core.data.settings.*
 import com.shrivatsav.monomail.ui.components.SlideSheet
 import com.shrivatsav.monomail.ui.theme.MonoOpacity
-import com.shrivatsav.monomail.ui.theme.MonoSpring
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,11 +53,12 @@ internal fun SettingsDetailTopBar(title: String, onNavigateBack: () -> Unit) {
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 internal fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = MonoSpring.gentle()),
+            .animateContentSize(animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec()),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer
         ),

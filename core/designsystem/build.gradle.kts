@@ -61,4 +61,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.text.google.fonts)
     implementation(libs.androidx.graphics.path)
     implementation(libs.coil.compose)
+
+    debugImplementation(libs.androidx.compose.ui.tooling)
 }

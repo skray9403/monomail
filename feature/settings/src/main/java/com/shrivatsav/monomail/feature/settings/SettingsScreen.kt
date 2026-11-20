@@ -1,6 +1,5 @@
 package com.shrivatsav.monomail.feature.settings
 
-import com.shrivatsav.monomail.ui.components.clickableOnPress
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -10,7 +9,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import com.shrivatsav.monomail.ui.theme.cornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Send
@@ -209,50 +207,44 @@ private fun SettingsHubScreen(
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val settings by viewModel.settings.collectAsState()
     var devTapCount by remember { mutableIntStateOf(0) }
+    var searchQuery by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         contentWindowInsets = WindowInsets.statusBars,
+        topBar = {
+            Column {
+                TopAppBar(
+                    title = { Text("Settings") },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                )
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    singleLine = true,
+                    label = { Text("Search settings") },
+                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Rounded.Clear, contentDescription = "Clear search")
+                            }
+                        }
+                    },
+                )
+            }
+        },
     ) { padding ->
-        val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
-        val scrollConnection = remember {
-            object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
-                private var accumulated = 0f
-                private val threshold = 28f
-
-                override fun onPreScroll(
-                    available: androidx.compose.ui.geometry.Offset,
-                    source: androidx.compose.ui.input.nestedscroll.NestedScrollSource
-                ): androidx.compose.ui.geometry.Offset {
-                    val dy = available.y
-                    accumulated += dy
-                    if (accumulated < -threshold) {
-                        dockController.isScrolling = true
-                        accumulated = 0f
-                    } else if (accumulated > threshold) {
-                        dockController.isScrolling = false
-                        accumulated = 0f
-                    }
-                    return androidx.compose.ui.geometry.Offset.Zero
-                }
-            }
-        }
-        androidx.compose.runtime.DisposableEffect(Unit) {
-            dockController.onSettingsQueryChange = { dockController.settingsQuery = it }
-            dockController.isScrolling = false
-            onDispose {
-                dockController.settingsQuery = ""
-                dockController.isScrolling = false
-            }
-        }
-        val searchQuery = dockController.settingsQuery
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .nestedScroll(scrollConnection)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .padding(bottom = 96.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (searchQuery.isNotBlank()) {
@@ -438,7 +430,7 @@ private fun SettingsHubItem(
     ListItem(
         modifier = Modifier
             .fillMaxWidth()
-            .clickableOnPress { onClick(section) },
+            .clickable { onClick(section) },
         leadingContent = {
             Box(
                 modifier = Modifier
