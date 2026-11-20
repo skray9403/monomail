@@ -236,22 +236,34 @@ fun InboxScreen(
         dockController.selectedTabIndex = if (targetIdx >= 0) targetIdx else 0
         dockController.isScrolling = false
     }
+    val motionScheme = MaterialTheme.motionScheme
+
     LaunchedEffect(Unit) {
         dockController.onTabSelected = { targetIdx ->
+            val targetTab = primaryTabs.getOrNull(targetIdx) ?: InboxTab.INBOX
+            if (immediateTab != targetTab) {
+                viewModel.switchTab(targetTab)
+            }
             coroutineScope.launch {
-                pagerState.animateScrollToPage(targetIdx)
+                if (kotlin.math.abs(pagerState.currentPage - targetIdx) > 1) {
+                    pagerState.scrollToPage(targetIdx)
+                } else {
+                    pagerState.animateScrollToPage(
+                        page = targetIdx,
+                        animationSpec = motionScheme.defaultSpatialSpec()
+                    )
+                }
             }
         }
     }
 
     LaunchedEffect(isSearchExpanded, isSearchFocused, isSearchActive, searchFilters.query) {
-        dockController.isSearchActive = isSearchExpanded || isSearchFocused || isSearchActive || searchFilters.query.isNotEmpty()
+        dockController.isSearchActive =
+            isSearchExpanded || isSearchFocused || isSearchActive || searchFilters.query.isNotEmpty()
     }
 
-    LaunchedEffect(isSearchActive) {
-        if (!isSearchActive) {
-            focusManager.clearFocus()
-            kotlinx.coroutines.delay(100)
+    LaunchedEffect(isSearchActive, isSearchExpanded) {
+        if (!isSearchActive && !isSearchExpanded) {
             focusManager.clearFocus()
         }
     }
