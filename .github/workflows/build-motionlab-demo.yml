@@ -1,0 +1,39 @@
+name: Build Motion Lab Demo
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - experiment/motion-lab-clock-expressive-nav
+
+concurrency:
+  group: motion-lab-demo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout isolated experiment
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Build standalone Motion Lab demo APK
+        run: ./gradlew :motionlab-demo:assembleDebug
+      - name: Verify standalone APK
+        run: |
+          APK="motionlab-demo/build/outputs/apk/debug/motionlab-demo-debug.apk"
+          test -s "$APK"
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -V | tail -n 1)
+          "$AAPT2" dump badging "$APK" | sed -n '1p'
+      - name: Upload Motion Lab demo only
+        uses: actions/upload-artifact@v4
+        with:
+          name: monomail-motion-lab-demo
+          path: motionlab-demo/build/outputs/apk/debug/motionlab-demo-debug.apk
+          if-no-files-found: error
