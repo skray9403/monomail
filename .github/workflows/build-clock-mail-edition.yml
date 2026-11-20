@@ -1,0 +1,40 @@
+name: Build MonoMail Clock Edition
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - experiment/clock-mail-expressive-app
+
+concurrency:
+  group: clock-mail-expressive-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-clock-mail:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout isolated Clock Edition
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Build the standalone Clock Edition app only
+        run: ./gradlew --no-daemon :clockmail-demo:assembleDebug
+      - name: Verify package and APK
+        run: |
+          APK="clockmail-demo/build/outputs/apk/debug/clockmail-demo-debug.apk"
+          test -s "$APK"
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -V | tail -n 1)
+          "$AAPT2" dump badging "$APK" | tee /tmp/apk-badging.txt
+          grep -F "package: name='com.shrivatsav.clockmail'" /tmp/apk-badging.txt
+      - name: Upload MonoMail Clock Edition only
+        uses: actions/upload-artifact@v4
+        with:
+          name: monomail-clock-edition
+          path: clockmail-demo/build/outputs/apk/debug/clockmail-demo-debug.apk
+          if-no-files-found: error
