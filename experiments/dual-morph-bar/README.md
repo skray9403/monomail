@@ -38,3 +38,5 @@ experiments/dual-morph-bar/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 This experiment lives on `experiment/messages-dual-morph-bar` and does not change MonoMail's production app modules or default branch.
+
+CI note: a change under this directory triggers the isolated debug APK workflow.
