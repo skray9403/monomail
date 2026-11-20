@@ -498,7 +498,7 @@ fun ComposeScreen(
     LaunchedEffect(state.isSent) {
         if (state.isSent) {
             showSentAnimation.value = true
-            kotlinx.coroutines.delay(1500)
+            kotlinx.coroutines.delay(350)
             onSent()
         }
     }
@@ -701,11 +701,11 @@ fun ComposeScreen(
     }
     AnimatedVisibility(
         visible = showSentAnimation.value,
-        enter = fadeIn(animationSpec = spring()) + scaleIn(
-            initialScale = 0.5f,
-            animationSpec = spring(dampingRatio = 0.5f, stiffness = 300f)
+        enter = fadeIn(MaterialTheme.motionScheme.fastEffectsSpec()) + scaleIn(
+            initialScale = 0.92f,
+            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec()
         ),
-        exit = fadeOut() + scaleOut(),
+        exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
         modifier = Modifier.fillMaxSize()
     ) {
         SentAnimationOverlay()
