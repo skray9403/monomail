@@ -123,13 +123,13 @@ private fun DualMorphLabApp() {
                     val delta = consumed.y
                     if (delta < 0f) {
                         scrollAccumulator += -delta
-                        if (scrollAccumulator >= 7f) {
+                        if (scrollAccumulator >= 28f) {
                             isScrolling = true
                             scrollAccumulator = 0f
                         }
                     } else if (delta > 0f) {
                         scrollAccumulator -= delta
-                        if (scrollAccumulator <= -7f) {
+                        if (scrollAccumulator <= -28f) {
                             isScrolling = false
                             scrollAccumulator = 0f
                         }
@@ -242,32 +242,30 @@ private fun MonoMailDock(
     val expandedDockWidth = (screenWidth - 32.dp) - 76.dp
     val collapsedDockWidth = 180.dp
     val selectionMode = selectedCount > 0
-
-    val collapseFraction by animateFloatAsState(
-        targetValue = if (isScrolling) 1f else 0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
-        label = "dockCollapseFraction"
-    )
     val springDp = spring<androidx.compose.ui.unit.Dp>(
         dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium
     )
     val springFloat = spring<Float>(
         dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium
     )
+    val collapseFraction by animateFloatAsState(
+        targetValue = if (isScrolling && !selectionMode) 1f else 0f,
+        animationSpec = springFloat, label = "dockCollapseFraction"
+    )
     val dockWidth by animateDpAsState(
         targetValue = if (isScrolling && !selectionMode) collapsedDockWidth else expandedDockWidth,
         animationSpec = springDp, label = "dockWidth"
     )
     val fabWidth by animateDpAsState(
-        targetValue = if (isScrolling) 0.dp else 64.dp,
+        targetValue = if (isScrolling && !selectionMode) 0.dp else 64.dp,
         animationSpec = springDp, label = "fabWidth"
     )
     val fabSpacing by animateDpAsState(
-        targetValue = if (isScrolling) 0.dp else 12.dp,
+        targetValue = if (isScrolling && !selectionMode) 0.dp else 12.dp,
         animationSpec = springDp, label = "fabSpacing"
     )
     val fabAlpha by animateFloatAsState(
-        targetValue = if (isScrolling) 0f else 1f,
+        targetValue = if (isScrolling && !selectionMode) 0f else 1f,
         animationSpec = springFloat, label = "fabAlpha"
     )
 
@@ -288,107 +286,136 @@ private fun MonoMailDock(
             tonalElevation = 1.dp,
             shadowElevation = 0.dp
         ) {
-            androidx.compose.animation.AnimatedContent(
-                targetState = selectionMode,
-                transitionSpec = {
-                    (androidx.compose.animation.fadeIn(tween(180)) +
-                        androidx.compose.animation.scaleIn(initialScale = 0.92f, animationSpec = tween(220)))
-                        .togetherWith(androidx.compose.animation.fadeOut(tween(100)))
-                },
-                label = "dockContextMorph"
-            ) { contextual ->
+            // Stable three-slot geometry: only each slot's content changes.
             Row(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (contextual) {
-                    IconButton(onClick = onClearSelection, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Clear selection")
-                    }
-                    Text(
-                        text = selectedCount.toString(),
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1
-                    )
-                    IconButton(onClick = onArchive, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Rounded.Archive, contentDescription = "Archive selected")
-                    }
-                    IconButton(onClick = onMarkUnread, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Rounded.MarkEmailUnread, contentDescription = "Mark unread")
-                    }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Rounded.Delete, contentDescription = "Delete selected")
-                    }
-                } else {
-                dockTabs.forEachIndexed { index, tab ->
-                    val selected = selectedTab == index
-                    val bg by androidx.compose.animation.animateColorAsState(
-                        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                        animationSpec = tween(180), label = "tabBg_$index"
-                    )
-                    val content by androidx.compose.animation.animateColorAsState(
-                        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                        animationSpec = tween(180), label = "tabContent_$index"
-                    )
-                    Box(
-                        modifier = Modifier.weight(1f).fillMaxHeight()
-                            .clip(CircleShape).background(bg)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = ripple(bounded = true)
-                            ) { onTabSelected(index) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                            Icon(tab.icon, contentDescription = tab.label, tint = content, modifier = Modifier.size(20.dp))
-                            val textAlpha = (1f - collapseFraction * 2.5f).coerceIn(0f, 1f)
-                            if (textAlpha > 0.01f) {
-                                Spacer(Modifier.width((6.dp * (1f - collapseFraction)).coerceAtLeast(0.dp)))
-                                Text(
-                                    text = tab.label, maxLines = 1, softWrap = false,
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
-                                    ),
-                                    color = content.copy(alpha = textAlpha),
-                                    modifier = Modifier.graphicsLayer { alpha = textAlpha }
-                                )
-                            }
-                        }
-                    }
-                }
-                }
-            }
+                MorphDockSlot(
+                    modifier = Modifier.weight(1f), selectionMode = selectionMode,
+                    normalIcon = Icons.Rounded.Inbox, normalLabel = "Inbox",
+                    actionIcon = Icons.Rounded.Close,
+                    actionLabel = "$selectedCount selected",
+                    selected = selectedTab == 0, collapseFraction = collapseFraction,
+                    onClick = { if (selectionMode) onClearSelection() else onTabSelected(0) }
+                )
+                MorphDockSlot(
+                    modifier = Modifier.weight(1f), selectionMode = selectionMode,
+                    normalIcon = Icons.AutoMirrored.Rounded.Send, normalLabel = "Sent",
+                    actionIcon = Icons.Rounded.Archive, actionLabel = "Archive",
+                    selected = selectedTab == 1, collapseFraction = collapseFraction,
+                    onClick = { if (selectionMode) onArchive() else onTabSelected(1) }
+                )
+                MorphDockSlot(
+                    modifier = Modifier.weight(1f), selectionMode = selectionMode,
+                    normalIcon = Icons.Rounded.Archive, normalLabel = "Archived",
+                    actionIcon = Icons.Rounded.MarkEmailUnread, actionLabel = "Unread",
+                    selected = selectedTab == 2, collapseFraction = collapseFraction,
+                    onClick = { if (selectionMode) onMarkUnread() else onTabSelected(2) }
+                )
             }
         }
-        if (!selectionMode && fabWidth > 0.5.dp) {
-            Spacer(Modifier.width(fabSpacing))
-            FilledIconButton(
-                onClick = { },
-                modifier = Modifier.size(fabWidth).graphicsLayer {
-                    alpha = fabAlpha
-                    val scale = (fabWidth / 64.dp).coerceIn(0f, 1f)
-                    scaleX = scale
-                    scaleY = scale
-                    shape = CircleShape
-                    clip = false
-                    shadowElevation = (6.dp * fabAlpha).toPx()
+
+        Spacer(Modifier.width(fabSpacing))
+        // Never remove the FAB from composition. It morphs into Delete.
+        FilledIconButton(
+            onClick = { if (selectionMode) onDelete() },
+            modifier = Modifier.size(64.dp).graphicsLayer {
+                alpha = fabAlpha
+                val scale = (fabWidth / 64.dp).coerceIn(0f, 1f)
+                scaleX = scale
+                scaleY = scale
+                shape = CircleShape
+                clip = false
+                shadowElevation = (6.dp * fabAlpha).toPx()
+            },
+            enabled = selectionMode || !isScrolling,
+            shape = CircleShape,
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = if (selectionMode) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+                contentColor = if (selectionMode) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        ) {
+            androidx.compose.animation.AnimatedContent(
+                targetState = selectionMode,
+                transitionSpec = {
+                    (androidx.compose.animation.fadeIn(tween(150)) +
+                        androidx.compose.animation.scaleIn(initialScale = 0.8f, animationSpec = tween(180)))
+                        .togetherWith(androidx.compose.animation.fadeOut(tween(90)))
                 },
-                shape = CircleShape,
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                label = "fabContextMorph"
+            ) { contextual ->
+                Icon(
+                    if (contextual) Icons.Rounded.Delete else Icons.Rounded.Edit,
+                    contentDescription = if (contextual) "Delete selected" else "Compose",
+                    modifier = Modifier.size(24.dp)
                 )
-            ) {
-                if (fabAlpha > 0.15f && fabWidth > 24.dp) {
-                    Icon(Icons.Rounded.Edit, contentDescription = "Compose", modifier = Modifier.size(24.dp))
-                }
             }
         }
     }
 }
 
+@Composable
+private fun MorphDockSlot(
+    modifier: Modifier,
+    selectionMode: Boolean,
+    normalIcon: ImageVector,
+    normalLabel: String,
+    actionIcon: ImageVector,
+    actionLabel: String,
+    selected: Boolean,
+    collapseFraction: Float,
+    onClick: () -> Unit
+) {
+    val background by androidx.compose.animation.animateColorAsState(
+        targetValue = if (selected && !selectionMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        animationSpec = tween(180), label = "dockSlotBackground"
+    )
+    val contentColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (selected && !selectionMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(180), label = "dockSlotContent"
+    )
+    Box(
+        modifier = modifier.fillMaxHeight().clip(CircleShape).background(background).clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = ripple(bounded = true), onClick = onClick
+        ),
+        contentAlignment = Alignment.Center
+    ) {
+        androidx.compose.animation.AnimatedContent(
+            targetState = selectionMode,
+            transitionSpec = {
+                (androidx.compose.animation.fadeIn(tween(150)) +
+                    androidx.compose.animation.scaleIn(initialScale = 0.88f, animationSpec = tween(180)))
+                    .togetherWith(androidx.compose.animation.fadeOut(tween(90)))
+            },
+            label = "dockSlotMorph"
+        ) { contextual ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                Icon(
+                    if (contextual) actionIcon else normalIcon,
+                    contentDescription = if (contextual) actionLabel else normalLabel,
+                    tint = if (contextual) MaterialTheme.colorScheme.onSurface else contentColor,
+                    modifier = Modifier.size(20.dp)
+                )
+                val labelAlpha = if (contextual) 1f else (1f - collapseFraction * 2.5f).coerceIn(0f, 1f)
+                if (labelAlpha > 0.01f) {
+                    Spacer(Modifier.width(5.dp * labelAlpha))
+                    Text(
+                        text = if (contextual) actionLabel else normalLabel,
+                        maxLines = 1, softWrap = false,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = if (selected && !contextual) FontWeight.SemiBold else FontWeight.Medium
+                        ),
+                        color = (if (contextual) MaterialTheme.colorScheme.onSurface else contentColor).copy(alpha = labelAlpha),
+                        modifier = Modifier.graphicsLayer { alpha = labelAlpha }
+                    )
+                }
+            }
+        }
+    }
+}
 
 private data class MailRow(
     val sender: String,
