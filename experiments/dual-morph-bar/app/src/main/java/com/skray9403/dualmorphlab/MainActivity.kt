@@ -56,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -327,3 +328,19 @@ private fun MonoMailDock(
         }
     }
 }
+
+
+private data class MailRow(
+    val sender: String,
+    val subject: String,
+    val time: String,
+    val unread: Boolean
+)
+
+private data class DockTab(val label: String, val icon: ImageVector)
+
+private val dockTabs = listOf(
+    DockTab("Inbox", Icons.Rounded.Inbox),
+    DockTab("Sent", Icons.AutoMirrored.Rounded.Send),
+    DockTab("Archived", Icons.Rounded.Archive)
+)
