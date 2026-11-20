@@ -1192,89 +1192,8 @@ private fun QuotedBodySection(originalBody: String) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ComposeBottomBar(
-    isSending: Boolean,
-    isSent: Boolean,
-    canSend: Boolean,
-    onAttach: () -> Unit,
-    onDraftsClick: () -> Unit,
-    onSend: () -> Unit
-) {
-    // Keep the toolbar detached from the system gesture area. The IME inset is
-    // consumed here as well, so the actions remain reachable while composing.
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .imePadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        HorizontalFloatingToolbar(
-            expanded = true,
-            modifier = Modifier.widthIn(min = 216.dp, max = 320.dp),
-            colors = FloatingToolbarDefaults.standardFloatingToolbarColors(),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-            expandedShadowElevation = 8.dp,
-            content = {
-                IconButton(
-                    onClick = onDraftsClick,
-                    enabled = !isSending && !isSent,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Drafts,
-                        contentDescription = "Drafts",
-                    )
-                }
-                IconButton(
-                    onClick = onAttach,
-                    enabled = !isSending && !isSent,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.AttachFile,
-                        contentDescription = "Attach",
-                    )
-                }
-                Spacer(Modifier.weight(1f))
-                when {
-                    isSending -> LoadingIndicator(
-                        modifier = Modifier.size(36.dp),
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    !isSent -> IconButton(
-                        onClick = onSend,
-                        enabled = canSend,
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.Send,
-                            contentDescription = "Send",
-                        )
-                    }
-                }
-            }
-        )
-    }
-}
 
 @Composable
-private fun SlideToSendControl(
-    canSend: Boolean,
-    onSend: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    FilledTonalButton(
-        onClick = onSend,
-        enabled = canSend,
-        modifier = modifier.fillMaxWidth().height(52.dp),
-    ) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Rounded.Send,
-            contentDescription = null,
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(if (canSend) "Send" else "Add a recipient")
-    }
-}
 
 @Composable
 fun AttachmentPreview(
