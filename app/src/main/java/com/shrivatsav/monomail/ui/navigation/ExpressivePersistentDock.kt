@@ -24,6 +24,8 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -68,17 +70,24 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.awaitPointerEvent
 import com.shrivatsav.monomail.ui.components.DockMode
 import com.shrivatsav.monomail.ui.components.FloatingDockController
 
@@ -105,10 +114,13 @@ internal fun ExpressivePersistentDock(
     val isInboxMode = dockController.mode == DockMode.INBOX
     val isScrolling = isInboxMode && dockController.isScrolling
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    var dockPressed by remember { mutableStateOf(false) }
+    var dockTouchPoint by remember { mutableStateOf(Offset.Zero) }
 
-    val expandedDockWidth = (screenWidth - 32.dp) - 76.dp
-    val collapsedDockWidth = 180.dp
-    val fullScreenWidth = screenWidth - 32.dp
+    // Tighter footprint: retain room for the adjacent compose action without spanning nearly the screen.
+    val expandedDockWidth = (screenWidth - 32.dp) - 104.dp
+    val collapsedDockWidth = 168.dp
+    val fullScreenWidth = screenWidth - 56.dp
 
     // Unified collapse progress (0f = full tabs + FAB at rest, 1f = compact icon pill while scrolling)
     // Synchronizes text alpha and tab spacing strictly for Inbox tab contents
@@ -168,7 +180,8 @@ internal fun ExpressivePersistentDock(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 12.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -176,7 +189,7 @@ internal fun ExpressivePersistentDock(
         Surface(
             modifier = Modifier
                 .width(animatedDockWidth)
-                .height(64.dp)
+                .height(60.dp)
                 .graphicsLayer {
                     shape = RoundedCornerShape(percent = 50)
                     clip = false
@@ -184,6 +197,33 @@ internal fun ExpressivePersistentDock(
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                         ambientShadowColor = Color.Black.copy(alpha = 0.10f)
                         spotShadowColor = Color.Black.copy(alpha = 0.16f)
+                    }
+                }
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        dockTouchPoint = down.position
+                        dockPressed = true
+                        do {
+                            val event = awaitPointerEvent()
+                            event.changes.firstOrNull()?.let { dockTouchPoint = it.position }
+                        } while (event.changes.any { it.pressed })
+                        dockPressed = false
+                    }
+                }
+                .drawWithCache {
+                    val glow = Brush.radialGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
+                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.09f),
+                            Color.Transparent
+                        ),
+                        center = dockTouchPoint,
+                        radius = size.minDimension * 1.15f
+                    )
+                    onDrawWithContent {
+                        drawContent()
+                        if (dockPressed) drawRect(glow)
                     }
                 },
             shape = RoundedCornerShape(percent = 50),
