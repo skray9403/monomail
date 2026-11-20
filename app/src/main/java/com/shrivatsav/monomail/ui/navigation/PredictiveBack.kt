@@ -120,7 +120,7 @@ internal fun backRevealEnter(): EnterTransition =
 internal fun AnimatedContentScope.revealDimModifier(navController: NavController): Modifier {
     val entry = LocalLifecycleOwner.current as? NavBackStackEntry
     val current by navController.currentBackStackEntryAsState()
-    val isRevealing = BackSwipe.isBackGestureActive || (transition.initialState == EnterExitState.PreEnter && transition.targetState == EnterExitState.Visible && entry != null && current?.id == entry.id)
+    val isRevealing = BackSwipe.isBackGestureActive || (transition.currentState == EnterExitState.PreEnter && transition.targetState == EnterExitState.Visible && entry != null && current?.id == entry.id)
     val dim by transition.animateFloat(
         transitionSpec = { tween(BackMs, easing = BackEasing) },
         label = "backRevealDim",
