@@ -2,6 +2,8 @@
 
 An isolated Compose test app for the scroll-reactive two-action bar inspired by the supplied Google Messages recording.
 
+Status: implementation committed; CI build is configured for this experiment branch.
+
 ## What to test
 
 - Scroll the inbox upward: Search expands while Compose contracts and exchanges positions.
