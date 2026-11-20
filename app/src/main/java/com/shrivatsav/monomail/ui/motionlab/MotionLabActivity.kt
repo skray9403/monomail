@@ -40,7 +40,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -304,6 +305,8 @@ fun MotionLabMainScreen() {
                         onScreenChange = { activeScreen = it },
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .imePadding()
                             .padding(bottom = 20.dp)
                     )
                 }
@@ -435,8 +438,7 @@ fun InteractiveMorphingDock(
                 Surface(
                     shape = CircleShape,
                     color = if (activeScreen == SimulatedScreen.THREAD_DETAIL) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shadowElevation = 6.dp,
-                    modifier = Modifier.animateContentSize(spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioNoBouncy))
+                    shadowElevation = 6.dp
                 ) {
                     AnimatedContent(
                         targetState = activeScreen,
@@ -465,8 +467,7 @@ fun InteractiveMorphingDock(
                 Surface(
                     shape = CircleShape,
                     color = if (activeScreen == SimulatedScreen.HOME) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shadowElevation = 6.dp,
-                    modifier = Modifier.animateContentSize(spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioNoBouncy))
+                    shadowElevation = 6.dp
                 ) {
                     AnimatedContent(
                         targetState = activeScreen,
@@ -617,6 +618,7 @@ fun DynamicSwipeTabPill(
     Row(
         modifier = Modifier
             .height(52.dp)
+            .animateContentSize(spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioNoBouncy))
             .padding(horizontal = 6.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -638,12 +640,16 @@ fun DynamicSwipeTabPill(
                 label = "tabContentColor"
             )
 
-            Surface(
-                shape = CircleShape,
-                color = containerColor,
+            Box(
                 modifier = Modifier
                     .height(40.dp)
-                    .clickable { onTabClick(tab.index) }
+                    .clip(CircleShape)
+                    .background(containerColor)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(bounded = true)
+                    ) { onTabClick(tab.index) },
+                contentAlignment = Alignment.Center
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = (10 + (6 * labelExpansion)).dp),
