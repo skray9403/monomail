@@ -30,10 +30,7 @@ jobs:
       - name: Install Android SDK platform
         run: |
           yes | sdkmanager --licenses
-          echo "Available Android platform packages:"
-          sdkmanager --list --channel=3 | grep -E 'platforms;android-[0-9]+' | head -40
-          echo "Requested platform:"
-          sdkmanager --channel=3 "platforms;android-37"
+          sdkmanager --channel=3 "platforms;android-37.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
