@@ -22,6 +22,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -179,108 +181,127 @@ class InboxViewModel @Inject constructor(
     fun getSavedScrollPosition(tab: InboxTab): Pair<Int, Int> =
         _scrollPositions.value[tab] ?: (0 to 0)
 
+    private val _threadsByTab = MutableStateFlow<Map<InboxTab, List<EmailThread>>>(emptyMap())
+    val threadsByTab: StateFlow<Map<InboxTab, List<EmailThread>>> = _threadsByTab.asStateFlow()
+
+    private fun getThreadsFlowForTab(
+        tab: InboxTab,
+        accountId: String?,
+        organize: Boolean,
+        unifiedEnabled: Boolean
+    ): Flow<List<EmailThread>> {
+        if (accountId == null) return flowOf(emptyList())
+        val flow = if (organize) {
+            when {
+                tab == InboxTab.UNIFIED || unifiedEnabled -> {
+                    when (tab) {
+                        InboxTab.UNIFIED, InboxTab.INBOX -> repository.getAllInboxThreadsFlow()
+                        InboxTab.SENT -> repository.getAllSentThreadsFlow()
+                        InboxTab.ARCHIVED -> repository.getAllArchivedThreadsFlow()
+                        InboxTab.STARRED -> repository.getAllStarredThreadsFlow()
+                        InboxTab.TRASH -> repository.getAllTrashThreadsFlow()
+                        InboxTab.SNOOZED -> repository.getAllSnoozedThreadsFlow()
+                        InboxTab.SPAM -> repository.getAllSpamThreadsFlow()
+                        InboxTab.DRAFTS -> repository.getAllDraftThreadsFlow()
+                    }
+                }
+                else -> {
+                    when (tab) {
+                        InboxTab.UNIFIED -> repository.getAllInboxThreadsFlow()
+                        InboxTab.SENT -> repository.getSentThreadsFlow(accountId)
+                        InboxTab.ARCHIVED -> repository.getArchivedThreadsFlow(accountId)
+                        InboxTab.STARRED -> repository.getStarredThreadsFlow(accountId)
+                        InboxTab.TRASH -> repository.getTrashThreadsFlow(accountId)
+                        InboxTab.SNOOZED -> repository.getSnoozedThreadsFlow(accountId)
+                        InboxTab.SPAM -> repository.getSpamThreadsFlow(accountId)
+                        InboxTab.DRAFTS -> repository.getDraftThreadsFlow(accountId)
+                        else -> repository.getInboxThreadsFlow(tab, accountId)
+                    }
+                }
+            }
+        } else {
+            when {
+                tab == InboxTab.UNIFIED || unifiedEnabled -> {
+                    when (tab) {
+                        InboxTab.UNIFIED, InboxTab.INBOX -> repository.getAllInboxEmailsFlow()
+                        InboxTab.SENT -> repository.getAllSentEmailsFlow()
+                        InboxTab.ARCHIVED -> repository.getAllArchivedEmailsFlow()
+                        InboxTab.STARRED -> repository.getAllStarredEmailsFlow()
+                        InboxTab.TRASH -> repository.getAllTrashEmailsFlow()
+                        InboxTab.SNOOZED -> repository.getInboxEmailsFlow(InboxTab.INBOX, accountId)
+                        InboxTab.SPAM -> repository.getAllSpamEmailsFlow()
+                        InboxTab.DRAFTS -> repository.getAllInboxEmailsFlow()
+                    }
+                }
+                else -> {
+                    when (tab) {
+                        InboxTab.INBOX, InboxTab.UNIFIED -> repository.getInboxEmailsFlow(tab, accountId)
+                        InboxTab.SENT -> repository.getSentEmailsFlow(accountId)
+                        InboxTab.ARCHIVED -> repository.getArchivedEmailsFlow(accountId)
+                        InboxTab.STARRED -> repository.getStarredEmailsFlow(accountId)
+                        InboxTab.TRASH -> repository.getTrashEmailsFlow(accountId)
+                        InboxTab.SNOOZED -> repository.getInboxEmailsFlow(InboxTab.INBOX, accountId)
+                        InboxTab.SPAM -> repository.getSpamEmailsFlow(accountId)
+                        InboxTab.DRAFTS -> repository.getInboxEmailsFlow(InboxTab.INBOX, accountId)
+                    }
+                }
+            }.map { emails ->
+                emails.map { email ->
+                    EmailThread(
+                        threadId = email.threadId,
+                        subject = email.subject.replaceFirst(Regex("^(Re|Fwd|Fw):\\s*", RegexOption.IGNORE_CASE), ""),
+                        from = if (tab == InboxTab.SENT) email.to else email.from,
+                        fromEmail = if (tab == InboxTab.SENT) email.to else email.fromEmail,
+                        snippet = email.snippet,
+                        date = email.date,
+                        messageCount = 1,
+                        isRead = email.isRead,
+                        isStarred = email.isStarred,
+                        latestMessageId = email.id,
+                        participants = if (tab == InboxTab.SENT) listOf(email.to) else listOf(email.fromEmail),
+                        accountId = email.accountId
+                    )
+                }
+            }
+        }
+        return combine(flow, pendingHideIds) { threads, hiddenIds ->
+            if (hiddenIds.isEmpty()) threads
+            else threads.filter { it.threadId !in hiddenIds }
+        }.distinctUntilChanged()
+    }
+
     init {
         viewModelScope.launch {
             combine(_currentTab, _activeAccountId, _unifiedInboxEnabled, _organizeByThread) { tab, accountId, unifiedEnabled, organize ->
                 Quad(tab, accountId, organize, unifiedEnabled)
             }
                 .flatMapLatest { (tab, accountId, organize, unifiedEnabled) ->
-                    if (accountId == null) {
-                        return@flatMapLatest kotlinx.coroutines.flow.flowOf(
-                            InboxState.Success(emptyList(), tab)
-                        )
-                    }
-                    val flow = if (organize) {
-                        when {
-                            tab == InboxTab.UNIFIED || unifiedEnabled -> {
-                                when (tab) {
-                                    InboxTab.UNIFIED, InboxTab.INBOX -> repository.getAllInboxThreadsFlow()
-                                    InboxTab.SENT -> repository.getAllSentThreadsFlow()
-                                    InboxTab.ARCHIVED -> repository.getAllArchivedThreadsFlow()
-                                    InboxTab.STARRED -> repository.getAllStarredThreadsFlow()
-                                    InboxTab.TRASH -> repository.getAllTrashThreadsFlow()
-                                    InboxTab.SNOOZED -> repository.getAllSnoozedThreadsFlow()
-                                    InboxTab.SPAM -> repository.getAllSpamThreadsFlow()
-                                    InboxTab.DRAFTS -> repository.getAllDraftThreadsFlow()
-                                }
-                            }
-                            else -> {
-                                when (tab) {
-                                    InboxTab.UNIFIED -> repository.getAllInboxThreadsFlow()
-                                    InboxTab.SENT -> repository.getSentThreadsFlow(accountId)
-                                    InboxTab.ARCHIVED -> repository.getArchivedThreadsFlow(accountId)
-                                    InboxTab.STARRED -> repository.getStarredThreadsFlow(accountId)
-                                    InboxTab.TRASH -> repository.getTrashThreadsFlow(accountId)
-                                    InboxTab.SNOOZED -> repository.getSnoozedThreadsFlow(accountId)
-                                    InboxTab.SPAM -> repository.getSpamThreadsFlow(accountId)
-                                    InboxTab.DRAFTS -> repository.getDraftThreadsFlow(accountId)
-                                    else -> repository.getInboxThreadsFlow(tab, accountId)
-                                }
-                            }
-                        }
-                    } else {
-                        when {
-                            tab == InboxTab.UNIFIED || unifiedEnabled -> {
-                                when (tab) {
-                                    InboxTab.UNIFIED, InboxTab.INBOX -> repository.getAllInboxEmailsFlow()
-                                    InboxTab.SENT -> repository.getAllSentEmailsFlow()
-                                    InboxTab.ARCHIVED -> repository.getAllArchivedEmailsFlow()
-                                    InboxTab.STARRED -> repository.getAllStarredEmailsFlow()
-                                    InboxTab.TRASH -> repository.getAllTrashEmailsFlow()
-                                    InboxTab.SNOOZED -> repository.getInboxEmailsFlow(InboxTab.INBOX, accountId)
-                                    InboxTab.SPAM -> repository.getAllSpamEmailsFlow()
-                                    InboxTab.DRAFTS -> repository.getAllInboxEmailsFlow()
-                                }
-                            }
-                            else -> {
-                                when (tab) {
-                                    InboxTab.INBOX, InboxTab.UNIFIED -> repository.getInboxEmailsFlow(tab, accountId)
-                                    InboxTab.SENT -> repository.getSentEmailsFlow(accountId)
-                                    InboxTab.ARCHIVED -> repository.getArchivedEmailsFlow(accountId)
-                                    InboxTab.STARRED -> repository.getStarredEmailsFlow(accountId)
-                                    InboxTab.TRASH -> repository.getTrashEmailsFlow(accountId)
-                                    InboxTab.SNOOZED -> repository.getInboxEmailsFlow(InboxTab.INBOX, accountId)
-                                    InboxTab.SPAM -> repository.getSpamEmailsFlow(accountId)
-                                    InboxTab.DRAFTS -> repository.getInboxEmailsFlow(InboxTab.INBOX, accountId)
-                                }
-                            }
-                        }.map { emails ->
-                            emails.map { email ->
-                                EmailThread(
-                                    threadId = email.threadId,
-                                    subject = email.subject.replaceFirst(Regex("^(Re|Fwd|Fw):\\s*", RegexOption.IGNORE_CASE), ""),
-                                    from = if (tab == InboxTab.SENT) email.to else email.from,
-                                    fromEmail = if (tab == InboxTab.SENT) email.to else email.fromEmail,
-                                    snippet = email.snippet,
-                                    date = email.date,
-                                    messageCount = 1,
-                                    isRead = email.isRead,
-                                    isStarred = email.isStarred,
-                                    latestMessageId = email.id,
-                                    participants = if (tab == InboxTab.SENT) listOf(email.to) else listOf(email.fromEmail),
-                                    accountId = email.accountId
-                                )
-                            }
-                        }
-                    }
-                    // Keep the visible thread list stable when only transient UI flags
-                    // (refresh spinner / load-more spinner) change. Otherwise each flag
-                    // emission creates a brand-new filtered list and restarts screen work.
-                    val visibleThreads = combine(flow, pendingHideIds) { threads, hiddenIds ->
-                        if (hiddenIds.isEmpty()) threads
-                        else threads.filter { it.threadId !in hiddenIds }
-                    }.distinctUntilChanged()
-
+                    val visibleThreads = getThreadsFlowForTab(tab, accountId, organize, unifiedEnabled)
                     combine(
                         visibleThreads,
                         _isRefreshing,
                         _isLoadingMore
                     ) { threads, isRefreshing, isLoadingMore ->
+                        _threadsByTab.update { it + (tab to threads) }
                         InboxState.Success(threads, tab, isRefreshing, isLoadingMore, pageTokens[getPageTokenKey()])
                     }
                 }.collect { newState ->
                     _state.value = newState
                 }
+        }
+
+        viewModelScope.launch {
+            combine(_activeAccountId, _unifiedInboxEnabled, _organizeByThread) { accountId, unifiedEnabled, organize ->
+                Triple(accountId, unifiedEnabled, organize)
+            }.collectLatest { (accountId, unifiedEnabled, organize) ->
+                listOf(InboxTab.INBOX, InboxTab.SENT, InboxTab.ARCHIVED).forEach { tab ->
+                    launch {
+                        getThreadsFlowForTab(tab, accountId, organize, unifiedEnabled).collect { threads ->
+                            _threadsByTab.update { it + (tab to threads) }
+                        }
+                    }
+                }
+            }
         }
     }
     private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)

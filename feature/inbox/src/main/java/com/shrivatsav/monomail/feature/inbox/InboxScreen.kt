@@ -33,6 +33,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -97,6 +99,58 @@ fun InboxScreen(
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val syncState by viewModel.inboxSyncState.collectAsStateWithLifecycle()
     val immediateTab by viewModel.currentTab.collectAsStateWithLifecycle()
+    val threadsByTab by viewModel.threadsByTab.collectAsStateWithLifecycle()
+    val primaryTabs = remember { listOf(InboxTab.INBOX, InboxTab.SENT, InboxTab.ARCHIVED) }
+    val initialPage = remember {
+        when (immediateTab) {
+            InboxTab.SENT -> 1
+            InboxTab.ARCHIVED -> 2
+            else -> 0
+        }
+    }
+    val pagerState = rememberPagerState(
+        initialPage = initialPage,
+        pageCount = { primaryTabs.size }
+    )
+    val inboxListState = rememberLazyListState()
+    val sentListState = rememberLazyListState()
+    val archivedListState = rememberLazyListState()
+    val otherListState = rememberLazyListState()
+    val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
+    val coroutineScope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val collapseThresholdPx = with(density) { 32.dp.toPx() }
+    val expandThresholdPx = with(density) { 48.dp.toPx() }
+
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            private var accumulatedDown = 0f
+            private var accumulatedUp = 0f
+
+            fun reset() {
+                accumulatedDown = 0f
+                accumulatedUp = 0f
+            }
+
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val dy = available.y
+                if (dy < 0f) {
+                    accumulatedDown += -dy
+                    accumulatedUp = 0f
+                    if (accumulatedDown > collapseThresholdPx && !dockController.isScrolling) {
+                        dockController.isScrolling = true
+                    }
+                } else if (dy > 0f) {
+                    accumulatedUp += dy
+                    accumulatedDown = 0f
+                    if (accumulatedUp > expandThresholdPx && dockController.isScrolling) {
+                        dockController.isScrolling = false
+                    }
+                }
+                return Offset.Zero
+            }
+        }
+    }
     var showBackfillDialog by remember { mutableStateOf(false) }
 
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
@@ -121,7 +175,6 @@ fun InboxScreen(
     val searchFilters by viewModel.searchFilters.collectAsStateWithLifecycle()
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
 
-    val pullToRefreshState = rememberPullToRefreshState()
     val currentThreads = (state as? InboxState.Success)?.threads ?: emptyList()
     val hapticFeedback = LocalHapticFeedback.current
     val focusManager = LocalFocusManager.current
@@ -149,7 +202,38 @@ fun InboxScreen(
     } else if (isBulkMode) {
         BackHandler { viewModel.exitBulkSelectMode() }
     } else if (immediateTab != InboxTab.INBOX) {
-        BackHandler { viewModel.switchTab(InboxTab.INBOX) }
+        BackHandler {
+            if (immediateTab !in primaryTabs) {
+                viewModel.switchTab(InboxTab.INBOX)
+            } else {
+                coroutineScope.launch {
+                    pagerState.animateScrollToPage(0)
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(pagerState.currentPage) {
+        val targetTab = primaryTabs[pagerState.currentPage]
+        if (immediateTab != targetTab) {
+            viewModel.switchTab(targetTab)
+        }
+        dockController.selectedTabIndex = pagerState.currentPage
+    }
+    LaunchedEffect(immediateTab) {
+        val targetIdx = primaryTabs.indexOf(immediateTab)
+        if (targetIdx >= 0 && targetIdx != pagerState.currentPage) {
+            pagerState.animateScrollToPage(targetIdx)
+        }
+        dockController.selectedTabIndex = if (targetIdx >= 0) targetIdx else 0
+        dockController.isScrolling = false
+    }
+    LaunchedEffect(Unit) {
+        dockController.onTabSelected = { targetIdx ->
+            coroutineScope.launch {
+                pagerState.animateScrollToPage(targetIdx)
+            }
+        }
     }
 
     LaunchedEffect(isSearchActive) {
@@ -163,7 +247,6 @@ fun InboxScreen(
     val isRefreshing = (state as? InboxState.Success)?.isRefreshing == true
     val navBarHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(viewModel) {
         viewModel.uiError.collect { errorMsg ->
@@ -288,11 +371,14 @@ fun InboxScreen(
                     }
                     when (val s = state) {
                         is InboxState.Loading -> {
-                            Column(
-                                modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
+                                LoadingIndicator(
+                                    modifier = Modifier.size(44.dp),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             }
                         }
 
@@ -307,525 +393,84 @@ fun InboxScreen(
                         }
 
                         is InboxState.Success -> {
-                            val currentTab = s.currentTab
-                            key(currentTab) {
-                            val savedPos = remember(currentTab) { viewModel.getSavedScrollPosition(currentTab) }
-                            val listState = rememberLazyListState(
-                                initialFirstVisibleItemIndex = savedPos.first,
-                                initialFirstVisibleItemScrollOffset = savedPos.second
-                            )
-                            val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
-                            val density = LocalDensity.current
-                            val collapseThresholdPx = with(density) { 32.dp.toPx() }
-                            val expandThresholdPx = with(density) { 48.dp.toPx() }
-
-                            val isAtTop by remember {
-                                derivedStateOf {
-                                    listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
-                                }
-                            }
-                            // Use primitive accumulators inside the remember block to prevent
-                            // triggering Compose snapshot mutations on every touch motion event
-                            val nestedScrollConnection = remember {
-                                object : NestedScrollConnection {
-                                    private var accumulatedDown = 0f
-                                    private var accumulatedUp = 0f
-
-                                    fun reset() {
-                                        accumulatedDown = 0f
-                                        accumulatedUp = 0f
-                                    }
-
-                                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                                        val dy = available.y
-                                        if (dy < 0f) {
-                                            // Finger dragging up / list scrolling down deeper into inbox
-                                            accumulatedDown += -dy
-                                            accumulatedUp = 0f
-                                            if (accumulatedDown > collapseThresholdPx && !dockController.isScrolling) {
-                                                dockController.isScrolling = true
-                                            }
-                                        } else if (dy > 0f) {
-                                            // Finger dragging down / list scrolling up toward top
-                                            accumulatedUp += dy
-                                            accumulatedDown = 0f
-                                            if (accumulatedUp > expandThresholdPx && dockController.isScrolling) {
-                                                dockController.isScrolling = false
-                                            }
-                                        }
-                                        return Offset.Zero
-                                    }
-                                }
-                            }
-                            LaunchedEffect(isAtTop) {
-                                if (isAtTop) {
-                                    dockController.isScrolling = false
-                                    nestedScrollConnection.reset()
-                                }
-                            }
-                            val shouldLoadMore by remember {
-                                derivedStateOf {
-                                    val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                                    val totalItems = listState.layoutInfo.totalItemsCount
-                                    totalItems > 0 && lastVisible >= totalItems - 5
-                                }
-                            }
-                            LaunchedEffect(Unit) {
-                                snapshotFlow { shouldLoadMore }.collect { if (it) viewModel.loadMore() }
-                            }
-                            // Save scroll position only on tab disposal rather than firing
-                            // allocations and StateFlow updates on every single pixel delta
-                            DisposableEffect(currentTab) {
-                                onDispose {
-                                    viewModel.saveScrollState(
-                                        currentTab,
-                                        listState.firstVisibleItemIndex,
-                                        listState.firstVisibleItemScrollOffset
-                                    )
-                                }
-                            }
-                            val threadsToDisplay = if (isSearchActive) searchResults else s.threads
-                            var expandedGroupsList by androidx.compose.runtime.saveable.rememberSaveable {
-                                mutableStateOf(emptyList<String>())
-                            }
-                            // Inbox tabs contain at most 500 locally cached rows. Building their
-                            // lightweight grouping/sort structure synchronously avoids showing
-                            // an empty list for a frame while an async calculation catches up.
-                            val inboxStructure = remember(
-                                threadsToDisplay,
-                                appSettings.smartGroupingEnabled,
-                                appSettings.smartGroupingRecentOnly,
-                                isSearchActive,
-                                currentTab
-                            ) {
-                                val useGrouping = appSettings.smartGroupingEnabled &&
-                                    !isSearchActive && currentTab == InboxTab.INBOX
-                                computeInboxStructure(
-                                    threadsToDisplay,
-                                    useGrouping,
-                                    appSettings.smartGroupingRecentOnly
-                                )
-                            }
-                            val displayItems = remember(inboxStructure, expandedGroupsList, currentTab) {
-                                flattenDisplayItems(inboxStructure, expandedGroupsList.toSet(), tabPrefix = currentTab.name)
-                            }
-                            val orderedThreadIds by remember(displayItems) {
-                                derivedStateOf {
-                                    displayItems.mapNotNull { item ->
-                                        when (item) {
-                                            is InboxDisplayItem.SingleThread -> item.thread.threadId
-                                            is InboxDisplayItem.NestedThread -> item.thread.threadId
-                                            else -> null
-                                        }
-                                    }
-                                }
-                            }
-                            val searchFeatherColor = MaterialTheme.colorScheme.background
-                            val searchFeatherBrush = remember(searchFeatherColor) {
-                                Brush.verticalGradient(
-                                    colorStops = arrayOf(
-                                        0.0f to searchFeatherColor.copy(alpha = 0.96f),
-                                        0.45f to searchFeatherColor.copy(alpha = 0.72f),
-                                        1.0f to searchFeatherColor.copy(alpha = 0.0f),
-                                    ),
-                                    startY = 0f,
-                                    endY = with(density) { 30.dp.toPx() },
-                                )
-                            }
-                            PullToRefreshBox(
-                                isRefreshing = s.isRefreshing,
-                                onRefresh = { viewModel.refresh() },
-                                state = pullToRefreshState,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    // Draw over the first rows, not in the gap above them.
-                                    // This makes the header blend into scrolling content.
-                                    .drawWithContent {
-                                        drawContent()
-                                        val featherHeight = 30.dp.toPx()
-                                        drawRect(
-                                            brush = searchFeatherBrush,
-                                            size = Size(size.width, featherHeight),
-                                        )
-                                    },
-                                indicator = {}
-                            ) {
-                                if (threadsToDisplay.isEmpty()) {
-                                    var illustration: com.shrivatsav.monomail.ui.components.IllustrationType = com.shrivatsav.monomail.ui.components.IllustrationType.INBOX_ZERO
-                                    var title = ""
-                                    var subtitle = ""
-                                    var ctaText: String? = null
-                                    var onCtaClick: (() -> Unit)? = null
-                                    if (isSearchActive) {
-                                        illustration = com.shrivatsav.monomail.ui.components.IllustrationType.SEARCH_EMPTY
-                                        title = "No results found"
-                                        subtitle = "Try searching on the server instead."
-                                        ctaText = "Search server"
+                            if (immediateTab in primaryTabs) {
+                                HorizontalPager(
+                                    state = pagerState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    userScrollEnabled = !isSearchActive && !isBulkMode
+                                ) { page ->
+                                    val tab = primaryTabs[page]
+                                    val threads = if (isSearchActive && tab == immediateTab) {
+                                        searchResults
                                     } else {
-                                        // During an active sync an empty tab is
-                                        // usually just "not synced yet" — show a
-                                        // cloud + "tab is syncing" instead of the
-                                        // misleading "You're all caught up".
-                                        val tabFolderName = when (currentTab) {
-                                            InboxTab.INBOX -> "Inbox"
-                                            InboxTab.SENT -> "Sent"
-                                            InboxTab.ARCHIVED -> "Archived"
-                                            InboxTab.SPAM -> "Spam"
-                                            InboxTab.TRASH -> "Trash"
-                                            InboxTab.DRAFTS -> "Drafts"
-                                            else -> null
-                                        }
-                                        val tabIsSyncing = when (currentTab) {
-                                            // Aggregate tabs cover every folder's sync.
-                                            InboxTab.UNIFIED, InboxTab.STARRED, InboxTab.SNOOZED ->
-                                                syncState.deepSyncProgress != null || syncState.isBackfilling
-                                            else -> tabFolderName != null && (
-                                                syncState.deepSyncProgress?.folder == tabFolderName ||
-                                                    syncState.backfillProgress?.folder == tabFolderName
-                                                )
-                                        }
-                                        if (tabIsSyncing) {
-                                            val tabLabel = when (currentTab) {
-                                                InboxTab.INBOX -> "Inbox"
-                                                InboxTab.SENT -> "Sent"
-                                                InboxTab.ARCHIVED -> "Archived"
-                                                InboxTab.SPAM -> "Spam"
-                                                InboxTab.TRASH -> "Trash"
-                                                InboxTab.DRAFTS -> "Drafts"
-                                                InboxTab.STARRED -> "Starred"
-                                                InboxTab.SNOOZED -> "Snoozed"
-                                                InboxTab.UNIFIED -> "Unified inbox"
-                                            }
-                                            illustration = com.shrivatsav.monomail.ui.components.IllustrationType.CLOUD_SYNC
-                                            title = "$tabLabel tab is syncing"
-                                            subtitle = "Please wait until it completes."
-                                            ctaText = null
-                                            onCtaClick = null
-                                        } else {
-                                        when (currentTab) {
-                                            InboxTab.SENT -> {
-                                                illustration = com.shrivatsav.monomail.ui.components.IllustrationType.PAPER_PLANE
-                                                title = "Nothing sent yet"
-                                                subtitle = "Your sent emails will appear here."
-                                                ctaText = null
-                                                onCtaClick = null
-                                            }
-                                            InboxTab.STARRED -> {
-                                                illustration = com.shrivatsav.monomail.ui.components.IllustrationType.INBOX_ZERO
-                                                title = "No starred emails"
-                                                subtitle = "Star important emails to find them here."
-                                                ctaText = null
-                                                onCtaClick = null
-                                            }
-                                            InboxTab.TRASH, InboxTab.SPAM -> {
-                                                illustration = com.shrivatsav.monomail.ui.components.IllustrationType.INBOX_ZERO
-                                                title = "Empty"
-                                                subtitle = "No messages here."
-                                                ctaText = null
-                                                onCtaClick = null
-                                            }
-                                            InboxTab.ARCHIVED -> {
-                                                illustration = com.shrivatsav.monomail.ui.components.IllustrationType.INBOX_ZERO
-                                                title = "No archived emails"
-                                                subtitle = "Emails you archive will appear here."
-                                                ctaText = null
-                                                onCtaClick = null
-                                            }
-                                            InboxTab.SNOOZED -> {
-                                                illustration = com.shrivatsav.monomail.ui.components.IllustrationType.INBOX_ZERO
-                                                title = "Nothing snoozed"
-                                                subtitle = "Snoozed emails will reappear when ready."
-                                                ctaText = null
-                                                onCtaClick = null
-                                            }
-                                            InboxTab.UNIFIED -> {
-                                                illustration = com.shrivatsav.monomail.ui.components.IllustrationType.INBOX_ZERO
-                                                title = "You're all caught up"
-                                                subtitle = "No emails across all your accounts."
-                                                ctaText = null
-                                                onCtaClick = null
-                                            }
-                                            else -> {
-                                                illustration = com.shrivatsav.monomail.ui.components.IllustrationType.INBOX_ZERO
-                                                title = "You're all caught up"
-                                                subtitle = "Your inbox is empty."
-                                                ctaText = null
-                                                onCtaClick = null
-                                            }
-                                        }
+                                        threadsByTab[tab] ?: if (tab == immediateTab) s.threads else emptyList()
                                     }
+                                    val listState = when (tab) {
+                                        InboxTab.SENT -> sentListState
+                                        InboxTab.ARCHIVED -> archivedListState
+                                        else -> inboxListState
                                     }
-                                    com.shrivatsav.monomail.ui.components.EmptyStateView(
-                                        illustration = illustration,
-                                        title = title,
-                                        subtitle = subtitle,
-                                        ctaText = ctaText,
-                                        onCtaClick = onCtaClick
+                                    InboxTabList(
+                                        tab = tab,
+                                        threads = threads,
+                                        isRefreshing = if (tab == immediateTab) s.isRefreshing else false,
+                                        isLoadingMore = if (tab == immediateTab) s.isLoadingMore else false,
+                                        isSearchActive = isSearchActive && tab == immediateTab,
+                                        searchQuery = searchFilters.query,
+                                        listState = listState,
+                                        appSettings = appSettings,
+                                        viewModel = viewModel,
+                                        syncState = syncState,
+                                        isBulkMode = isBulkMode,
+                                        selectedThreadIds = selectedThreadIds,
+                                        navBarHeight = navBarHeight,
+                                        nestedScrollConnection = nestedScrollConnection,
+                                        is24HourTime = is24HourTime,
+                                        onEmailClick = { accId, tId, mId -> navActions.onEmailClick(accId, tId, mId) },
+                                        onLongClick = { thread ->
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            longPressedThread = thread
+                                        },
+                                        onThreadToDeleteChange = { threadToDelete = it },
+                                        onRefresh = { viewModel.refresh() },
+                                        onLoadMore = { viewModel.loadMore() },
+                                        onSearchServer = { viewModel.searchServer(it) }
                                     )
-                                } else {
-                                    val itemKeyFn = { it: InboxDisplayItem -> it.key }
-                                    LazyColumn(
-                                        state = listState,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .nestedScroll(nestedScrollConnection),
-                                        contentPadding = PaddingValues(bottom = navBarHeight + 112.dp)
-                                    ) {
-                                        itemsIndexed(
-                                            items = displayItems,
-                                            key = { _, item -> itemKeyFn(item) },
-                                            contentType = { _, item ->
-                                                when (item) {
-                                                    is InboxDisplayItem.DateHeader -> "date_header"
-                                                    is InboxDisplayItem.GroupHeader -> "group_header"
-                                                    is InboxDisplayItem.SingleThread -> "email_thread"
-                                                    is InboxDisplayItem.NestedThread -> "nested_email_thread"
-                                                }
-                                            }
-                                        ) { index, displayItem ->
-                                            when (displayItem) {
-                                                is InboxDisplayItem.DateHeader -> {
-                                                    com.shrivatsav.monomail.ui.components.SectionHeader(
-                                                        label = displayItem.title,
-                                                        showTopDivider = false,
-                                                        modifier = Modifier
-                                                            .background(MaterialTheme.colorScheme.background)
-                                                    )
-                                                }
-
-                                                is InboxDisplayItem.GroupHeader -> {
-                                                    GroupHeaderItem(
-                                                        modifier = Modifier,
-                                                        groupName = displayItem.groupName,
-                                                        count = displayItem.count,
-                                                        unreadCount = displayItem.unreadCount,
-                                                        isExpanded = displayItem.isExpanded,
-                                                        onClick = {
-                                                            expandedGroupsList =
-                                                                if (expandedGroupsList.contains(
-                                                                        displayItem.groupName
-                                                                    )
-                                                                ) {
-                                                                    expandedGroupsList - displayItem.groupName
-                                                                } else {
-                                                                    expandedGroupsList + displayItem.groupName
-                                                                }
-                                                        }
-                                                    )
-                                                }
-                                                is InboxDisplayItem.SingleThread -> {
-                                                    val isUnread = !displayItem.thread.isRead
-                                                    val prevIsSingle = index > 0 && displayItems[index - 1] is InboxDisplayItem.SingleThread
-                                                    val nextIsSingle = index < displayItems.lastIndex && displayItems[index + 1] is InboxDisplayItem.SingleThread
-                                                    val groupPos = when {
-                                                        !prevIsSingle && !nextIsSingle -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.SOLO
-                                                        !prevIsSingle -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.TOP
-                                                        !nextIsSingle -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.BOTTOM
-                                                        else -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.MIDDLE
-                                                    }
-                                                    val prevUnread = isUnread && index > 0 && displayItems[index - 1].let {
-                                                        it is InboxDisplayItem.SingleThread && !it.thread.isRead
-                                                    }
-                                                    val nextUnread = isUnread && index < displayItems.lastIndex && displayItems[index + 1].let {
-                                                        it is InboxDisplayItem.SingleThread && !it.thread.isRead
-                                                    }
-                                                    val unreadPos = when {
-                                                        !isUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.SOLO
-                                                        prevUnread && nextUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.MIDDLE
-                                                        prevUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.BOTTOM
-                                                        nextUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.TOP
-                                                        else -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.SOLO
-                                                    }
-                                                    SwipeableEmailItem(
-                                                        modifier = Modifier,
-                                                        thread = displayItem.thread,
-                                                        tabForSwipe = currentTab,
-                                                        appSettings = appSettings,
-                                                        viewModel = viewModel,
-                                                        callbacks = SwipeCallbacks(
-                                                            onThreadToDeleteChange = { threadToDelete = it },
-                                                            onEmailClick = { navActions.onEmailClick(displayItem.thread.accountId, displayItem.thread.threadId, displayItem.thread.latestMessageId) },
-                                                            onLongClick = {
-                                                                hapticFeedback.performHapticFeedback(
-                                                                    HapticFeedbackType.LongPress
-                                                                )
-                                                                longPressedThread = displayItem.thread
-                                                            },
-                                                            isNested = false
-                                                        ),
-                                                        selection = SelectionState(
-                                                            isSelected = displayItem.thread.threadId in selectedThreadIds,
-                                                            isBulkMode = isBulkMode,
-                                                            onSelectToggle = { viewModel.toggleThreadSelection(displayItem.thread.threadId) },
-                                                            onRangeSelect = { viewModel.rangeSelectTo(displayItem.thread.threadId, orderedThreadIds) },
-                                                            onAvatarLongClick = {
-                                                                viewModel.enterBulkSelectMode(displayItem.thread.threadId)
-                                                            }
-                                                        ),
-                                                        unreadPosition = unreadPos,
-                                                        groupPosition = groupPos
-                                                    )
-                                                }
-
-                                                is InboxDisplayItem.NestedThread -> {
-                                                    val isUnread = !displayItem.thread.isRead
-                                                    val prevIsNested = index > 0 && displayItems[index - 1] is InboxDisplayItem.NestedThread
-                                                    val nextIsNested = index < displayItems.lastIndex && displayItems[index + 1] is InboxDisplayItem.NestedThread
-                                                    val groupPos = when {
-                                                        !prevIsNested && !nextIsNested -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.SOLO
-                                                        !prevIsNested -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.TOP
-                                                        !nextIsNested -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.BOTTOM
-                                                        else -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.MIDDLE
-                                                    }
-                                                    val prevUnread = isUnread && index > 0 && displayItems[index - 1].let {
-                                                        it is InboxDisplayItem.NestedThread && !it.thread.isRead
-                                                    }
-                                                    val nextUnread = isUnread && index < displayItems.lastIndex && displayItems[index + 1].let {
-                                                        it is InboxDisplayItem.NestedThread && !it.thread.isRead
-                                                    }
-                                                    val unreadPos = when {
-                                                        !isUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.SOLO
-                                                        prevUnread && nextUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.MIDDLE
-                                                        prevUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.BOTTOM
-                                                        nextUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.TOP
-                                                        else -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.SOLO
-                                                    }
-                                                    Column(modifier = Modifier) {
-                                                        AnimatedVisibility(
-                                                            visible = displayItem.isVisible,
-                                                            enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(),
-                                                            exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut()
-                                                        ) {
-                                                            SwipeableEmailItem(
-                                                                modifier = Modifier,
-                                                                thread = displayItem.thread,
-                                                                tabForSwipe = currentTab,
-                                                                appSettings = appSettings,
-                                                                viewModel = viewModel,
-                                                                callbacks = SwipeCallbacks(
-                                                                    onThreadToDeleteChange = { threadToDelete = it },
-                                                                    onEmailClick = { navActions.onEmailClick(displayItem.thread.accountId, displayItem.thread.threadId, displayItem.thread.latestMessageId) },
-                                                                    onLongClick = {
-                                                                        hapticFeedback.performHapticFeedback(
-                                                                            HapticFeedbackType.LongPress
-                                                                        )
-                                                                        longPressedThread = displayItem.thread
-                                                                    },
-                                                                    isNested = true
-                                                                ),
-                                                                selection = SelectionState(
-                                                                    isSelected = displayItem.thread.threadId in selectedThreadIds,
-                                                                    isBulkMode = isBulkMode,
-                                                                    onSelectToggle = { viewModel.toggleThreadSelection(displayItem.thread.threadId) },
-                                                                    onRangeSelect = { viewModel.rangeSelectTo(displayItem.thread.threadId, orderedThreadIds) },
-                                                                    onAvatarLongClick = {
-                                                                        viewModel.enterBulkSelectMode(displayItem.thread.threadId)
-                                                                    }
-                                                                ),
-                                                                unreadPosition = unreadPos,
-                                                                groupPosition = groupPos
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        
-                                        }
-
-                                        if (isSearchActive && s.threads.isNotEmpty()) {
-                                            item(key = "search_server_cta") {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(
-                                                            horizontal = 24.dp,
-                                                            vertical = 28.dp
-                                                        ),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    OutlinedButton(
-                                                        onClick = { viewModel.searchServer(searchFilters.query) },
-                                                        shape = MaterialTheme.shapes.large
-                                                    ) { Text("Search server for older emails") }
-                                                }
-                                            }
-                                        }
-
-                                        if (s.isLoadingMore) {
-                                            item(key = "loading_more") {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(16.dp),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    CircularProgressIndicator(
-                                                        modifier = Modifier.size(24.dp),
-                                                        color = MaterialTheme.colorScheme.onSurface,
-                                                        strokeWidth = 2.dp
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
                                 }
+                            } else {
+                                val threads = if (isSearchActive) searchResults else s.threads
+                                InboxTabList(
+                                    tab = immediateTab,
+                                    threads = threads,
+                                    isRefreshing = s.isRefreshing,
+                                    isLoadingMore = s.isLoadingMore,
+                                    isSearchActive = isSearchActive,
+                                    searchQuery = searchFilters.query,
+                                    listState = otherListState,
+                                    appSettings = appSettings,
+                                    viewModel = viewModel,
+                                    syncState = syncState,
+                                    isBulkMode = isBulkMode,
+                                    selectedThreadIds = selectedThreadIds,
+                                    navBarHeight = navBarHeight,
+                                    nestedScrollConnection = nestedScrollConnection,
+                                    is24HourTime = is24HourTime,
+                                    onEmailClick = { accId, tId, mId -> navActions.onEmailClick(accId, tId, mId) },
+                                    onLongClick = { thread ->
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        longPressedThread = thread
+                                    },
+                                    onThreadToDeleteChange = { threadToDelete = it },
+                                    onRefresh = { viewModel.refresh() },
+                                    onLoadMore = { viewModel.loadMore() },
+                                    onSearchServer = { viewModel.searchServer(it) }
+                                )
                             }
-                            } // key(currentTab)
                         }
                     }
                 }
             }
 
-
-            // Softly feather the content into the dock area. The brush is a
-            // single static draw layer; it performs no blur or bitmap capture.
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(navBarHeight + 124.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0.0f to MaterialTheme.colorScheme.background.copy(alpha = 0.0f),
-                                0.58f to MaterialTheme.colorScheme.background.copy(alpha = 0.18f),
-                                1.0f to MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
-                            )
-                        )
-                    )
-                    // Very subtle side shading, confined to the floating dock zone.
-                    .background(
-                        Brush.horizontalGradient(
-                            colorStops = arrayOf(
-                                0.0f to MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f),
-                                0.14f to Color.Transparent,
-                                0.86f to Color.Transparent,
-                                1.0f to MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f),
-                            )
-                        )
-                    )
-            )
-
-            // Coordinate with the single persistent floating dock outside NavHost
-            val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
-            LaunchedEffect(immediateTab) {
-                dockController.selectedTabIndex = when (immediateTab) {
-                    InboxTab.SENT -> 1
-                    InboxTab.ARCHIVED -> 2
-                    else -> 0
-                }
-                dockController.isScrolling = false
-            }
-            LaunchedEffect(Unit) {
-                dockController.onTabSelected = { index ->
-                    val tab = when (index) {
-                        1 -> InboxTab.SENT
-                        2 -> InboxTab.ARCHIVED
-                        else -> InboxTab.INBOX
-                    }
-                    viewModel.switchTab(tab)
-                }
-            }
 
             AnimatedVisibility(
                 visible = isBulkMode,
@@ -1258,6 +903,428 @@ fun InboxScreen(
                 showSnoozePicker = false
             }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun InboxTabList(
+    tab: InboxTab,
+    threads: List<EmailThread>,
+    isRefreshing: Boolean,
+    isLoadingMore: Boolean,
+    isSearchActive: Boolean,
+    searchQuery: String,
+    listState: LazyListState,
+    appSettings: com.shrivatsav.monomail.core.data.settings.AppSettings,
+    viewModel: InboxViewModel,
+    syncState: InboxViewModel.InboxSyncState,
+    isBulkMode: Boolean,
+    selectedThreadIds: Set<String>,
+    navBarHeight: Dp,
+    nestedScrollConnection: NestedScrollConnection,
+    is24HourTime: Boolean,
+    onEmailClick: (String, String, String?) -> Unit,
+    onLongClick: (EmailThread) -> Unit,
+    onThreadToDeleteChange: (EmailThread?) -> Unit,
+    onRefresh: () -> Unit,
+    onLoadMore: () -> Unit,
+    onSearchServer: (String) -> Unit
+) {
+    val density = LocalDensity.current
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val totalItems = listState.layoutInfo.totalItemsCount
+            totalItems > 0 && lastVisible >= totalItems - 5
+        }
+    }
+    LaunchedEffect(Unit) {
+        snapshotFlow { shouldLoadMore }.collect { if (it) onLoadMore() }
+    }
+
+    var expandedGroupsList by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf(emptyList<String>())
+    }
+    val inboxStructure = remember(
+        threads,
+        appSettings.smartGroupingEnabled,
+        appSettings.smartGroupingRecentOnly,
+        isSearchActive,
+        tab
+    ) {
+        val useGrouping = appSettings.smartGroupingEnabled &&
+            !isSearchActive && tab == InboxTab.INBOX
+        computeInboxStructure(
+            threads,
+            useGrouping,
+            appSettings.smartGroupingRecentOnly
+        )
+    }
+    val displayItems = remember(inboxStructure, expandedGroupsList, tab) {
+        flattenDisplayItems(inboxStructure, expandedGroupsList.toSet(), tabPrefix = tab.name)
+    }
+    val orderedThreadIds by remember(displayItems) {
+        derivedStateOf {
+            displayItems.mapNotNull { item ->
+                when (item) {
+                    is InboxDisplayItem.SingleThread -> item.thread.threadId
+                    is InboxDisplayItem.NestedThread -> item.thread.threadId
+                    else -> null
+                }
+            }
+        }
+    }
+    val searchFeatherColor = MaterialTheme.colorScheme.background
+    val searchFeatherBrush = remember(searchFeatherColor) {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0.0f to searchFeatherColor.copy(alpha = 0.96f),
+                0.45f to searchFeatherColor.copy(alpha = 0.72f),
+                1.0f to searchFeatherColor.copy(alpha = 0.0f),
+            ),
+            startY = 0f,
+            endY = with(density) { 30.dp.toPx() },
+        )
+    }
+    val pullToRefreshState = rememberPullToRefreshState()
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        state = pullToRefreshState,
+        modifier = Modifier
+            .fillMaxSize()
+            .drawWithContent {
+                drawContent()
+                val featherHeight = 30.dp.toPx()
+                drawRect(
+                    brush = searchFeatherBrush,
+                    size = Size(size.width, featherHeight),
+                )
+            },
+        indicator = {
+            if (pullToRefreshState.distanceFraction > 0f || isRefreshing) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 16.dp)
+                        .graphicsLayer {
+                            translationY = pullToRefreshState.distanceFraction * 60.dp.toPx()
+                            alpha = (pullToRefreshState.distanceFraction * 1.5f).coerceIn(0f, 1f)
+                        }
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        shadowElevation = 6.dp,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            LoadingIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    ) {
+        if (threads.isEmpty()) {
+            var illustration = com.shrivatsav.monomail.ui.components.IllustrationType.INBOX_ZERO
+            var title = ""
+            var subtitle = ""
+            var ctaText: String? = null
+            var onCtaClick: (() -> Unit)? = null
+            if (isSearchActive) {
+                illustration = com.shrivatsav.monomail.ui.components.IllustrationType.SEARCH_EMPTY
+                title = "No results found"
+                subtitle = "Try searching on the server instead."
+                ctaText = "Search server"
+                onCtaClick = { onSearchServer(searchQuery) }
+            } else {
+                val tabFolderName = when (tab) {
+                    InboxTab.INBOX -> "Inbox"
+                    InboxTab.SENT -> "Sent"
+                    InboxTab.ARCHIVED -> "Archived"
+                    InboxTab.SPAM -> "Spam"
+                    InboxTab.TRASH -> "Trash"
+                    InboxTab.DRAFTS -> "Drafts"
+                    else -> null
+                }
+                val tabIsSyncing = when (tab) {
+                    InboxTab.UNIFIED, InboxTab.STARRED, InboxTab.SNOOZED ->
+                        syncState.deepSyncProgress != null || syncState.isBackfilling
+                    else -> tabFolderName != null && (
+                        syncState.deepSyncProgress?.folder == tabFolderName ||
+                            syncState.backfillProgress?.folder == tabFolderName
+                    )
+                }
+                if (tabIsSyncing) {
+                    val tabLabel = when (tab) {
+                        InboxTab.INBOX -> "Inbox"
+                        InboxTab.SENT -> "Sent"
+                        InboxTab.ARCHIVED -> "Archived"
+                        InboxTab.SPAM -> "Spam"
+                        InboxTab.TRASH -> "Trash"
+                        InboxTab.DRAFTS -> "Drafts"
+                        InboxTab.STARRED -> "Starred"
+                        InboxTab.SNOOZED -> "Snoozed"
+                        InboxTab.UNIFIED -> "Unified inbox"
+                    }
+                    illustration = com.shrivatsav.monomail.ui.components.IllustrationType.CLOUD_SYNC
+                    title = "$tabLabel tab is syncing"
+                    subtitle = "Please wait until it completes."
+                    ctaText = null
+                    onCtaClick = null
+                } else {
+                    when (tab) {
+                        InboxTab.SENT -> {
+                            illustration = com.shrivatsav.monomail.ui.components.IllustrationType.PAPER_PLANE
+                            title = "Nothing sent yet"
+                            subtitle = "Your sent emails will appear here."
+                            ctaText = null
+                            onCtaClick = null
+                        }
+                        InboxTab.STARRED -> {
+                            illustration = com.shrivatsav.monomail.ui.components.IllustrationType.INBOX_ZERO
+                            title = "No starred emails"
+                            subtitle = "Star important emails to find them here."
+                            ctaText = null
+                            onCtaClick = null
+                        }
+                        InboxTab.TRASH, InboxTab.SPAM -> {
+                            illustration = com.shrivatsav.monomail.ui.components.IllustrationType.INBOX_ZERO
+                            title = "Empty"
+                            subtitle = "No messages here."
+                            ctaText = null
+                            onCtaClick = null
+                        }
+                        InboxTab.ARCHIVED -> {
+                            illustration = com.shrivatsav.monomail.ui.components.IllustrationType.INBOX_ZERO
+                            title = "No archived emails"
+                            subtitle = "Emails you archive will appear here."
+                            ctaText = null
+                            onCtaClick = null
+                        }
+                        InboxTab.SNOOZED -> {
+                            illustration = com.shrivatsav.monomail.ui.components.IllustrationType.INBOX_ZERO
+                            title = "Nothing snoozed"
+                            subtitle = "Snoozed emails will reappear when ready."
+                            ctaText = null
+                            onCtaClick = null
+                        }
+                        InboxTab.UNIFIED -> {
+                            illustration = com.shrivatsav.monomail.ui.components.IllustrationType.INBOX_ZERO
+                            title = "You're all caught up"
+                            subtitle = "No emails across all your accounts."
+                            ctaText = null
+                            onCtaClick = null
+                        }
+                        else -> {
+                            illustration = com.shrivatsav.monomail.ui.components.IllustrationType.INBOX_ZERO
+                            title = "You're all caught up"
+                            subtitle = "Your inbox is empty."
+                            ctaText = null
+                            onCtaClick = null
+                        }
+                    }
+                }
+            }
+            com.shrivatsav.monomail.ui.components.EmptyStateView(
+                illustration = illustration,
+                title = title,
+                subtitle = subtitle,
+                ctaText = ctaText,
+                onCtaClick = onCtaClick
+            )
+        } else {
+            val itemKeyFn = { it: InboxDisplayItem -> it.key }
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(nestedScrollConnection),
+                contentPadding = PaddingValues(bottom = navBarHeight + 112.dp)
+            ) {
+                itemsIndexed(
+                    items = displayItems,
+                    key = { _, item -> itemKeyFn(item) },
+                    contentType = { _, item ->
+                        when (item) {
+                            is InboxDisplayItem.DateHeader -> "date_header"
+                            is InboxDisplayItem.GroupHeader -> "group_header"
+                            is InboxDisplayItem.SingleThread -> "email_thread"
+                            is InboxDisplayItem.NestedThread -> "nested_email_thread"
+                        }
+                    }
+                ) { index, displayItem ->
+                    when (displayItem) {
+                        is InboxDisplayItem.DateHeader -> {
+                            com.shrivatsav.monomail.ui.components.SectionHeader(
+                                label = displayItem.title,
+                                showTopDivider = false,
+                                modifier = Modifier.background(MaterialTheme.colorScheme.background)
+                            )
+                        }
+
+                        is InboxDisplayItem.GroupHeader -> {
+                            GroupHeaderItem(
+                                modifier = Modifier,
+                                groupName = displayItem.groupName,
+                                count = displayItem.count,
+                                unreadCount = displayItem.unreadCount,
+                                isExpanded = displayItem.isExpanded,
+                                onClick = {
+                                    expandedGroupsList =
+                                        if (expandedGroupsList.contains(displayItem.groupName)) {
+                                            expandedGroupsList - displayItem.groupName
+                                        } else {
+                                            expandedGroupsList + displayItem.groupName
+                                        }
+                                }
+                            )
+                        }
+                        is InboxDisplayItem.SingleThread -> {
+                            val isUnread = !displayItem.thread.isRead
+                            val prevIsSingle = index > 0 && displayItems[index - 1] is InboxDisplayItem.SingleThread
+                            val nextIsSingle = index < displayItems.lastIndex && displayItems[index + 1] is InboxDisplayItem.SingleThread
+                            val groupPos = when {
+                                !prevIsSingle && !nextIsSingle -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.SOLO
+                                !prevIsSingle -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.TOP
+                                !nextIsSingle -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.BOTTOM
+                                else -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.MIDDLE
+                            }
+                            val prevUnread = isUnread && index > 0 && displayItems[index - 1].let {
+                                it is InboxDisplayItem.SingleThread && !it.thread.isRead
+                            }
+                            val nextUnread = isUnread && index < displayItems.lastIndex && displayItems[index + 1].let {
+                                it is InboxDisplayItem.SingleThread && !it.thread.isRead
+                            }
+                            val unreadPos = when {
+                                !isUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.SOLO
+                                prevUnread && nextUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.MIDDLE
+                                prevUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.BOTTOM
+                                nextUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.TOP
+                                else -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.SOLO
+                            }
+                            SwipeableEmailItem(
+                                modifier = Modifier,
+                                thread = displayItem.thread,
+                                tabForSwipe = tab,
+                                appSettings = appSettings,
+                                viewModel = viewModel,
+                                callbacks = SwipeCallbacks(
+                                    onThreadToDeleteChange = onThreadToDeleteChange,
+                                    onEmailClick = { onEmailClick(displayItem.thread.accountId, displayItem.thread.threadId, displayItem.thread.latestMessageId) },
+                                    onLongClick = { onLongClick(displayItem.thread) },
+                                    isNested = false
+                                ),
+                                selection = SelectionState(
+                                    isSelected = displayItem.thread.threadId in selectedThreadIds,
+                                    isBulkMode = isBulkMode,
+                                    onSelectToggle = { viewModel.toggleThreadSelection(displayItem.thread.threadId) },
+                                    onRangeSelect = { viewModel.rangeSelectTo(displayItem.thread.threadId, orderedThreadIds) },
+                                    onAvatarLongClick = { viewModel.enterBulkSelectMode(displayItem.thread.threadId) }
+                                ),
+                                unreadPosition = unreadPos,
+                                groupPosition = groupPos,
+                                is24HourTime = is24HourTime
+                            )
+                        }
+
+                        is InboxDisplayItem.NestedThread -> {
+                            val isUnread = !displayItem.thread.isRead
+                            val prevIsNested = index > 0 && displayItems[index - 1] is InboxDisplayItem.NestedThread
+                            val nextIsNested = index < displayItems.lastIndex && displayItems[index + 1] is InboxDisplayItem.NestedThread
+                            val groupPos = when {
+                                !prevIsNested && !nextIsNested -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.SOLO
+                                !prevIsNested -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.TOP
+                                !nextIsNested -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.BOTTOM
+                                else -> com.shrivatsav.monomail.feature.inbox.components.GroupPosition.MIDDLE
+                            }
+                            val prevUnread = isUnread && index > 0 && displayItems[index - 1].let {
+                                it is InboxDisplayItem.NestedThread && !it.thread.isRead
+                            }
+                            val nextUnread = isUnread && index < displayItems.lastIndex && displayItems[index + 1].let {
+                                it is InboxDisplayItem.NestedThread && !it.thread.isRead
+                            }
+                            val unreadPos = when {
+                                !isUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.SOLO
+                                prevUnread && nextUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.MIDDLE
+                                prevUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.BOTTOM
+                                nextUnread -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.TOP
+                                else -> com.shrivatsav.monomail.feature.inbox.components.UnreadPosition.SOLO
+                            }
+                            Column(modifier = Modifier) {
+                                AnimatedVisibility(
+                                    visible = displayItem.isVisible,
+                                    enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(),
+                                    exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut()
+                                ) {
+                                    SwipeableEmailItem(
+                                        modifier = Modifier,
+                                        thread = displayItem.thread,
+                                        tabForSwipe = tab,
+                                        appSettings = appSettings,
+                                        viewModel = viewModel,
+                                        callbacks = SwipeCallbacks(
+                                            onThreadToDeleteChange = onThreadToDeleteChange,
+                                            onEmailClick = { onEmailClick(displayItem.thread.accountId, displayItem.thread.threadId, displayItem.thread.latestMessageId) },
+                                            onLongClick = { onLongClick(displayItem.thread) },
+                                            isNested = true
+                                        ),
+                                        selection = SelectionState(
+                                            isSelected = displayItem.thread.threadId in selectedThreadIds,
+                                            isBulkMode = isBulkMode,
+                                            onSelectToggle = { viewModel.toggleThreadSelection(displayItem.thread.threadId) },
+                                            onRangeSelect = { viewModel.rangeSelectTo(displayItem.thread.threadId, orderedThreadIds) },
+                                            onAvatarLongClick = { viewModel.enterBulkSelectMode(displayItem.thread.threadId) }
+                                        ),
+                                        unreadPosition = unreadPos,
+                                        groupPosition = groupPos,
+                                        is24HourTime = is24HourTime
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (isSearchActive && threads.isNotEmpty()) {
+                    item(key = "search_server_cta") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 28.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            OutlinedButton(
+                                onClick = { onSearchServer(searchQuery) },
+                                shape = MaterialTheme.shapes.large
+                            ) { Text("Search server for older emails") }
+                        }
+                    }
+                }
+
+                if (isLoadingMore) {
+                    item(key = "loading_more") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                strokeWidth = 2.dp
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

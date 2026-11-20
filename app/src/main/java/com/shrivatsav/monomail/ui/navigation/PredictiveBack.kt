@@ -65,6 +65,7 @@ private val BackEasing = LinearOutSlowInEasing
 /** Edge the current/last back gesture started from. Read lazily by the slide lambda each frame. */
 internal object BackSwipe {
     var edge by mutableIntStateOf(NavigationEvent.EDGE_LEFT)
+    var isBackGestureActive by androidx.compose.runtime.mutableStateOf(false)
 }
 
 /** Call once, above the NavHost. Mirrors the gesture's swipe edge into [BackSwipe.edge]. */
@@ -75,6 +76,9 @@ internal fun TrackBackSwipeEdge() {
         owner.navigationEventDispatcher.transitionState.collect { state ->
             if (state is NavigationEventTransitionState.InProgress) {
                 BackSwipe.edge = state.latestEvent.swipeEdge
+                BackSwipe.isBackGestureActive = true
+            } else {
+                BackSwipe.isBackGestureActive = false
             }
         }
     }
@@ -110,20 +114,21 @@ internal fun backRevealEnter(): EnterTransition =
 
 /**
  * Darkens the screen being revealed, lightening as the gesture progresses. Only draws when this
- * entry is *not* the top of the stack, so a forward push never dims the incoming screen.
+ * entry is being revealed by a pop/back navigation, so a forward push never dims the incoming screen.
  */
 @Composable
 internal fun AnimatedContentScope.revealDimModifier(navController: NavController): Modifier {
     val entry = LocalLifecycleOwner.current as? NavBackStackEntry
     val current by navController.currentBackStackEntryAsState()
+    val isRevealing = BackSwipe.isBackGestureActive || (transition.initialState == EnterExitState.PreEnter && transition.targetState == EnterExitState.Visible && entry != null && current?.id == entry.id)
     val dim by transition.animateFloat(
         transitionSpec = { tween(BackMs, easing = BackEasing) },
         label = "backRevealDim",
-    ) { if (it == EnterExitState.PreEnter) RevealDim else 0f }
+    ) { if (it == EnterExitState.PreEnter && isRevealing) RevealDim else 0f }
     return Modifier.drawWithContent {
         drawContent()
         val alpha = dim
-        if (alpha > 0f && entry != null && current?.id != entry.id) {
+        if (alpha > 0f && isRevealing && entry != null && current?.id != entry.id) {
             drawRect(Color.Black.copy(alpha = alpha))
         }
     }
@@ -131,7 +136,7 @@ internal fun AnimatedContentScope.revealDimModifier(navController: NavController
 
 /**
  * Rounded, elevated surface that is square and shadowless at rest, and dynamically animates
- * corners (0dp -> 28dp) and elevation (0dp -> 8dp) strictly while navigating or seeking back.
+ * corners (0dp -> 28dp) and elevation (0dp -> 12dp) strictly while navigating or seeking back.
  */
 @Composable
 internal fun AnimatedContentScope.BackCardSurface(
@@ -141,11 +146,17 @@ internal fun AnimatedContentScope.BackCardSurface(
     val radius by transition.animateDp(
         transitionSpec = { tween(BackMs, easing = BackEasing) },
         label = "backCardRadius",
-    ) { if (it == EnterExitState.Visible) 0.dp else CardRadius }
+    ) { state ->
+        when {
+            state == EnterExitState.PostExit -> CardRadius
+            state == EnterExitState.PreEnter && BackSwipe.isBackGestureActive -> CardRadius
+            else -> 0.dp
+        }
+    }
     val elevation by transition.animateDp(
         transitionSpec = { tween(BackMs, easing = BackEasing) },
         label = "backCardElevation",
-    ) { if (it == EnterExitState.Visible) 0.dp else CardElevation }
+    ) { state -> if (state == EnterExitState.PostExit) CardElevation else 0.dp }
     val reveal = revealDimModifier(navController)
     Box(
         modifier = Modifier
@@ -154,11 +165,11 @@ internal fun AnimatedContentScope.BackCardSurface(
                 val r = radius
                 val elev = elevation
                 shape = RoundedCornerShape(r)
-                clip = r > 0.dp
+                clip = r > 0.5.dp
                 shadowElevation = elev.toPx()
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    ambientShadowColor = Color.Black.copy(alpha = 0.20f)
-                    spotShadowColor = Color.Black.copy(alpha = 0.35f)
+                    ambientShadowColor = Color.Black.copy(alpha = 0.12f)
+                    spotShadowColor = Color.Black.copy(alpha = 0.18f)
                 }
             }
             .background(MaterialTheme.colorScheme.background)

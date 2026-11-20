@@ -5,7 +5,6 @@
 
 package com.shrivatsav.monomail.ui.navigation
 
-import android.os.Build
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -21,6 +20,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -30,11 +31,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -72,26 +75,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.shrivatsav.monomail.ui.components.DockMode
 import com.shrivatsav.monomail.ui.components.FloatingDockController
 
 /**
- * Single, persistent, Material 3 Expressive floating bottom dock.
- * Hoisted outside NavHost so it remains consistent across the entire app
- * and smoothly morphs with spring physics between screen contexts:
- *   - Inbox: Tabs with scroll-collapse (full text+icon at rest -> compact icon-only pill on scroll) + Compose FAB
- *   - Detail: Reply & Forward action dock
- *   - Compose: Attachment & action bar
- *   - Settings: Search bar pill
+ * Single, persistent, Material 3 Expressive floating bottom navigation bar and dock.
  *
- * Emulates the soft, diffused ambient/spot elevation shadows seen in Google Messages.
+ * Implementation Code for Material 3 Expressive Floating Bottom Navigation Bar
+ * Author: Er. Mohd Amaan
+ *
+ * Uses Surface with CircleShape directly to prevent rectangular shadow artifacts,
+ * native 8.dp shadow elevation, and smooth animateContentSize transitions.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -104,251 +106,192 @@ internal fun ExpressivePersistentDock(
 
     val isInboxMode = dockController.mode == DockMode.INBOX
     val isScrolling = isInboxMode && dockController.isScrolling
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
 
-    val expandedDockWidth = (screenWidth - 32.dp) - 76.dp
-    val collapsedDockWidth = 180.dp
-    val fullScreenWidth = screenWidth - 32.dp
-
-    // Unified collapse progress (0f = full tabs + FAB at rest, 1f = compact icon pill while scrolling)
-    // Synchronizes text alpha and tab spacing strictly for Inbox tab contents
-    val collapseFraction by animateFloatAsState(
-        targetValue = if (isScrolling) 1f else 0f,
+    // Vertical hide/reveal offset on scroll fling (Gmail & M3 FloatingToolbar pattern)
+    val animatedOffsetY by animateDpAsState(
+        targetValue = if (isScrolling) 100.dp else 0.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMedium
         ),
-        label = "dockCollapseFraction"
-    )
-
-    // Animated container dimensions across BOTH scroll collapse and route morphing
-    val targetDockWidth = when {
-        !isInboxMode -> fullScreenWidth
-        isScrolling -> collapsedDockWidth
-        else -> expandedDockWidth
-    }
-
-    val targetFabWidth = if (isInboxMode && !isScrolling) 64.dp else 0.dp
-    val targetFabSpacing = if (isInboxMode && !isScrolling) 12.dp else 0.dp
-    val targetFabAlpha = if (isInboxMode && !isScrolling) 1f else 0f
-
-    val springDp = spring<androidx.compose.ui.unit.Dp>(
-        dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = Spring.StiffnessMedium
-    )
-    val springFloat = spring<Float>(
-        dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = Spring.StiffnessMedium
-    )
-
-    val animatedDockWidth by animateDpAsState(
-        targetValue = targetDockWidth,
-        animationSpec = springDp,
-        label = "dockWidth"
-    )
-
-    val animatedFabWidth by animateDpAsState(
-        targetValue = targetFabWidth,
-        animationSpec = springDp,
-        label = "fabWidth"
-    )
-
-    val animatedFabSpacing by animateDpAsState(
-        targetValue = targetFabSpacing,
-        animationSpec = springDp,
-        label = "fabSpacing"
-    )
-
-    val animatedFabAlpha by animateFloatAsState(
-        targetValue = targetFabAlpha,
-        animationSpec = springFloat,
-        label = "fabAlpha"
+        label = "dockOffsetY"
     )
 
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .offset { IntOffset(x = 0, y = animatedOffsetY.roundToPx()) }
             .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Floating pill container with Google Messages diffused elevation
-        Surface(
-            modifier = Modifier
-                .width(animatedDockWidth)
-                .height(64.dp)
-                .graphicsLayer {
-                    shape = RoundedCornerShape(percent = 50)
-                    clip = false
-                    shadowElevation = 6.dp.toPx()
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        ambientShadowColor = Color.Black.copy(alpha = 0.10f)
-                        spotShadowColor = Color.Black.copy(alpha = 0.16f)
-                    }
-                },
-            shape = RoundedCornerShape(percent = 50),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 1.dp,
-            shadowElevation = 0.dp, // Drawn by graphicsLayer for soft diffused blur
-        ) {
-            AnimatedContent(
-                targetState = dockController.mode,
-                transitionSpec = {
-                    // Sequence outgoing exit (fast 80ms fade/scale) followed by incoming entrance (delay 80ms)
-                    // so outgoing and incoming screens never draw on top of each other inside the dock container
-                    (fadeIn(tween(140, delayMillis = 80)) + scaleIn(tween(140, delayMillis = 80), initialScale = 0.94f))
-                        .togetherWith(fadeOut(tween(80)) + scaleOut(tween(80), targetScale = 0.94f))
-                },
-                label = "dockModeTransition"
-            ) { mode ->
-                when (mode) {
-                    DockMode.INBOX -> {
-                        InboxDockContent(
-                            collapseFraction = collapseFraction,
-                            selectedIndex = dockController.selectedTabIndex,
-                            onTabSelected = dockController.onTabSelected
-                        )
-                    }
-                    DockMode.THREAD -> {
-                        ThreadDockContent(
-                            onReply = { dockController.onReplyAction?.invoke() },
-                            onForward = { dockController.onForwardAction?.invoke() }
-                        )
-                    }
-                    DockMode.COMPOSE -> {
-                        ComposeDockContent(
-                            canSend = dockController.canSend,
-                            isSending = dockController.isSending,
-                            onAttach = { dockController.onAttachAction?.invoke() },
-                            onDrafts = { dockController.onDraftsAction?.invoke() },
-                            onSend = { dockController.onSendAction?.invoke() }
-                        )
-                    }
-                    DockMode.SETTINGS -> {
-                        SettingsDockContent(
-                            query = dockController.settingsQuery,
-                            onQueryChange = dockController.onSettingsQueryChange
-                        )
-                    }
-                    DockMode.HIDDEN -> {
-                        Spacer(Modifier.size(0.dp))
-                    }
+        if (isInboxMode) {
+            // Material 3 Expressive Floating Bottom Navigation Bar
+            Surface(
+                shape = CircleShape, // Prevents rectangular shadow artifacts!
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shadowElevation = 8.dp,
+                modifier = Modifier.animateContentSize()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .padding(horizontal = 6.dp, vertical = 6.dp)
+                        .height(52.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    FloatingNavItem(
+                        label = "Inbox",
+                        icon = Icons.Rounded.Inbox,
+                        selected = dockController.selectedTabIndex == 0,
+                        onClick = { dockController.onTabSelected(0) }
+                    )
+                    FloatingNavItem(
+                        label = "Sent",
+                        icon = Icons.AutoMirrored.Rounded.Send,
+                        selected = dockController.selectedTabIndex == 1,
+                        onClick = { dockController.onTabSelected(1) }
+                    )
+                    FloatingNavItem(
+                        label = "Archived",
+                        icon = Icons.Rounded.Archive,
+                        selected = dockController.selectedTabIndex == 2,
+                        onClick = { dockController.onTabSelected(2) }
+                    )
                 }
             }
-        }
 
-        // Compose FAB (synchronized with identical spring physics, continuous width & alpha)
-        if (animatedFabWidth > 0.5.dp) {
-            Spacer(Modifier.width(animatedFabSpacing))
+            Spacer(Modifier.width(12.dp))
+
+            // Compose FAB
             FilledIconButton(
                 onClick = onComposeClick,
                 modifier = Modifier
-                    .size(animatedFabWidth)
-                    .graphicsLayer {
-                        alpha = animatedFabAlpha
-                        val scale = (animatedFabWidth / 64.dp).coerceIn(0f, 1f)
-                        scaleX = scale
-                        scaleY = scale
-                        shape = CircleShape
-                        clip = false
-                        shadowElevation = (6.dp * animatedFabAlpha).toPx()
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                            ambientShadowColor = Color.Black.copy(alpha = 0.10f * animatedFabAlpha)
-                            spotShadowColor = Color.Black.copy(alpha = 0.16f * animatedFabAlpha)
-                        }
-                    },
+                    .size(56.dp)
+                    .shadow(8.dp, CircleShape),
                 shape = CircleShape,
                 colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             ) {
-                if (animatedFabAlpha > 0.15f && animatedFabWidth > 24.dp) {
-                    Icon(
-                        imageVector = Icons.Rounded.Edit,
-                        contentDescription = "Compose",
-                        modifier = Modifier.size(24.dp)
-                    )
+                Icon(
+                    imageVector = Icons.Rounded.Edit,
+                    contentDescription = "Compose",
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        } else {
+            // Mode-specific persistent pill (Detail Reply/Forward, Compose bar, Settings search)
+            Surface(
+                shape = CircleShape, // Prevents rectangular shadow artifacts!
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shadowElevation = 8.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .animateContentSize()
+            ) {
+                AnimatedContent(
+                    targetState = dockController.mode,
+                    transitionSpec = {
+                        (fadeIn(tween(140, delayMillis = 60)) + scaleIn(tween(140, delayMillis = 60), initialScale = 0.95f))
+                            .togetherWith(fadeOut(tween(60)) + scaleOut(tween(60), targetScale = 0.95f))
+                    },
+                    label = "dockModeContent"
+                ) { mode ->
+                    when (mode) {
+                        DockMode.THREAD -> {
+                            ThreadDockContent(
+                                onReply = { dockController.onReplyAction?.invoke() },
+                                onForward = { dockController.onForwardAction?.invoke() }
+                            )
+                        }
+                        DockMode.COMPOSE -> {
+                            ComposeDockContent(
+                                canSend = dockController.canSend,
+                                isSending = dockController.isSending,
+                                onAttach = { dockController.onAttachAction?.invoke() },
+                                onDrafts = { dockController.onDraftsAction?.invoke() },
+                                onSend = { dockController.onSendAction?.invoke() }
+                            )
+                        }
+                        DockMode.SETTINGS -> {
+                            SettingsDockContent(
+                                query = dockController.settingsQuery,
+                                onQueryChange = dockController.onSettingsQueryChange
+                            )
+                        }
+                        else -> {
+                            Spacer(Modifier.size(0.dp))
+                        }
+                    }
                 }
             }
         }
     }
 }
 
+/**
+ * Expressive floating navigation item that expands its label on selection
+ * and gracefully displays the icon on unselected tabs.
+ */
 @Composable
-private fun InboxDockContent(
-    collapseFraction: Float,
-    selectedIndex: Int,
-    onTabSelected: (Int) -> Unit,
+fun RowScope.FloatingNavItem(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val tabs = remember {
-        listOf(
-            Triple(0, Icons.Rounded.Inbox, "Inbox"),
-            Triple(1, Icons.AutoMirrored.Rounded.Send, "Sent"),
-            Triple(2, Icons.Rounded.Archive, "Archived")
-        )
-    }
+    val animatedBgColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "tabBg"
+    )
+    val animatedContentColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "tabContent"
+    )
 
-    // Text alpha drops quickly as soon as collapse starts, and only fades in once container is wide
-    val textAlpha = (1f - collapseFraction * 2.5f).coerceIn(0f, 1f)
-
-    Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .clip(CircleShape)
+            .background(animatedBgColor)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(bounded = true),
+                onClick = onClick
+            )
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.Center
     ) {
-        tabs.forEach { (index, icon, label) ->
-            val selected = selectedIndex == index
-            val animatedBgColor by animateColorAsState(
-                targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                animationSpec = tween(180),
-                label = "tabBg_$index"
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = animatedContentColor,
+                modifier = Modifier.size(20.dp)
             )
-            val animatedContentColor by animateColorAsState(
-                targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                animationSpec = tween(180),
-                label = "tabContent_$index"
-            )
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(percent = 50))
-                    .background(animatedBgColor)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = ripple(bounded = true)
-                    ) { onTabSelected(index) },
-                contentAlignment = Alignment.Center
+            AnimatedVisibility(
+                visible = selected,
+                enter = expandHorizontally(spring(stiffness = Spring.StiffnessMedium)) + fadeIn(),
+                exit = shrinkHorizontally(spring(stiffness = Spring.StiffnessMedium)) + fadeOut()
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = label,
-                        tint = animatedContentColor,
-                        modifier = Modifier.size(20.dp)
+                Row {
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = label,
+                        maxLines = 1,
+                        softWrap = false,
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = animatedContentColor
                     )
-                    if (textAlpha > 0.01f) {
-                        Spacer(Modifier.width((6.dp * (1f - collapseFraction)).coerceAtLeast(0.dp)))
-                        Text(
-                            text = label,
-                            maxLines = 1,
-                            softWrap = false,
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
-                            ),
-                            color = animatedContentColor.copy(alpha = animatedContentColor.alpha * textAlpha),
-                            modifier = Modifier.graphicsLayer { alpha = textAlpha }
-                        )
-                    }
                 }
             }
         }
@@ -363,7 +306,7 @@ private fun ThreadDockContent(
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -372,7 +315,7 @@ private fun ThreadDockContent(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight(),
-            shape = RoundedCornerShape(percent = 50),
+            shape = CircleShape,
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
@@ -391,7 +334,7 @@ private fun ThreadDockContent(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight(),
-            shape = RoundedCornerShape(percent = 50),
+            shape = CircleShape,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
         ) {
             Icon(
@@ -417,7 +360,7 @@ private fun ComposeDockContent(
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -450,7 +393,7 @@ private fun ComposeDockContent(
         Button(
             onClick = onSend,
             enabled = canSend && !isSending,
-            shape = RoundedCornerShape(percent = 50),
+            shape = CircleShape,
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary

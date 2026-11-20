@@ -219,12 +219,12 @@ private fun ReauthDialog(
 
 private val NavSpatialSpec = spring<IntOffset>(
     dampingRatio = Spring.DampingRatioNoBouncy,
-    stiffness = Spring.StiffnessMediumLow,
+    stiffness = Spring.StiffnessMedium,
 )
 
 private val NavFloatSpec = spring<Float>(
     dampingRatio = Spring.DampingRatioNoBouncy,
-    stiffness = Spring.StiffnessMediumLow,
+    stiffness = Spring.StiffnessMedium,
 )
 
 private fun routeType(route: String?): String = when {
@@ -247,30 +247,33 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
             animationSpec = NavSpatialSpec,
         ) +
             scaleIn(
-                initialScale = 0.965f,
+                initialScale = 0.96f,
                 animationSpec = NavFloatSpec,
             )
     "drill" ->
         slideIntoContainer(
             AnimatedContentTransitionScope.SlideDirection.Start,
             animationSpec = NavSpatialSpec,
-        )
+        ) +
+            scaleIn(
+                initialScale = 0.96f,
+                animationSpec = NavFloatSpec,
+            )
     else -> fadeIn(animationSpec = motionScheme.fastEffectsSpec())
 }
 
 private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.slideOutForRoute(
     motionScheme: MotionScheme
 ): ExitTransition = when (routeType(targetState.destination.route)) {
-    "compose" ->
+    "compose", "drill" ->
         scaleOut(
             targetScale = 0.94f,
             animationSpec = NavFloatSpec,
-        )
-    "drill" ->
-        fadeOut(
-            animationSpec = motionScheme.fastEffectsSpec(),
-            targetAlpha = 0.85f,
-        )
+        ) +
+            fadeOut(
+                animationSpec = motionScheme.fastEffectsSpec(),
+                targetAlpha = 0.85f,
+            )
     else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
 }
 

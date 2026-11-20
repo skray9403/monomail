@@ -69,9 +69,9 @@ fun EmailItem(
     compactMode: Boolean = false,
     selection: SelectionState = SelectionState(),
     unreadPosition: UnreadPosition = UnreadPosition.SOLO,
+    is24HourTime: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val is24HourTime = AndroidDateFormat.is24HourFormat(LocalContext.current)
     val isUnread = !thread.isRead
     val haptics = LocalHapticFeedback.current
     val rowClick = if (selection.isBulkMode) selection.onRangeSelect else onClick
@@ -224,12 +224,25 @@ private val dayFormatter = DateTimeFormatter.ofPattern("EEE", Locale.getDefault(
 private val dateFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
 private val fullDateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.getDefault())
 
+private val systemZone: ZoneId get() = ZoneId.systemDefault()
+private var cachedTodayDayOfYear: Int = -1
+private var cachedTodayDate: LocalDate? = null
+
+private fun getTodayDate(): LocalDate {
+    val now = LocalDate.now(systemZone)
+    if (now.dayOfYear != cachedTodayDayOfYear) {
+        cachedTodayDayOfYear = now.dayOfYear
+        cachedTodayDate = now
+    }
+    return cachedTodayDate ?: now
+}
+
 private fun formatTimestamp(epochMillis: Long, is24HourTime: Boolean): String {
     if (epochMillis == 0L) return ""
     val formatter = if (is24HourTime) time24Formatter else time12Formatter
-    val zoned = Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault())
+    val zoned = Instant.ofEpochMilli(epochMillis).atZone(systemZone)
     val date = zoned.toLocalDate()
-    val today = LocalDate.now(ZoneId.systemDefault())
+    val today = getTodayDate()
     return when {
         date == today -> formatter.format(zoned)
         date.isAfter(today.minusDays(7)) -> dayFormatter.format(zoned)

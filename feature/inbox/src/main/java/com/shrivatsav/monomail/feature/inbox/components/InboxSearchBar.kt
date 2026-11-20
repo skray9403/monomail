@@ -78,42 +78,128 @@ internal fun InboxSearchBar(
     val containerColor by animateColorAsState(
         targetValue = when {
             bulkSelection.isBulkMode -> MaterialTheme.colorScheme.secondaryContainer
-            // toastState removed; handled as Top Sheet in InboxScreen
             else -> MaterialTheme.colorScheme.surfaceContainer
         },
         animationSpec = tween(300),
         label = "SearchBarColor"
     )
 
+    var isExpanded by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+
+    // If query is cleared externally, collapse if not focused
+    LaunchedEffect(query) {
+        if (query.isNotEmpty() && !isExpanded) {
+            isExpanded = true
+        }
+    }
+
+    val display = remember(isRefreshing, unifiedInboxEnabled, accounts, userProfile) {
+        SearchDisplayState(isRefreshing, unifiedInboxEnabled, accounts, userProfile)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = if (isExpanded) 0.dp else 16.dp, vertical = if (isExpanded) 0.dp else 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         SearchBar(
             inputField = {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .padding(horizontal = 4.dp)
-                ) {
-                    if (bulkSelection.isBulkMode) {
+                if (bulkSelection.isBulkMode) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .padding(horizontal = 4.dp)
+                    ) {
                         BulkSelectionContent(bulkSelection)
-                    } else {
-                        // No toast overlay; always show search input
-                        SearchInputContent(query, onQueryChange, onServerSearch, actions, SearchDisplayState(isRefreshing, unifiedInboxEnabled, accounts, userProfile), onFocusChange)
                     }
+                } else {
+                    SearchBarDefaults.InputField(
+                        query = query,
+                        onQueryChange = onQueryChange,
+                        onSearch = {
+                            onServerSearch(query)
+                        },
+                        expanded = isExpanded,
+                        onExpandedChange = {
+                            isExpanded = it
+                            onFocusChange?.invoke(it)
+                        },
+                        placeholder = {
+                            Text(
+                                if (display.isRefreshing) "Syncing..." else if (display.unifiedInboxEnabled) "Search all accounts..." else "Search in mail",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            )
+                        },
+                        leadingIcon = {
+                            if (isExpanded) {
+                                IconButton(onClick = {
+                                    isExpanded = false
+                                    onQueryChange("")
+                                    onFocusChange?.invoke(false)
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                        contentDescription = "Back",
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            } else if (display.isRefreshing) {
+                                LoadingIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            } else {
+                                Icon(
+                                    painter = painterResource(com.shrivatsav.monomail.feature.inbox.R.drawable.ic_monomail_mark),
+                                    contentDescription = "Monomail",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        },
+                        trailingIcon = {
+                            if (isExpanded && query.isNotEmpty()) {
+                                IconButton(onClick = { onQueryChange("") }) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = "Clear search",
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            } else {
+                                SearchTrailingIcon(actions, display)
+                            }
+                        }
+                    )
                 }
             },
-            expanded = false,
-            onExpandedChange = {},
+            expanded = isExpanded && !bulkSelection.isBulkMode,
+            onExpandedChange = {
+                if (!bulkSelection.isBulkMode) {
+                    isExpanded = it
+                    onFocusChange?.invoke(it)
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
             colors = SearchBarDefaults.colors(containerColor = containerColor),
-            shape = MaterialTheme.shapes.extraLarge,
-            windowInsets = WindowInsets(0.dp)
-        ) {}
+            shape = if (isExpanded) RoundedCornerShape(0.dp) else MaterialTheme.shapes.extraLarge,
+            windowInsets = if (isExpanded) WindowInsets.statusBars else WindowInsets(0.dp)
+        ) {
+            if (query.isNotEmpty()) {
+                ListItem(
+                    headlineContent = { Text("Search server for \"$query\"") },
+                    leadingContent = {
+                        Icon(Icons.Rounded.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    },
+                    modifier = Modifier.clickable {
+                        onServerSearch(query)
+                    }
+                )
+            }
+        }
     }
 }
 
