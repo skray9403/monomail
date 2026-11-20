@@ -1716,15 +1716,14 @@ private fun ImageAttachmentCard(
         } else null
         isLoaded = true
     }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .clickable(enabled = decodedBitmap != null) {
-                if (decodedBitmap != null) {
-                    onNavigateToAttachmentViewer(attachment.messageId, attachment.id, attachment.mimeType, attachment.name)
-                }
+                onNavigateToAttachmentViewer(attachment.messageId, attachment.id, attachment.mimeType, attachment.name)
             }
     ) {
         Box(
@@ -1732,7 +1731,8 @@ private fun ImageAttachmentCard(
             contentAlignment = Alignment.Center
         ) {
             val bitmap = decodedBitmap
-            if (bitmap != null) {
+            when {
+                bitmap != null -> {
                     androidx.compose.foundation.Image(
                         bitmap = bitmap,
                         contentDescription = attachment.name,
@@ -1741,7 +1741,8 @@ private fun ImageAttachmentCard(
                             .heightIn(max = 280.dp),
                         contentScale = androidx.compose.ui.layout.ContentScale.FillWidth
                     )
-                } else {
+                }
+                isLoaded -> {
                     Box(
                         modifier = Modifier.fillMaxWidth().height(120.dp),
                         contentAlignment = Alignment.Center
@@ -1754,16 +1755,17 @@ private fun ImageAttachmentCard(
                         )
                     }
                 }
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(160.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    androidx.compose.material3.CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
+                else -> {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(160.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
                 }
             }
         }
