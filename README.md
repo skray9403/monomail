@@ -176,6 +176,16 @@ Minimum SDK: 26 (Android 8.0).
 
 Debug variants use the standard Android debug key and may be built without release credentials. Play Store release builds require non-placeholder OAuth, push, Firebase, MSAL, and release-keystore configuration.
 
+### Motion Lab & Specifications
+
+Monomail includes a dedicated standalone on-device **Motion Lab** activity (`MotionLabActivity`) for testing, physical interaction, and real-time tuning of Material 3 Expressive motion physics, 1:1 touch-synchronized sliding docks, directional scroll connections, authentic Google-style avatar gestures, and Android 15 Predictive Back navigation.
+
+- **Detailed Technical Specification:** [docs/MOTION_AND_NAVIGATION_SPECS.md](docs/MOTION_AND_NAVIGATION_SPECS.md)
+- **Launch Motion Lab via ADB:**
+  ```bash
+  adb shell am start -n com.shrivatsav.monomail/.ui.motionlab.MotionLabActivity
+  ```
+
 ## Contributing
 
 PRs welcome. Open an issue first for significant changes.
