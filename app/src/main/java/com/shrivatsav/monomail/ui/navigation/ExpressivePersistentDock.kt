@@ -222,12 +222,15 @@ internal fun ExpressivePersistentDock(
                             MaterialTheme.colorScheme.tertiary.copy(alpha = 0.09f),
                             Color.Transparent
                         ),
-                        center = dockTouchPoint,
+                        center = if (dockPressed) dockTouchPoint else Offset(size.width / 2f, size.height / 2f),
                         radius = size.minDimension * 1.15f
                     )
                     onDrawWithContent {
                         drawContent()
-                        if (dockPressed) drawRect(glow)
+                        if (dockPressed || isScrolling) {
+                            drawRect(glow)
+                            drawRect(Color.Black.copy(alpha = if (dockPressed) 0.035f else 0.018f))
+                        }
                     }
                 },
             shape = RoundedCornerShape(percent = 50),
