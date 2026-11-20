@@ -40,7 +40,7 @@ internal fun InboxSettingsScreen(
             )
             AnimatedVisibility(
                 visible = settings.smartGroupingEnabled,
-                enter = expandVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) + fadeIn(tween(200)),
+                enter = expandVertically(animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec()) + fadeIn(MaterialTheme.motionScheme.fastEffectsSpec()),
                 exit = shrinkVertically(tween(200)) + fadeOut(tween(150))
             ) {
                 Column {
