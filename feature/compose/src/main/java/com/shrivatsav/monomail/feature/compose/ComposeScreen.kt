@@ -427,6 +427,8 @@ fun ComposeScreen(
     onBack: () -> Unit,
     onSent: () -> Unit
 ) {
+    var showQuotedBody by remember { mutableStateOf(false) }
+
     val state by viewModel.state.collectAsState()
     val suggestions by viewModel.suggestions.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -693,7 +695,12 @@ fun ComposeScreen(
                     color = MaterialTheme.colorScheme.outlineVariant,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
                 )
-                QuotedBodySection(originalBody = originalBody)
+                TextButton(onClick = { showQuotedBody = !showQuotedBody }) {
+                    Text(if (showQuotedBody) "Hide quoted message" else "Show quoted message")
+                }
+                if (showQuotedBody) {
+                    QuotedBodySection(originalBody = originalBody)
+                }
             }
 
             Spacer(Modifier.height(96.dp))
