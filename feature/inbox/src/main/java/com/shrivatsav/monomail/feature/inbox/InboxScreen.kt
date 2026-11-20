@@ -236,22 +236,34 @@ fun InboxScreen(
         dockController.selectedTabIndex = if (targetIdx >= 0) targetIdx else 0
         dockController.isScrolling = false
     }
+    val motionScheme = MaterialTheme.motionScheme
+
     LaunchedEffect(Unit) {
         dockController.onTabSelected = { targetIdx ->
+            val targetTab = primaryTabs.getOrNull(targetIdx) ?: InboxTab.INBOX
+            if (immediateTab != targetTab) {
+                viewModel.switchTab(targetTab)
+            }
             coroutineScope.launch {
-                pagerState.animateScrollToPage(targetIdx)
+                if (kotlin.math.abs(pagerState.currentPage - targetIdx) > 1) {
+                    pagerState.scrollToPage(targetIdx)
+                } else {
+                    pagerState.animateScrollToPage(
+                        page = targetIdx,
+                        animationSpec = motionScheme.defaultSpatialSpec()
+                    )
+                }
             }
         }
     }
 
     LaunchedEffect(isSearchExpanded, isSearchFocused, isSearchActive, searchFilters.query) {
-        dockController.isSearchActive = isSearchExpanded || isSearchFocused || isSearchActive || searchFilters.query.isNotEmpty()
+        dockController.isSearchActive =
+            isSearchExpanded || isSearchFocused || isSearchActive || searchFilters.query.isNotEmpty()
     }
 
-    LaunchedEffect(isSearchActive) {
-        if (!isSearchActive) {
-            focusManager.clearFocus()
-            kotlinx.coroutines.delay(100)
+    LaunchedEffect(isSearchActive, isSearchExpanded) {
+        if (!isSearchActive && !isSearchExpanded) {
             focusManager.clearFocus()
         }
     }
@@ -1350,79 +1362,6 @@ private fun InboxTabList(
 }
 
 
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
-@Composable
-private fun BottomFabArea(
-    immediateTab: InboxTab,
-    appSettings: com.shrivatsav.monomail.core.data.settings.AppSettings,
-    unifiedInboxEnabled: Boolean,
-    navActions: InboxNavActions,
-    viewModel: InboxViewModel,
-    navBarHeight: Dp,
-    onMoveSpamToTrash: () -> Unit,
-) {
-    // Follow the Google Photos-style floating composition: a destination pill
-    // and an independent circular primary action on one horizontal baseline.
-    // Keep a 16dp safe-area gap above gesture navigation and 16dp screen gutters.
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                start = 16.dp,
-                end = 16.dp,
-                bottom = navBarHeight + 16.dp,
-            ),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        BottomDockBar(
-            currentTab = immediateTab,
-            dockConfig = appSettings.dockConfig,
-            unifiedInboxEnabled = unifiedInboxEnabled,
-            appSettings = appSettings,
-            onTabClick = { viewModel.switchTab(it) },
-            modifier = Modifier.weight(1f),
-        )
-
-        AnimatedContent(
-            targetState = immediateTab == InboxTab.SPAM,
-            label = "InboxFloatingAction",
-            transitionSpec = {
-                (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.88f)) togetherWith
-                    (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.88f))
-            },
-        ) { isSpam ->
-            if (isSpam) {
-                MoveToTrashFab(onMoveSpamToTrash)
-            } else {
-                ComposeFab(navActions.onCompose)
-            }
-        }
-    }
-}
-
-@Composable
-private fun MoveToTrashFab(onClick: () -> Unit) {
-    ExtendedFloatingActionButton(
-        onClick = onClick,
-        icon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
-        text = { Text("Trash") },
-        containerColor = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-    )
-}
-
-@Composable
-private fun ComposeFab(onClick: () -> Unit) {
-    FloatingActionButton(
-        onClick = onClick,
-        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-    ) {
-        Icon(Icons.Rounded.Edit, contentDescription = "Compose")
-    }
-}
 
 private data class LongPressMenuActions(
     val onEmailClick: () -> Unit,

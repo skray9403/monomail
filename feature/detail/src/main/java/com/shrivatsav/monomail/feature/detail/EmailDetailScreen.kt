@@ -1213,101 +1213,111 @@ private fun EmailWebViewCard(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var pendingLink by remember(emailId) { mutableStateOf<Uri?>(null) }
-    var renderGeneration by remember(emailId, htmlContent, allowRemoteImages) { mutableStateOf(0) }
-    var rendererRetryCount by remember(emailId, htmlContent, allowRemoteImages) { mutableStateOf(0) }
-    var isLoaded by remember(emailId, htmlContent, allowRemoteImages, renderGeneration) { mutableStateOf(false) }
-    var loadError by remember(emailId, htmlContent, allowRemoteImages, renderGeneration) { mutableStateOf<String?>(null) }
+    var renderGeneration by remember(emailId, allowRemoteImages) { mutableStateOf(0) }
+    var rendererRetryCount by remember(emailId, allowRemoteImages) { mutableStateOf(0) }
+    var isLoaded by remember(emailId, allowRemoteImages, renderGeneration) { mutableStateOf(false) }
+    var loadError by remember(emailId, allowRemoteImages, renderGeneration) { mutableStateOf<String?>(null) }
     val alpha by animateFloatAsState(
         targetValue = if (isLoaded) 1f else 0f,
         animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
         label = "WebViewFade"
     )
-    var emailContentWebView by remember(emailId, htmlContent, allowRemoteImages, renderGeneration) { mutableStateOf<WebView?>(null) }
-    DisposableEffect(emailId, htmlContent, allowRemoteImages, renderGeneration) {
-        onDispose { emailContentWebView?.apply { removeAllViews(); destroy() }; emailContentWebView = null }
+    var emailContentWebView by remember(emailId, allowRemoteImages, renderGeneration) { mutableStateOf<WebView?>(null) }
+    var lastLoadedHtml by remember(emailId, allowRemoteImages, renderGeneration) { mutableStateOf("") }
+
+    DisposableEffect(emailId, allowRemoteImages, renderGeneration) {
+        onDispose {
+            emailContentWebView?.apply { removeAllViews(); destroy() }
+            emailContentWebView = null
+        }
     }
-    val cardBgColor = Color.Transparent
     val useDarkening = isSystemInDarkTheme()
+
     Column {
         if (htmlContent.isBlank()) {
             EmailBodyLoadingSkeleton(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 450.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = 140.dp)
             )
         } else {
-            androidx.compose.runtime.key(emailId, htmlContent, allowRemoteImages, renderGeneration) {
+            androidx.compose.runtime.key(emailId, allowRemoteImages, renderGeneration) {
                 val callbackGeneration = renderGeneration
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                        .heightIn(min = 450.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .heightIn(min = 120.dp)
                         .clip(cornerShape(16.dp))
-                        .background(cardBgColor, cornerShape(16.dp))
                 ) {
                     AndroidView(
-                    modifier = Modifier.fillMaxWidth().padding(12.dp).alpha(alpha),
-                    factory = { context ->
-                        WebView(context).apply {
-                            emailContentWebView = this
-                            configureWebView(this, allowRemoteImages)
-                            setOnTouchListener(createTouchHandler())
-                            webViewClient = createWebViewClient(
-                                allowRemoteImages = allowRemoteImages,
-                                onLinkClick = { pendingLink = it },
-                                onPageFinished = {
-                                    if (callbackGeneration == renderGeneration) {
-                                        loadError = null
-                                        isLoaded = true
-                                    }
-                                },
-                                onMainFrameError = { message ->
-                                    if (callbackGeneration == renderGeneration) {
-                                        isLoaded = false
-                                        loadError = message
-                                    }
-                                },
-                                onRenderProcessGone = {
-                                    if (callbackGeneration == renderGeneration) {
-                                        emailContentWebView = null
-                                        isLoaded = false
-                                        if (rendererRetryCount < 1) {
-                                            rendererRetryCount++
-                                            renderGeneration++
-                                        } else {
-                                            loadError = "Email renderer stopped unexpectedly."
+                        modifier = Modifier.fillMaxWidth().padding(12.dp).alpha(alpha),
+                        factory = { ctx ->
+                            WebView(ctx).apply {
+                                emailContentWebView = this
+                                configureWebView(this, allowRemoteImages)
+                                setOnTouchListener(createTouchHandler())
+                                webViewClient = createWebViewClient(
+                                    allowRemoteImages = allowRemoteImages,
+                                    onLinkClick = { pendingLink = it },
+                                    onPageFinished = {
+                                        if (callbackGeneration == renderGeneration) {
+                                            loadError = null
+                                            isLoaded = true
+                                        }
+                                    },
+                                    onMainFrameError = { message ->
+                                        if (callbackGeneration == renderGeneration) {
+                                            isLoaded = false
+                                            loadError = message
+                                        }
+                                    },
+                                    onRenderProcessGone = {
+                                        if (callbackGeneration == renderGeneration) {
+                                            emailContentWebView = null
+                                            isLoaded = false
+                                            if (rendererRetryCount < 1) {
+                                                rendererRetryCount++
+                                                renderGeneration++
+                                            } else {
+                                                loadError = "Email renderer stopped unexpectedly."
+                                            }
                                         }
                                     }
-                                }
-                            )
-                            try {
-                                loadDataWithBaseURL(
-                                    "file:///android_asset/",
-                                    patchEmailHtml(htmlContent),
-                                    "text/html",
-                                    "UTF-8",
-                                    null
                                 )
-                            } catch (e: Exception) {
-                                android.util.Log.e("EmailWebView", "Failed to load email HTML content", e)
-                                if (callbackGeneration == renderGeneration) {
-                                    loadError = "Could not render this email."
+                            }
+                        },
+                        update = { webView ->
+                            webView.settings.loadWithOverviewMode = false
+                            webView.settings.useWideViewPort = false
+                            webView.isHorizontalScrollBarEnabled = !useOverviewScaling
+                            webView.settings.blockNetworkImage = !allowRemoteImages
+                            webView.settings.textZoom = (context.resources.configuration.fontScale * 100f)
+                                .toInt()
+                                .coerceIn(50, 300)
+                            if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+                                WebSettingsCompat.setAlgorithmicDarkeningAllowed(webView.settings, useDarkening)
+                            }
+                            val patched = patchEmailHtml(htmlContent)
+                            if (patched != lastLoadedHtml) {
+                                lastLoadedHtml = patched
+                                try {
+                                    webView.loadDataWithBaseURL(
+                                        "file:///android_asset/",
+                                        patched,
+                                        "text/html",
+                                        "UTF-8",
+                                        null
+                                    )
+                                } catch (e: Exception) {
+                                    android.util.Log.e("EmailWebView", "Failed to load email HTML content", e)
+                                    if (callbackGeneration == renderGeneration) {
+                                        loadError = "Could not render this email."
+                                    }
                                 }
                             }
                         }
-                    },
-                    update = { webView ->
-                    webView.settings.loadWithOverviewMode = false
-                    webView.settings.useWideViewPort = false
-                    webView.isHorizontalScrollBarEnabled = !useOverviewScaling
-                    webView.settings.blockNetworkImage = !allowRemoteImages
-                    webView.settings.textZoom = (context.resources.configuration.fontScale * 100f)
-                        .toInt()
-                        .coerceIn(50, 300)
-                    if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
-                        WebSettingsCompat.setAlgorithmicDarkeningAllowed(webView.settings, useDarkening)
-                    }
-                    }
-                )
+                    )
                     if (!isLoaded && loadError == null) {
-                        EmailBodyLoadingSkeleton(modifier = Modifier.fillMaxSize().padding(12.dp))
+                        EmailBodyLoadingSkeleton(modifier = Modifier.fillMaxWidth().padding(12.dp))
                     }
                 }
             }
@@ -1320,6 +1330,7 @@ private fun EmailWebViewCard(
                     TextButton(onClick = {
                         loadError = null
                         isLoaded = false
+                        lastLoadedHtml = ""
                         renderGeneration++
                     }) { Text("Retry") }
                 }
@@ -1696,46 +1707,53 @@ private fun ImageAttachmentCard(
     onFetchAttachment: suspend (String, String) -> ByteArray?,
     onNavigateToAttachmentViewer: (messageId: String, attachmentId: String, mimeType: String, name: String) -> Unit = { _, _, _, _ -> }
 ) {
-    var imageBytes by remember { androidx.compose.runtime.mutableStateOf<ByteArray?>(null) }
-    androidx.compose.runtime.LaunchedEffect(attachment.id) {
-        imageBytes = try {
+    var decodedBitmap by remember(attachment.id) {
+        mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)
+    }
+    var isLoaded by remember(attachment.id) { mutableStateOf(false) }
+
+    LaunchedEffect(attachment.id) {
+        val bytes = try {
             onFetchAttachment(attachment.messageId, attachment.id)
         } catch (e: Exception) {
             android.util.Log.e("EmailDetailScreen", "Failed to fetch image attachment ${attachment.id}", e)
             null
         }
+        decodedBitmap = if (bytes != null) {
+            withContext(Dispatchers.Default) {
+                val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
+                android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)?.asImageBitmap()
+            }
+        } else null
+        isLoaded = true
     }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .clickable {
-                if (imageBytes != null) {
-                    onNavigateToAttachmentViewer(attachment.messageId, attachment.id, attachment.mimeType, attachment.name)
-                }
+            .clickable(enabled = decodedBitmap != null) {
+                onNavigateToAttachmentViewer(attachment.messageId, attachment.id, attachment.mimeType, attachment.name)
             }
     ) {
         Box(
             modifier = Modifier.fillMaxWidth(),
             contentAlignment = Alignment.Center
         ) {
-            val bytes = imageBytes
-            if (bytes != null) {
-                val opts = android.graphics.BitmapFactory.Options().apply {
-                    inSampleSize = 2
-                }
-                val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
-                if (bitmap != null) {
+            val bitmap = decodedBitmap
+            when {
+                bitmap != null -> {
                     androidx.compose.foundation.Image(
-                        bitmap = bitmap.asImageBitmap(),
+                        bitmap = bitmap,
                         contentDescription = attachment.name,
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 280.dp),
                         contentScale = androidx.compose.ui.layout.ContentScale.FillWidth
                     )
-                } else {
+                }
+                isLoaded -> {
                     Box(
                         modifier = Modifier.fillMaxWidth().height(120.dp),
                         contentAlignment = Alignment.Center
@@ -1748,16 +1766,17 @@ private fun ImageAttachmentCard(
                         )
                     }
                 }
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(160.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    androidx.compose.material3.CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
+                else -> {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(160.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
                 }
             }
         }

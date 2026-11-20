@@ -6,20 +6,14 @@
 package com.shrivatsav.monomail.ui.navigation
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -30,6 +24,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -41,15 +36,11 @@ import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Drafts
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Inbox
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -61,26 +52,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.shrivatsav.monomail.ui.components.DockMode
 import com.shrivatsav.monomail.ui.components.FloatingDockController
+import com.shrivatsav.monomail.ui.components.clickableOnPress
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
-/**
- * Single, persistent, Material 3 Expressive floating dual-element dock architecture.
- *
- * Implements:
- * 1. Dual separate floating elements without background container clutter.
- * 2. 56dp height substantial architecture across all destinations.
- * 3. Dynamic 1:1 continuous swipe tab pill: selected = [Icon + Bold Label], unselected = [Icon].
- * 4. Directional scroll contraction: scrolling down into content contracts tabs into compact 3-icon pill
- *    [Icon] [Icon] [Icon] and FAB to 46dp; stopping retains collapsed shape; scrolling in opposite direction expands.
- * 5. Surface with CircleShape & 6.dp soft shadow elevation, perfectly elevated above system insets.
- * 6. Calm Crossfade morphing transitions across Home, Thread Detail, Settings, and Compose.
- * 7. Clean slide-down dismissal strictly when search is active.
- */
 @Composable
 internal fun ExpressivePersistentDock(
     dockController: FloatingDockController,
@@ -89,15 +68,12 @@ internal fun ExpressivePersistentDock(
 ) {
     if (dockController.mode == DockMode.HIDDEN) return
 
+    val motionScheme = MaterialTheme.motionScheme
     val isHidden = (dockController.mode == DockMode.INBOX) && dockController.isSearchActive
 
-    // Vertical hide offset ONLY when search is active (scrolling contracts rather than hides)
     val animatedOffsetY by animateDpAsState(
         targetValue = if (isHidden) 140.dp else 0.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
+        animationSpec = motionScheme.defaultSpatialSpec(),
         label = "dockOffsetY"
     )
 
@@ -109,14 +85,8 @@ internal fun ExpressivePersistentDock(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // LEFT FLOATING ELEMENT
-        LeftDockElement(
-            dockController = dockController,
-        )
-
+        LeftDockElement(dockController = dockController)
         Spacer(Modifier.width(12.dp))
-
-        // RIGHT FLOATING ELEMENT
         RightDockElement(
             dockController = dockController,
             onComposeClick = onComposeClick,
@@ -130,66 +100,63 @@ private fun LeftDockElement(
     modifier: Modifier = Modifier
 ) {
     val mode = dockController.mode
+    val motionScheme = MaterialTheme.motionScheme
     val containerColor by animateColorAsState(
         targetValue = when (mode) {
             DockMode.THREAD -> MaterialTheme.colorScheme.primaryContainer
             else -> MaterialTheme.colorScheme.surfaceContainerHigh
         },
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        animationSpec = motionScheme.fastEffectsSpec(),
         label = "leftElementColor"
     )
 
     Surface(
         shape = CircleShape,
         color = containerColor,
-        shadowElevation = 6.dp,
+        shadowElevation = 4.dp,
         modifier = modifier
     ) {
-        Box(
-            modifier = Modifier.animateContentSize(
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                )
-            )
-        ) {
-            AnimatedContent(
-                targetState = mode,
-                transitionSpec = {
-                    (fadeIn(tween(160, delayMillis = 30)) + scaleIn(tween(160, delayMillis = 30), initialScale = 0.94f))
-                        .togetherWith(fadeOut(tween(100)) + scaleOut(tween(100), targetScale = 0.94f))
-                },
-                label = "leftDockContent"
-            ) { targetMode ->
-                when (targetMode) {
-                    DockMode.INBOX -> {
-                        DynamicSwipeTabPill(
-                            continuousPosition = dockController.continuousTabPosition,
-                            isCollapsed = dockController.isScrolling,
-                            containerHeight = 56.dp,
-                            onTabClick = { dockController.onTabSelected(it) }
+        AnimatedContent(
+            targetState = mode,
+            transitionSpec = {
+                (fadeIn(motionScheme.fastEffectsSpec()) +
+                    scaleIn(motionScheme.fastSpatialSpec(), initialScale = 0.96f))
+                    .togetherWith(fadeOut(motionScheme.fastEffectsSpec()))
+                    .using(
+                        SizeTransform(
+                            clip = false,
+                            sizeAnimationSpec = { _, _ -> motionScheme.defaultSpatialSpec() }
                         )
-                    }
-                    DockMode.THREAD -> {
-                        ReplyActionPill(
-                            onClick = { dockController.onReplyAction?.invoke() }
-                        )
-                    }
-                    DockMode.SETTINGS -> {
-                        SettingsBackBubble(
-                            isCollapsed = dockController.isScrolling,
-                            onClick = { dockController.onBackClick?.invoke() }
-                        )
-                    }
-                    DockMode.COMPOSE -> {
-                        ComposeLeftActions(
-                            onDrafts = { dockController.onDraftsAction?.invoke() },
-                            onAttach = { dockController.onAttachAction?.invoke() },
-                            isSending = dockController.isSending
-                        )
-                    }
-                    else -> Spacer(Modifier.size(0.dp))
+                    )
+            },
+            label = "leftDockContent"
+        ) { targetMode ->
+            when (targetMode) {
+                DockMode.INBOX -> {
+                    DynamicSwipeTabPill(
+                        continuousPosition = dockController.continuousTabPosition,
+                        containerHeight = 56.dp,
+                        onTabClick = { dockController.onTabSelected(it) }
+                    )
                 }
+                DockMode.THREAD -> {
+                    ReplyActionPill(
+                        onClick = { dockController.onReplyAction?.invoke() }
+                    )
+                }
+                DockMode.SETTINGS -> {
+                    SettingsBackBubble(
+                        onClick = { dockController.onBackClick?.invoke() }
+                    )
+                }
+                DockMode.COMPOSE -> {
+                    ComposeLeftActions(
+                        onDrafts = { dockController.onDraftsAction?.invoke() },
+                        onAttach = { dockController.onAttachAction?.invoke() },
+                        isSending = dockController.isSending
+                    )
+                }
+                else -> Spacer(Modifier.size(0.dp))
             }
         }
     }
@@ -202,96 +169,84 @@ private fun RightDockElement(
     modifier: Modifier = Modifier
 ) {
     val mode = dockController.mode
+    val motionScheme = MaterialTheme.motionScheme
     val containerColor by animateColorAsState(
         targetValue = when (mode) {
             DockMode.INBOX -> MaterialTheme.colorScheme.primaryContainer
             DockMode.COMPOSE -> MaterialTheme.colorScheme.primary
             else -> MaterialTheme.colorScheme.surfaceContainerHigh
         },
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        animationSpec = motionScheme.fastEffectsSpec(),
         label = "rightElementColor"
     )
 
     Surface(
         shape = CircleShape,
         color = containerColor,
-        shadowElevation = 6.dp,
+        shadowElevation = 4.dp,
         modifier = modifier
     ) {
-        Box(
-            modifier = Modifier.animateContentSize(
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                )
-            )
-        ) {
-            AnimatedContent(
-                targetState = mode,
-                transitionSpec = {
-                    (fadeIn(tween(160, delayMillis = 30)) + scaleIn(tween(160, delayMillis = 30), initialScale = 0.94f))
-                        .togetherWith(fadeOut(tween(100)) + scaleOut(tween(100), targetScale = 0.94f))
-                },
-                label = "rightDockContent"
-            ) { targetMode ->
-                when (targetMode) {
-                    DockMode.INBOX -> {
-                        val fabSize by animateDpAsState(
-                            targetValue = if (dockController.isScrolling) 46.dp else 56.dp,
-                            animationSpec = spring(stiffness = Spring.StiffnessMedium),
-                            label = "composeFabSize"
+        AnimatedContent(
+            targetState = mode,
+            transitionSpec = {
+                (fadeIn(motionScheme.fastEffectsSpec()) +
+                    scaleIn(motionScheme.fastSpatialSpec(), initialScale = 0.96f))
+                    .togetherWith(fadeOut(motionScheme.fastEffectsSpec()))
+                    .using(
+                        SizeTransform(
+                            clip = false,
+                            sizeAnimationSpec = { _, _ -> motionScheme.defaultSpatialSpec() }
                         )
-                        IconButton(
-                            onClick = onComposeClick,
-                            modifier = Modifier.size(fabSize)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Edit,
-                                contentDescription = "Compose",
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(if (dockController.isScrolling) 20.dp else 22.dp)
-                            )
-                        }
-                    }
-                    DockMode.THREAD -> {
-                        ForwardActionPill(
-                            onClick = { dockController.onForwardAction?.invoke() }
+                    )
+            },
+            label = "rightDockContent"
+        ) { targetMode ->
+            when (targetMode) {
+                DockMode.INBOX -> {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .clickableOnPress(onPressDown = onComposeClick),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Edit,
+                            contentDescription = "Compose",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
-                    DockMode.SETTINGS -> {
-                        SettingsTitlePill(
-                            title = dockController.settingsTitle,
-                            isCollapsed = dockController.isScrolling
-                        )
-                    }
-                    DockMode.COMPOSE -> {
-                        ComposeSendPill(
-                            canSend = dockController.canSend,
-                            isSending = dockController.isSending,
-                            onSend = { dockController.onSendAction?.invoke() }
-                        )
-                    }
-                    else -> Spacer(Modifier.size(0.dp))
                 }
+                DockMode.THREAD -> {
+                    ForwardActionPill(
+                        onClick = { dockController.onForwardAction?.invoke() }
+                    )
+                }
+                DockMode.SETTINGS -> {
+                    SettingsTitlePill(title = dockController.settingsTitle)
+                }
+                DockMode.COMPOSE -> {
+                    ComposeSendPill(
+                        canSend = dockController.canSend,
+                        isSending = dockController.isSending,
+                        onSend = { dockController.onSendAction?.invoke() }
+                    )
+                }
+                else -> Spacer(Modifier.size(0.dp))
             }
         }
     }
 }
 
-/**
- * Dynamic 1:1 Continuous Swipe Tab Pill:
- * - At rest: Selected tab = [Icon + Bold Label], unselected = [Icon only].
- * - During swipe: Shifts through compact 3-icon state [Icon] [Icon] [Icon], smoothly expanding target label.
- * - Directional scroll: Collapses into compact 3-icon state when scrolling down; stays collapsed; regains full shape on opposite swipe!
- */
 @Composable
 private fun DynamicSwipeTabPill(
     continuousPosition: Float,
-    isCollapsed: Boolean,
-    containerHeight: androidx.compose.ui.unit.Dp,
+    containerHeight: Dp,
     onTabClick: (Int) -> Unit
 ) {
     val clampedPos = continuousPosition.coerceIn(0f, 2f)
+    val motionScheme = MaterialTheme.motionScheme
 
     data class TabInfo(val label: String, val icon: ImageVector, val index: Int)
     val tabs = remember {
@@ -302,42 +257,38 @@ private fun DynamicSwipeTabPill(
         )
     }
 
-    val itemHeight = containerHeight - 12.dp
+    val itemHeight = containerHeight - 8.dp // 48dp touch target inside a 56dp dock
 
     Row(
         modifier = Modifier
             .height(containerHeight)
-            .animateContentSize(spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioNoBouncy))
-            .padding(horizontal = 6.dp, vertical = 6.dp),
+            .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         tabs.forEach { tab ->
             val dist = abs(clampedPos - tab.index)
-            val baseExpansion = (1f - dist * 2.2f).coerceIn(0f, 1f)
-            val labelExpansion = if (isCollapsed) 0f else baseExpansion
+            val labelExpansion = (1f - dist * 2.2f).coerceIn(0f, 1f)
             val isCurrentSelected = dist < 0.5f
 
             val containerColor by animateColorAsState(
                 targetValue = if (isCurrentSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                animationSpec = motionScheme.fastEffectsSpec(),
                 label = "tabContainerColor"
             )
             val contentColor by animateColorAsState(
                 targetValue = if (isCurrentSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                animationSpec = motionScheme.fastEffectsSpec(),
                 label = "tabContentColor"
             )
 
             Box(
                 modifier = Modifier
                     .height(itemHeight)
+                    .widthIn(min = 48.dp)
                     .clip(CircleShape)
                     .background(containerColor)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = ripple(bounded = true)
-                    ) { onTabClick(tab.index) },
+                    .clickableOnPress { onTabClick(tab.index) },
                 contentAlignment = Alignment.Center
             ) {
                 Row(
@@ -374,18 +325,12 @@ private fun DynamicSwipeTabPill(
 }
 
 @Composable
-private fun ReplyActionPill(
-    onClick: () -> Unit
-) {
+private fun ReplyActionPill(onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .height(56.dp)
             .clip(CircleShape)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(bounded = true),
-                onClick = onClick
-            )
+            .clickableOnPress(onPressDown = onClick)
             .padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -410,18 +355,12 @@ private fun ReplyActionPill(
 }
 
 @Composable
-private fun ForwardActionPill(
-    onClick: () -> Unit
-) {
+private fun ForwardActionPill(onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .height(56.dp)
             .clip(CircleShape)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(bounded = true),
-                onClick = onClick
-            )
+            .clickableOnPress(onPressDown = onClick)
             .padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -446,18 +385,13 @@ private fun ForwardActionPill(
 }
 
 @Composable
-private fun SettingsBackBubble(
-    isCollapsed: Boolean,
-    onClick: () -> Unit
-) {
-    val bubbleSize by animateDpAsState(
-        targetValue = if (isCollapsed) 46.dp else 56.dp,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "settingsBubbleSize"
-    )
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier.size(bubbleSize)
+private fun SettingsBackBubble(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(56.dp)
+            .clip(CircleShape)
+            .clickableOnPress(onPressDown = onClick),
+        contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
@@ -469,19 +403,11 @@ private fun SettingsBackBubble(
 }
 
 @Composable
-private fun SettingsTitlePill(
-    title: String,
-    isCollapsed: Boolean
-) {
-    val horizPadding by animateDpAsState(
-        targetValue = if (isCollapsed) 16.dp else 28.dp,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "settingsTitlePadding"
-    )
+private fun SettingsTitlePill(title: String) {
     Box(
         modifier = Modifier
             .height(56.dp)
-            .padding(horizontal = horizPadding),
+            .padding(horizontal = 28.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -507,7 +433,13 @@ private fun ComposeLeftActions(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        IconButton(onClick = onDrafts, enabled = !isSending, modifier = Modifier.size(44.dp)) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .clickableOnPress(enabled = !isSending, onPressDown = onDrafts),
+            contentAlignment = Alignment.Center
+        ) {
             Icon(
                 imageVector = Icons.Rounded.Drafts,
                 contentDescription = "Drafts",
@@ -515,7 +447,13 @@ private fun ComposeLeftActions(
                 modifier = Modifier.size(20.dp)
             )
         }
-        IconButton(onClick = onAttach, enabled = !isSending, modifier = Modifier.size(44.dp)) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .clickableOnPress(enabled = !isSending, onPressDown = onAttach),
+            contentAlignment = Alignment.Center
+        ) {
             Icon(
                 imageVector = Icons.Rounded.AttachFile,
                 contentDescription = "Attach",
@@ -536,11 +474,9 @@ private fun ComposeSendPill(
         modifier = Modifier
             .height(56.dp)
             .clip(CircleShape)
-            .clickable(
+            .clickableOnPress(
                 enabled = canSend && !isSending,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(bounded = true),
-                onClick = onSend
+                onPressDown = onSend
             )
             .padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center

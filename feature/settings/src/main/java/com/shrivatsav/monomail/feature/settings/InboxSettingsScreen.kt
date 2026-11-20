@@ -13,13 +13,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.shrivatsav.monomail.core.data.settings.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun InboxSettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit
 ) {
     val settings by viewModel.settings.collectAsState()
+    val motionScheme = MaterialTheme.motionScheme
 
     ScrollableSettingsScaffold(title = "Inbox", onBack = onBack) {
         SettingsCard {
@@ -40,8 +41,8 @@ internal fun InboxSettingsScreen(
             )
             AnimatedVisibility(
                 visible = settings.smartGroupingEnabled,
-                enter = expandVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) + fadeIn(tween(200)),
-                exit = shrinkVertically(tween(200)) + fadeOut(tween(150))
+                enter = expandVertically(animationSpec = motionScheme.defaultSpatialSpec()) + fadeIn(motionScheme.fastEffectsSpec()),
+                exit = shrinkVertically(animationSpec = motionScheme.defaultSpatialSpec()) + fadeOut(motionScheme.fastEffectsSpec())
             ) {
                 Column {
                     CardDivider()
