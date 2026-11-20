@@ -158,6 +158,7 @@ private fun ClockMailApp() {
     var selected by remember { mutableStateOf<MailItem?>(null) }
     var composing by remember { mutableStateOf(false) }
     var searchOpen by remember { mutableStateOf(false) }
+    var settingsOpen by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var unreadOnly by remember { mutableStateOf(false) }
     var sender by remember { mutableStateOf("Sumit Kumar") }
@@ -185,13 +186,15 @@ private fun ClockMailApp() {
             composing -> composing = false
             selected != null -> selected = null
             searchOpen -> { searchOpen = false; query = "" }
+            searchOpen -> { searchOpen = false; query = "" }
+            settingsOpen -> settingsOpen = false
             destination == MailDestination.FOLDERS -> destination = MailDestination.INBOX
             else -> Unit
         }
     }
 
     BackHandler(
-        enabled = composing || selected != null || searchOpen || destination == MailDestination.FOLDERS
+        enabled = composing || selected != null || searchOpen || settingsOpen || destination == MailDestination.FOLDERS
     ) { closeLayer() }
 
     MaterialTheme(colorScheme = colors) {
@@ -233,6 +236,7 @@ private fun ClockMailApp() {
                         },
                         canSend = composeTo.isNotBlank()
                     )
+                    settingsOpen -> SettingsTopBar(onBack = { settingsOpen = false })
                     selected != null -> DetailTopBar(
                         onBack = { selected = null },
                         onArchive = {
@@ -251,13 +255,14 @@ private fun ClockMailApp() {
                         onAccount = {
                             sender = if (sender == "Sumit Kumar") "Work account" else "Sumit Kumar"
                         },
-                        onSettings = { destination = MailDestination.FOLDERS }
+                        onSettings = { settingsOpen = true }
                     )
                 }
 
                 val page = when {
                     composing -> "compose"
                     selected != null -> "detail-" + selected!!.id
+                    settingsOpen -> "settings"
                     destination == MailDestination.FOLDERS -> "folders"
                     else -> destination.name
                 }
@@ -281,6 +286,14 @@ private fun ClockMailApp() {
                             onBody = { composeBody = it }
                         )
                         target.startsWith("detail-") -> selected?.let { MailDetailPage(it) }
+                        target == "settings" -> SettingsPage(
+                            dark = dark,
+                            dynamic = dynamic,
+                            notifications = notifications,
+                            onDark = { dark = it },
+                            onDynamic = { dynamic = it },
+                            onNotifications = { notifications = it }
+                        )
                         target == "folders" -> FolderPage(
                             onSelect = { folder ->
                                 query = folder
@@ -329,7 +342,7 @@ private fun ClockMailApp() {
             }
 
             AnimatedVisibility(
-                visible = !composing,
+                visible = !composing && !settingsOpen,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
@@ -363,7 +376,7 @@ private fun ClockMailApp() {
             }
 
             AnimatedVisibility(
-                visible = !composing && selected == null && destination != MailDestination.FOLDERS,
+                visible = !composing && !settingsOpen && selected == null && destination != MailDestination.FOLDERS,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .navigationBarsPadding()
@@ -470,6 +483,19 @@ private fun DetailTopBar(onBack: () -> Unit, onArchive: () -> Unit) {
         IconButton(onClick = {}) {
             Icon(Icons.Rounded.MoreVert, contentDescription = "More")
         }
+    }
+}
+
+@Composable
+private fun SettingsTopBar(onBack: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+        }
+        Text("Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -999,8 +1025,6 @@ private fun ClockDock(
 ) {
     val entries = MailDestination.values().toList()
     val selectedIndex = entries.indexOf(destination).coerceAtLeast(0)
-    val itemWidth: Dp
-
     Surface(
         modifier = Modifier.fillMaxWidth().height(72.dp),
         shape = RoundedCornerShape(27.dp),
@@ -1009,7 +1033,7 @@ private fun ClockDock(
         shadowElevation = 14.dp
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            itemWidth = maxWidth / 5
+            val itemWidth = maxWidth / 5
             val indicatorX by animateDpAsState(
                 targetValue = itemWidth * selectedIndex,
                 animationSpec = spring(dampingRatio = 0.72f, stiffness = 420f),
