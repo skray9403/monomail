@@ -6,8 +6,9 @@
 package com.shrivatsav.monomail.ui.motionlab
 
 import android.os.Bundle
+import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
@@ -65,11 +66,13 @@ import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Inbox
-import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SwapVert
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -77,7 +80,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -86,9 +88,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -103,25 +105,31 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.shrivatsav.monomail.ui.theme.MonoMailTheme
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Dedicated Interactive Motion & Animation Lab for trying, tweaking, and approving animations.
+ * Dedicated Interactive Motion & Animation Lab for testing, tuning, and approving animations.
  */
 class MotionLabActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -147,6 +155,58 @@ enum class SimulatedScreen {
     SETTINGS
 }
 
+data class DemoAccount(
+    val name: String,
+    val email: String,
+    val avatarLetter: String,
+    val containerColor: Color,
+    val onContainerColor: Color
+)
+
+/**
+ * Directional scroll tracking:
+ * - Scrolling DOWN into content -> collapses the dock.
+ * - Stopping -> REMAINS collapsed (does NOT pop back!).
+ * - Scrolling UP (in opposite direction) -> regains full expanded shape!
+ */
+@Composable
+fun rememberDirectionalScrollConnection(
+    thresholdPx: Float = 28f
+): DirectionalScrollConnection {
+    return remember(thresholdPx) {
+        DirectionalScrollConnection(thresholdPx)
+    }
+}
+
+class DirectionalScrollConnection(
+    private val thresholdPx: Float
+) : NestedScrollConnection {
+    var isCollapsed by mutableStateOf(false)
+        private set
+    private var accumulatedScroll = 0f
+
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        val dy = available.y
+        accumulatedScroll += dy
+
+        if (accumulatedScroll < -thresholdPx) {
+            // Dragging up -> scrolling down into list -> collapse
+            isCollapsed = true
+            accumulatedScroll = 0f
+        } else if (accumulatedScroll > thresholdPx) {
+            // Dragging down -> scrolling up towards top (opposite direction) -> expand
+            isCollapsed = false
+            accumulatedScroll = 0f
+        }
+        return Offset.Zero
+    }
+
+    fun reset() {
+        isCollapsed = false
+        accumulatedScroll = 0f
+    }
+}
+
 @Composable
 fun MotionLabMainScreen() {
     var selectedOption by remember { mutableStateOf(MorphingOption.OPTION_A_CROSSFADE) }
@@ -154,6 +214,13 @@ fun MotionLabMainScreen() {
     var showAddAccountDialog by remember { mutableStateOf(false) }
     var showComposeModal by remember { mutableStateOf(false) }
     var isSearchExpanded by remember { mutableStateOf(false) }
+    var showTweakPanel by remember { mutableStateOf(false) }
+
+    // Live Crossfade Tuning Parameters (Point 1)
+    var crossfadeDurationMs by remember { mutableIntStateOf(160) }
+    var crossfadeDelayMs by remember { mutableIntStateOf(30) }
+    var crossfadeScale by remember { mutableFloatStateOf(0.94f) }
+    var dockHeightDp by remember { mutableIntStateOf(56) }
 
     val coroutineScope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = 0) { 3 }
@@ -164,7 +231,30 @@ fun MotionLabMainScreen() {
             .collect { continuousPos = it }
     }
 
+    // Directional scroll connections for Home and Settings (Point 2)
+    val homeScrollConnection = rememberDirectionalScrollConnection()
+    val settingsScrollConnection = rememberDirectionalScrollConnection()
     val settingsListState = rememberLazyListState()
+
+    // Accounts for Google Apps avatar swipe demo (Point 3)
+    val accounts = remember {
+        listOf(
+            DemoAccount("sumit Kumar", "skray9403@gmail.com", "S", Color(0xFFE8DEF8), Color(0xFF1D192B)),
+            DemoAccount("Work Mail", "dev@monomail.io", "W", Color(0xFFD0E4FF), Color(0xFF001D36)),
+            DemoAccount("Personal IMAP", "mehnaz@fastmail.com", "P", Color(0xFFFFD8E4), Color(0xFF31111D))
+        )
+    }
+    var currentAccountIndex by remember { mutableIntStateOf(0) }
+    var avatarSwipeDirection by remember { mutableIntStateOf(1) } // 1 for down, -1 for up
+    var accountSwitchedToast by remember { mutableStateOf<String?>(null) }
+
+    // Auto-dismiss account toast after 1.8s
+    LaunchedEffect(accountSwitchedToast) {
+        if (accountSwitchedToast != null) {
+            delay(1800)
+            accountSwitchedToast = null
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -184,7 +274,7 @@ fun MotionLabMainScreen() {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -204,14 +294,18 @@ fun MotionLabMainScreen() {
                             )
                         }
 
-                        // Screen Simulator Pills
+                        // Screen Simulator Switcher
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             SimulatedScreen.entries.forEach { screen ->
                                 val isSelected = activeScreen == screen
                                 Surface(
                                     shape = CircleShape,
                                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    modifier = Modifier.clickable { activeScreen = screen }
+                                    modifier = Modifier.clickable {
+                                        activeScreen = screen
+                                        homeScrollConnection.reset()
+                                        settingsScrollConnection.reset()
+                                    }
                                 ) {
                                     Text(
                                         text = when (screen) {
@@ -219,8 +313,8 @@ fun MotionLabMainScreen() {
                                             SimulatedScreen.THREAD_DETAIL -> "Detail"
                                             SimulatedScreen.SETTINGS -> "Settings"
                                         },
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        style = MaterialTheme.typography.labelSmall,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                        style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                                     )
@@ -232,31 +326,89 @@ fun MotionLabMainScreen() {
                     Spacer(Modifier.height(8.dp))
 
                     // Morphing Style Chips
-                    Text(
-                        "Morphing Animation Style:",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        FilterChip(
-                            selected = selectedOption == MorphingOption.OPTION_A_CROSSFADE,
-                            onClick = { selectedOption = MorphingOption.OPTION_A_CROSSFADE },
-                            label = { Text("A: Crossfade", fontSize = 11.sp) }
-                        )
-                        FilterChip(
-                            selected = selectedOption == MorphingOption.OPTION_B_ELEVATION_GLIDE,
-                            onClick = { selectedOption = MorphingOption.OPTION_B_ELEVATION_GLIDE },
-                            label = { Text("B: Glide", fontSize = 11.sp) }
-                        )
-                        FilterChip(
-                            selected = selectedOption == MorphingOption.OPTION_C_ELASTIC_SPLIT,
-                            onClick = { selectedOption = MorphingOption.OPTION_C_ELASTIC_SPLIT },
-                            label = { Text("C: Elastic", fontSize = 11.sp) }
-                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            FilterChip(
+                                selected = selectedOption == MorphingOption.OPTION_A_CROSSFADE,
+                                onClick = { selectedOption = MorphingOption.OPTION_A_CROSSFADE },
+                                label = { Text("A: Crossfade", fontSize = 11.sp) }
+                            )
+                            FilterChip(
+                                selected = selectedOption == MorphingOption.OPTION_B_ELEVATION_GLIDE,
+                                onClick = { selectedOption = MorphingOption.OPTION_B_ELEVATION_GLIDE },
+                                label = { Text("B: Glide", fontSize = 11.sp) }
+                            )
+                            FilterChip(
+                                selected = selectedOption == MorphingOption.OPTION_C_ELASTIC_SPLIT,
+                                onClick = { selectedOption = MorphingOption.OPTION_C_ELASTIC_SPLIT },
+                                label = { Text("C: Elastic", fontSize = 11.sp) }
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { showTweakPanel = !showTweakPanel },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                if (showTweakPanel) Icons.Rounded.ExpandLess else Icons.Rounded.Tune,
+                                contentDescription = "Tweak settings",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    // Collapsible Tweak Panel for Point 1 (Crossfade parameters)
+                    AnimatedVisibility(visible = showTweakPanel) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                "Tweak Crossfade Parameters (Live)",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.height(6.dp))
+
+                            // Duration Slider
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Duration: ${crossfadeDurationMs}ms", style = MaterialTheme.typography.labelSmall)
+                                Text("Entry Delay: ${crossfadeDelayMs}ms", style = MaterialTheme.typography.labelSmall)
+                            }
+                            Slider(
+                                value = crossfadeDurationMs.toFloat(),
+                                onValueChange = { crossfadeDurationMs = it.roundToInt() },
+                                valueRange = 100f..300f,
+                                modifier = Modifier.height(28.dp)
+                            )
+
+                            // Scale Factor Slider
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Scale Pop: ${"%.2f".format(crossfadeScale)}x", style = MaterialTheme.typography.labelSmall)
+                                Text("Dock Height: ${dockHeightDp}dp", style = MaterialTheme.typography.labelSmall)
+                            }
+                            Slider(
+                                value = crossfadeScale,
+                                onValueChange = { crossfadeScale = it },
+                                valueRange = 0.85f..1.0f,
+                                modifier = Modifier.height(28.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -271,6 +423,19 @@ fun MotionLabMainScreen() {
                     SimulatedScreen.HOME -> {
                         HomeInteractiveDemo(
                             pagerState = pagerState,
+                            scrollConnection = homeScrollConnection,
+                            accounts = accounts,
+                            currentAccountIndex = currentAccountIndex,
+                            avatarSwipeDirection = avatarSwipeDirection,
+                            onAvatarSwipe = { direction ->
+                                avatarSwipeDirection = direction
+                                currentAccountIndex = if (direction > 0) {
+                                    (currentAccountIndex + 1) % accounts.size
+                                } else {
+                                    (currentAccountIndex - 1 + accounts.size) % accounts.size
+                                }
+                                accountSwitchedToast = "Switched to ${accounts[currentAccountIndex].name}"
+                            },
                             onOpenAddAccount = { showAddAccountDialog = true },
                             isSearchExpanded = isSearchExpanded,
                             onSearchExpandedChange = { isSearchExpanded = it }
@@ -284,12 +449,37 @@ fun MotionLabMainScreen() {
                     SimulatedScreen.SETTINGS -> {
                         SettingsInteractiveDemo(
                             listState = settingsListState,
+                            scrollConnection = settingsScrollConnection,
                             onBackToHome = { activeScreen = SimulatedScreen.HOME }
                         )
                     }
                 }
 
-                // Floating Bottom Dock (Driven by the Selected Morphing Option)
+                // Floating Toast for Account Switch (Google apps style)
+                AnimatedVisibility(
+                    visible = accountSwitchedToast != null,
+                    enter = fadeIn(tween(120)) + slideInVertically(spring(stiffness = Spring.StiffnessMedium)) { -40 },
+                    exit = fadeOut(tween(120)) + slideOutVertically(spring(stiffness = Spring.StiffnessMedium)) { -40 },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 70.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.inverseSurface,
+                        shadowElevation = 8.dp
+                    ) {
+                        Text(
+                            text = accountSwitchedToast ?: "",
+                            color = MaterialTheme.colorScheme.inverseOnSurface,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Floating Bottom Dock (Driven by Selected Morphing & Directional Scroll)
                 if (!isSearchExpanded) {
                     InteractiveMorphingDock(
                         activeScreen = activeScreen,
@@ -300,7 +490,12 @@ fun MotionLabMainScreen() {
                                 pagerState.animateScrollToPage(targetIndex)
                             }
                         },
-                        isSettingsScrolling = settingsListState.isScrollInProgress,
+                        isHomeCollapsed = homeScrollConnection.isCollapsed,
+                        isSettingsCollapsed = settingsScrollConnection.isCollapsed,
+                        durationMs = crossfadeDurationMs,
+                        delayMs = crossfadeDelayMs,
+                        scaleFactor = crossfadeScale,
+                        containerHeight = dockHeightDp.dp,
                         onComposeClick = { showComposeModal = true },
                         onScreenChange = { activeScreen = it },
                         modifier = Modifier
@@ -314,7 +509,7 @@ fun MotionLabMainScreen() {
         }
     }
 
-    // Modal: Centered Add Account Dialog (Demonstrating Point 5 fix)
+    // Modal: Centered Add Account Dialog (Point 5 fix)
     if (showAddAccountDialog) {
         Dialog(onDismissRequest = { showAddAccountDialog = false }) {
             Surface(
@@ -362,46 +557,109 @@ fun MotionLabMainScreen() {
         }
     }
 
-    // Modal: Compose Modal (Demonstrating Point 6 Slide Up & Down Exit)
+    // Modal: Compose Modal with True Android 15 Predictive Back Gesture (Point 4)
+    var predictiveProgress by remember { mutableFloatStateOf(0f) }
+    var isPredictiveActive by remember { mutableStateOf(false) }
+
+    PredictiveBackHandler(enabled = showComposeModal) { progressFlow: Flow<BackEventCompat> ->
+        isPredictiveActive = true
+        try {
+            progressFlow.collect { backEvent ->
+                predictiveProgress = backEvent.progress
+            }
+            // Gesture finished: close modal
+            showComposeModal = false
+        } catch (e: CancellationException) {
+            // Gesture cancelled: springs back
+        } finally {
+            isPredictiveActive = false
+            predictiveProgress = 0f
+        }
+    }
+
     AnimatedVisibility(
         visible = showComposeModal,
         enter = slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it } + fadeIn(),
         exit = slideOutVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it } + fadeOut()
     ) {
-        BackHandler { showComposeModal = false }
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.surface
+        val animatedProgress by animateFloatAsState(
+            targetValue = if (isPredictiveActive) predictiveProgress else 0f,
+            animationSpec = spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioNoBouncy),
+            label = "predictiveProgressAnim"
+        )
+
+        // Real-time predictive physics: scale down, round corners, and downward translation
+        val sheetScale = 1f - (0.12f * animatedProgress)
+        val sheetCornerRadius = (28 * animatedProgress).dp
+        val sheetOffsetY = with(LocalDensity.current) { (90.dp.toPx() * animatedProgress) }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.45f * (1f - animatedProgress)))
         ) {
-            Column(
+            Surface(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
+                    .graphicsLayer {
+                        scaleX = sheetScale
+                        scaleY = sheetScale
+                        translationY = sheetOffsetY
+                        shape = RoundedCornerShape(sheetCornerRadius)
+                        clip = true
+                    },
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = (8 * animatedProgress).dp
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
                 ) {
-                    IconButton(onClick = { showComposeModal = false }) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Close")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        IconButton(onClick = { showComposeModal = false }) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Close")
+                        }
+                        Text("Compose", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Button(onClick = { showComposeModal = false }, shape = CircleShape) {
+                            Text("Send")
+                        }
                     }
-                    Text("Compose", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Button(onClick = { showComposeModal = false }, shape = CircleShape) {
-                        Text("Send")
+                    Spacer(Modifier.height(16.dp))
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                "Live Android 15 Predictive Back Active!",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "Swipe inward from the left or right edge of your phone to see this sheet scale, round its corners, and slide downwards following your thumb in real time!",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            if (isPredictiveActive) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Finger Progress: ${(predictiveProgress * 100).toInt()}%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                     }
-                }
-                Spacer(Modifier.height(16.dp))
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-                ) {
-                    Text(
-                        "Demonstrating Point 6:\nPage slides UP from bottom on enter, and exits DOWN to bottom on close/back gesture.",
-                        modifier = Modifier.padding(16.dp),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
                 }
             }
         }
@@ -409,7 +667,7 @@ fun MotionLabMainScreen() {
 }
 
 /**
- * Interactive Morphing Dock demonstrating Options A, B, and C.
+ * Interactive Morphing Dock with configurable crossfade physics and directional scroll reactivity.
  */
 @Composable
 fun InteractiveMorphingDock(
@@ -417,13 +675,16 @@ fun InteractiveMorphingDock(
     morphingOption: MorphingOption,
     continuousPosition: Float,
     onTabClick: (Int) -> Unit,
-    isSettingsScrolling: Boolean,
+    isHomeCollapsed: Boolean,
+    isSettingsCollapsed: Boolean,
+    durationMs: Int,
+    delayMs: Int,
+    scaleFactor: Float,
+    containerHeight: androidx.compose.ui.unit.Dp,
     onComposeClick: () -> Unit,
     onScreenChange: (SimulatedScreen) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val density = LocalDensity.current
-
     when (morphingOption) {
         MorphingOption.OPTION_A_CROSSFADE -> {
             // OPTION A: Calm Shared Crossfade (Zero erratic resizing, subtle in-place crossfade)
@@ -443,18 +704,25 @@ fun InteractiveMorphingDock(
                     AnimatedContent(
                         targetState = activeScreen,
                         transitionSpec = {
-                            fadeIn(tween(140, delayMillis = 30)).togetherWith(fadeOut(tween(80)))
+                            (fadeIn(tween(durationMs, delayMillis = delayMs)) + scaleIn(tween(durationMs, delayMillis = delayMs), initialScale = scaleFactor))
+                                .togetherWith(fadeOut(tween(durationMs / 2)) + scaleOut(tween(durationMs / 2), targetScale = scaleFactor))
                         },
                         label = "dockLeftContent"
                     ) { screen ->
                         when (screen) {
                             SimulatedScreen.HOME -> DynamicSwipeTabPill(
                                 continuousPosition = continuousPosition,
+                                isCollapsed = isHomeCollapsed,
+                                containerHeight = containerHeight,
                                 onTabClick = onTabClick
                             )
-                            SimulatedScreen.THREAD_DETAIL -> MockReplyPill(onClick = {})
+                            SimulatedScreen.THREAD_DETAIL -> MockReplyPill(
+                                containerHeight = containerHeight,
+                                onClick = {}
+                            )
                             SimulatedScreen.SETTINGS -> MockCircleBack(
-                                isScrolling = isSettingsScrolling,
+                                isCollapsed = isSettingsCollapsed,
+                                containerHeight = containerHeight,
                                 onClick = { onScreenChange(SimulatedScreen.HOME) }
                             )
                         }
@@ -472,16 +740,25 @@ fun InteractiveMorphingDock(
                     AnimatedContent(
                         targetState = activeScreen,
                         transitionSpec = {
-                            fadeIn(tween(140, delayMillis = 30)).togetherWith(fadeOut(tween(80)))
+                            (fadeIn(tween(durationMs, delayMillis = delayMs)) + scaleIn(tween(durationMs, delayMillis = delayMs), initialScale = scaleFactor))
+                                .togetherWith(fadeOut(tween(durationMs / 2)) + scaleOut(tween(durationMs / 2), targetScale = scaleFactor))
                         },
                         label = "dockRightContent"
                     ) { screen ->
                         when (screen) {
-                            SimulatedScreen.HOME -> MockComposeFab(onClick = onComposeClick)
-                            SimulatedScreen.THREAD_DETAIL -> MockForwardPill(onClick = {})
+                            SimulatedScreen.HOME -> MockComposeFab(
+                                isCollapsed = isHomeCollapsed,
+                                containerHeight = containerHeight,
+                                onClick = onComposeClick
+                            )
+                            SimulatedScreen.THREAD_DETAIL -> MockForwardPill(
+                                containerHeight = containerHeight,
+                                onClick = {}
+                            )
                             SimulatedScreen.SETTINGS -> MockSettingsTitlePill(
                                 title = "Settings",
-                                isScrolling = isSettingsScrolling
+                                isCollapsed = isSettingsCollapsed,
+                                containerHeight = containerHeight
                             )
                         }
                     }
@@ -510,27 +787,34 @@ fun InteractiveMorphingDock(
                             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh, shadowElevation = 6.dp) {
                                 DynamicSwipeTabPill(
                                     continuousPosition = continuousPosition,
+                                    isCollapsed = isHomeCollapsed,
+                                    containerHeight = containerHeight,
                                     onTabClick = onTabClick
                                 )
                             }
                             Spacer(Modifier.width(12.dp))
                             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, shadowElevation = 6.dp) {
-                                MockComposeFab(onClick = onComposeClick)
+                                MockComposeFab(
+                                    isCollapsed = isHomeCollapsed,
+                                    containerHeight = containerHeight,
+                                    onClick = onComposeClick
+                                )
                             }
                         }
                         SimulatedScreen.THREAD_DETAIL -> {
                             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, shadowElevation = 6.dp) {
-                                MockReplyPill(onClick = {})
+                                MockReplyPill(containerHeight = containerHeight, onClick = {})
                             }
                             Spacer(Modifier.width(12.dp))
                             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh, shadowElevation = 6.dp) {
-                                MockForwardPill(onClick = {})
+                                MockForwardPill(containerHeight = containerHeight, onClick = {})
                             }
                         }
                         SimulatedScreen.SETTINGS -> {
                             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh, shadowElevation = 6.dp) {
                                 MockCircleBack(
-                                    isScrolling = isSettingsScrolling,
+                                    isCollapsed = isSettingsCollapsed,
+                                    containerHeight = containerHeight,
                                     onClick = { onScreenChange(SimulatedScreen.HOME) }
                                 )
                             }
@@ -538,7 +822,8 @@ fun InteractiveMorphingDock(
                             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh, shadowElevation = 6.dp) {
                                 MockSettingsTitlePill(
                                     title = "Settings",
-                                    isScrolling = isSettingsScrolling
+                                    isCollapsed = isSettingsCollapsed,
+                                    containerHeight = containerHeight
                                 )
                             }
                         }
@@ -548,7 +833,7 @@ fun InteractiveMorphingDock(
         }
 
         MorphingOption.OPTION_C_ELASTIC_SPLIT -> {
-            // OPTION C: Elastic Pill Morph (Linear width interpolation with spring dynamics)
+            // OPTION C: Elastic Pill Morph
             Row(
                 modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.Center,
@@ -557,17 +842,19 @@ fun InteractiveMorphingDock(
                 Surface(
                     shape = CircleShape,
                     color = if (activeScreen == SimulatedScreen.THREAD_DETAIL) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shadowElevation = 6.dp,
-                    modifier = Modifier.animateContentSize(spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioNoBouncy))
+                    shadowElevation = 6.dp
                 ) {
                     when (activeScreen) {
                         SimulatedScreen.HOME -> DynamicSwipeTabPill(
                             continuousPosition = continuousPosition,
+                            isCollapsed = isHomeCollapsed,
+                            containerHeight = containerHeight,
                             onTabClick = onTabClick
                         )
-                        SimulatedScreen.THREAD_DETAIL -> MockReplyPill(onClick = {})
+                        SimulatedScreen.THREAD_DETAIL -> MockReplyPill(containerHeight = containerHeight, onClick = {})
                         SimulatedScreen.SETTINGS -> MockCircleBack(
-                            isScrolling = isSettingsScrolling,
+                            isCollapsed = isSettingsCollapsed,
+                            containerHeight = containerHeight,
                             onClick = { onScreenChange(SimulatedScreen.HOME) }
                         )
                     }
@@ -576,15 +863,19 @@ fun InteractiveMorphingDock(
                 Surface(
                     shape = CircleShape,
                     color = if (activeScreen == SimulatedScreen.HOME) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shadowElevation = 6.dp,
-                    modifier = Modifier.animateContentSize(spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioNoBouncy))
+                    shadowElevation = 6.dp
                 ) {
                     when (activeScreen) {
-                        SimulatedScreen.HOME -> MockComposeFab(onClick = onComposeClick)
-                        SimulatedScreen.THREAD_DETAIL -> MockForwardPill(onClick = {})
+                        SimulatedScreen.HOME -> MockComposeFab(
+                            isCollapsed = isHomeCollapsed,
+                            containerHeight = containerHeight,
+                            onClick = onComposeClick
+                        )
+                        SimulatedScreen.THREAD_DETAIL -> MockForwardPill(containerHeight = containerHeight, onClick = {})
                         SimulatedScreen.SETTINGS -> MockSettingsTitlePill(
                             title = "Settings",
-                            isScrolling = isSettingsScrolling
+                            isCollapsed = isSettingsCollapsed,
+                            containerHeight = containerHeight
                         )
                     }
                 }
@@ -594,14 +885,17 @@ fun InteractiveMorphingDock(
 }
 
 /**
- * Real 1:1 Swipe-Synchronized Dynamic Tab Pill (Point 7).
- * At rest: Selected tab = [Icon + Label], unselected tabs = [Icon only].
- * During swipe: Label collapses, transitioning through compact 3-icon state [Icon] [Icon] [Icon],
- * and target tab's label smoothly expands on arrival.
+ * 1:1 Swipe-Synchronized Dynamic Tab Pill (Point 2 & Point 7).
+ * - Generous 56dp height and touch-friendly padding.
+ * - At rest: Selected tab = [Icon + Bold Label], unselected = [Icon only].
+ * - During swipe: Shifts through compact 3-icon state [Icon] [Icon] [Icon], smoothly expanding target label.
+ * - Directional scroll: Collapses into compact 3-icon state when scrolling down; stays collapsed; regains full shape on opposite swipe!
  */
 @Composable
 fun DynamicSwipeTabPill(
     continuousPosition: Float,
+    isCollapsed: Boolean,
+    containerHeight: androidx.compose.ui.unit.Dp,
     onTabClick: (Int) -> Unit
 ) {
     val clampedPos = continuousPosition.coerceIn(0f, 2f)
@@ -615,18 +909,21 @@ fun DynamicSwipeTabPill(
         )
     }
 
+    val itemHeight = containerHeight - 12.dp
+
     Row(
         modifier = Modifier
-            .height(52.dp)
+            .height(containerHeight)
             .animateContentSize(spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioNoBouncy))
             .padding(horizontal = 6.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         tabs.forEach { tab ->
             val dist = abs(clampedPos - tab.index)
-            // Label expands when distance < 0.45; collapses to 0 by distance >= 0.5 (forming 3-icon state)
-            val labelExpansion = (1f - dist * 2.2f).coerceIn(0f, 1f)
+            // If directionally collapsed from scrolling, label is collapsed completely
+            val baseExpansion = (1f - dist * 2.2f).coerceIn(0f, 1f)
+            val labelExpansion = if (isCollapsed) 0f else baseExpansion
             val isCurrentSelected = dist < 0.5f
 
             val containerColor by animateColorAsState(
@@ -642,7 +939,7 @@ fun DynamicSwipeTabPill(
 
             Box(
                 modifier = Modifier
-                    .height(40.dp)
+                    .height(itemHeight)
                     .clip(CircleShape)
                     .background(containerColor)
                     .clickable(
@@ -652,7 +949,7 @@ fun DynamicSwipeTabPill(
                 contentAlignment = Alignment.Center
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = (10 + (6 * labelExpansion)).dp),
+                    modifier = Modifier.padding(horizontal = (12 + (8 * labelExpansion)).dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
@@ -660,20 +957,20 @@ fun DynamicSwipeTabPill(
                         imageVector = tab.icon,
                         contentDescription = tab.label,
                         tint = contentColor,
-                        modifier = Modifier.size((18 + (2 * labelExpansion)).dp)
+                        modifier = Modifier.size((20 + (2 * labelExpansion)).dp)
                     )
 
                     if (labelExpansion > 0.05f) {
                         Spacer(Modifier.width((6 * labelExpansion).dp))
                         Text(
                             text = tab.label,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = contentColor,
                             modifier = Modifier.graphicsLayer {
                                 alpha = labelExpansion
-                                scaleX = 0.8f + (0.2f * labelExpansion)
-                                scaleY = 0.8f + (0.2f * labelExpansion)
+                                scaleX = 0.85f + (0.15f * labelExpansion)
+                                scaleY = 0.85f + (0.15f * labelExpansion)
                             },
                             maxLines = 1
                         )
@@ -685,37 +982,46 @@ fun DynamicSwipeTabPill(
 }
 
 /**
- * Home Interactive Demo with:
- * 1. 1:1 Swipe-Synchronized Tab Bar.
- * 2. Signature Avatar Swipe Gesture to switch accounts.
- * 3. Search Bar expand / predictive collapse.
- * 4. Email list with native selection (no blur).
+ * Home Interactive Demo with Google Apps Avatar Vertical Swipe (Point 3)
+ * and Directional Scroll Connection (Point 2).
  */
 @Composable
 fun HomeInteractiveDemo(
     pagerState: PagerState,
+    scrollConnection: DirectionalScrollConnection,
+    accounts: List<DemoAccount>,
+    currentAccountIndex: Int,
+    avatarSwipeDirection: Int,
+    onAvatarSwipe: (Int) -> Unit,
     onOpenAddAccount: () -> Unit,
     isSearchExpanded: Boolean,
     onSearchExpandedChange: (Boolean) -> Unit
 ) {
-    // Avatar swipe account switcher state
-    val accounts = remember { listOf("sumit Kumar (Google)", "Work Mail (Exchange)", "Personal (IMAP)") }
-    var currentAccountIndex by remember { mutableIntStateOf(0) }
-    var avatarFlipAngle by remember { mutableFloatStateOf(0f) }
+    var dragAccumulator by remember { mutableFloatStateOf(0f) }
 
-    val animatedFlip by animateFloatAsState(
-        targetValue = avatarFlipAngle,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioNoBouncy),
-        label = "avatarFlip"
-    )
+    // Predictive back for Search view
+    PredictiveBackHandler(enabled = isSearchExpanded) { progressFlow: Flow<BackEventCompat> ->
+        try {
+            progressFlow.collect { }
+            onSearchExpandedChange(false)
+        } catch (e: CancellationException) {
+            // Cancelled
+        }
+    }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Search Bar with Avatar Vertical Drag Listener (Point 11)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollConnection)
+    ) {
+        // Search Bar with Google Apps Avatar Vertical Slide (Point 3)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = if (isSearchExpanded) 0.dp else 16.dp, vertical = 8.dp)
         ) {
+            val currentAccount = accounts[currentAccountIndex]
+
             SearchBar(
                 inputField = {
                     SearchBarDefaults.InputField(
@@ -724,7 +1030,13 @@ fun HomeInteractiveDemo(
                         onSearch = {},
                         expanded = isSearchExpanded,
                         onExpandedChange = onSearchExpandedChange,
-                        placeholder = { Text("Search in mail (${accounts[currentAccountIndex]})", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        placeholder = {
+                            Text(
+                                "Search in mail (${currentAccount.name})",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
                         leadingIcon = {
                             if (isSearchExpanded) {
                                 IconButton(onClick = { onSearchExpandedChange(false) }) {
@@ -736,35 +1048,56 @@ fun HomeInteractiveDemo(
                         },
                         trailingIcon = {
                             if (!isSearchExpanded) {
-                                // Avatar circle with Vertical Drag gesture (Point 11)
+                                // Google Apps Vertical Slide Avatar (Point 3)
                                 Box(
                                     modifier = Modifier
-                                        .size(34.dp)
-                                        .graphicsLayer { rotationX = animatedFlip }
+                                        .size(38.dp)
                                         .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary)
-                                        .pointerInput(Unit) {
-                                            detectVerticalDragGestures { _, dragAmount ->
-                                                if (dragAmount > 8f) {
-                                                    // Swipe Down -> Next account
-                                                    currentAccountIndex = (currentAccountIndex + 1) % accounts.size
-                                                    avatarFlipAngle += 360f
-                                                } else if (dragAmount < -8f) {
-                                                    // Swipe Up -> Previous account
-                                                    currentAccountIndex = (currentAccountIndex - 1 + accounts.size) % accounts.size
-                                                    avatarFlipAngle -= 360f
+                                        .background(currentAccount.containerColor)
+                                        .pointerInput(accounts) {
+                                            detectVerticalDragGestures(
+                                                onVerticalDrag = { change, dragAmount ->
+                                                    change.consume()
+                                                    dragAccumulator += dragAmount
+                                                },
+                                                onDragEnd = {
+                                                    if (dragAccumulator > 16f) {
+                                                        // Swipe DOWN -> Next account (slides in from top)
+                                                        onAvatarSwipe(1)
+                                                    } else if (dragAccumulator < -16f) {
+                                                        // Swipe UP -> Previous account (slides in from bottom)
+                                                        onAvatarSwipe(-1)
+                                                    }
+                                                    dragAccumulator = 0f
                                                 }
-                                            }
+                                            )
                                         }
                                         .clickable { onOpenAddAccount() },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        text = accounts[currentAccountIndex].first().toString(),
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp
-                                    )
+                                    AnimatedContent(
+                                        targetState = currentAccountIndex,
+                                        transitionSpec = {
+                                            if (avatarSwipeDirection >= 0) {
+                                                // Swipe Down: new comes from top (-1), old exits down (+1)
+                                                (slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { -it } + fadeIn())
+                                                    .togetherWith(slideOutVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it } + fadeOut())
+                                            } else {
+                                                // Swipe Up: new comes from bottom (+1), old exits up (-1)
+                                                (slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it } + fadeIn())
+                                                    .togetherWith(slideOutVertically(spring(stiffness = Spring.StiffnessMediumLow)) { -it } + fadeOut())
+                                            }
+                                        },
+                                        label = "googleAvatarSwipe"
+                                    ) { accIdx ->
+                                        val acc = accounts[accIdx]
+                                        Text(
+                                            text = acc.avatarLetter,
+                                            color = acc.onContainerColor,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -780,14 +1113,14 @@ fun HomeInteractiveDemo(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Search Suggestions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
-                    Text("Tap back arrow or swipe back from edge to collapse into search bar pill.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Tap back arrow or swipe back from edge to collapse back into search bar pill.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
 
-        // Swipe Hint Banner
+        // Hint Banner
         Card(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
         ) {
             Row(
@@ -797,43 +1130,59 @@ fun HomeInteractiveDemo(
                 Icon(Icons.Rounded.SwapVert, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "Swipe UP or DOWN on profile avatar to cycle accounts like Gmail! Swipe list to test 1:1 tab morph.",
+                    "Swipe avatar UP/DOWN to switch accounts (Google style). Scroll list down to collapse dock; swipe up to restore!",
                     style = MaterialTheme.typography.labelSmall
                 )
             }
         }
 
-        // Real HorizontalPager demonstrating 1:1 Swipe Morphing (Point 7)
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.weight(1f)
-        ) { page ->
-            LazyColumn(
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                item {
-                    Text(
-                        when (page) {
-                            0 -> "Inbox (Swipe horizontally below to test 1:1 tab morph)"
-                            1 -> "Sent Mail"
-                            else -> "Archived Messages"
-                        },
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-                items(8) { idx ->
-                    InteractiveEmailCard(
-                        title = when (page) {
-                            0 -> "Security Alert - Sign-in from Pixel 8a #$idx"
-                            1 -> "Reply: Quarterly Roadmap Review #$idx"
-                            else -> "Archived Notification #$idx"
-                        },
-                        sender = "Google Account Security",
-                        date = "Nov ${18 - idx}"
-                    )
+        // Email List with Account Transition (Point 3) & 1:1 Horizontal Pager (Point 7)
+        AnimatedContent(
+            targetState = currentAccountIndex,
+            transitionSpec = {
+                (fadeIn(tween(180)) + slideInVertically(tween(180)) { 20 })
+                    .togetherWith(fadeOut(tween(100)))
+            },
+            modifier = Modifier.weight(1f),
+            label = "accountEmailListTransition"
+        ) { accIdx ->
+            val account = accounts[accIdx]
+
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                LazyColumn(
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item {
+                        Text(
+                            when (page) {
+                                0 -> "${account.name} · Inbox"
+                                1 -> "${account.name} · Sent"
+                                else -> "${account.name} · Archived"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    items(10) { idx ->
+                        InteractiveEmailCard(
+                            title = when (accIdx) {
+                                0 -> "Security Alert - Sign-in from Pixel 8a #$idx"
+                                1 -> "Sprint Review: Q4 Roadmap & Milestones #$idx"
+                                else -> "Order Confirmation: Fastmail Payment #$idx"
+                            },
+                            sender = when (accIdx) {
+                                0 -> "Google Account Security"
+                                1 -> "Engineering Lead"
+                                else -> "Customer Care"
+                            },
+                            date = "Nov ${20 - idx}"
+                        )
+                    }
                 }
             }
         }
@@ -862,7 +1211,7 @@ fun InteractiveEmailCard(title: String, sender: String, date: String) {
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(42.dp)
                     .clip(CircleShape)
                     .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer),
                 contentAlignment = Alignment.Center
@@ -925,11 +1274,13 @@ fun ThreadDetailInteractiveDemo(onBackToHome: () -> Unit) {
 }
 
 /**
- * Settings Interactive Demo with Scroll Collapse (Point 8 & Point 9: Uniform Height).
+ * Settings Interactive Demo with Directional Scroll Collapse (Point 2)
+ * and Uniform 68dp Item Height (Point 9).
  */
 @Composable
 fun SettingsInteractiveDemo(
     listState: LazyListState,
+    scrollConnection: DirectionalScrollConnection,
     onBackToHome: () -> Unit
 ) {
     val settingsCategories = listOf(
@@ -944,7 +1295,11 @@ fun SettingsInteractiveDemo(
         "About & System" to "Version, open source licenses, diagnostics"
     )
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollConnection)
+    ) {
         LazyColumn(
             state = listState,
             contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 120.dp),
@@ -952,12 +1307,16 @@ fun SettingsInteractiveDemo(
         ) {
             item {
                 Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text("All items below have uniform 68dp height (Point 9)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "Scroll down to collapse bottom dock; swipe up in opposite direction to restore it!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(Modifier.height(8.dp))
             }
             items(settingsCategories.size) { idx ->
                 val (title, subtitle) = settingsCategories[idx]
-                // Point 9: Uniform Height Item
+                // Point 9: Uniform Height Item (68dp)
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -976,27 +1335,45 @@ fun SettingsInteractiveDemo(
     }
 }
 
-// ── Mock Floating Dock Components (52dp Height) ──────────────────────────
+// ── Mock Floating Dock Components (56dp Height) ──────────────────────────
 
 @Composable
-fun MockComposeFab(onClick: () -> Unit) {
+fun MockComposeFab(
+    isCollapsed: Boolean,
+    containerHeight: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit
+) {
+    val fabSize by animateDpAsState(
+        targetValue = if (isCollapsed) (containerHeight - 10.dp) else containerHeight,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioNoBouncy),
+        label = "fabSizeAnim"
+    )
+
     Box(
         modifier = Modifier
-            .size(52.dp)
+            .size(fabSize)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Icon(Icons.Rounded.Edit, contentDescription = "Compose", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(22.dp))
+        Icon(
+            Icons.Rounded.Edit,
+            contentDescription = "Compose",
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.size(24.dp)
+        )
     }
 }
 
 @Composable
-fun MockReplyPill(onClick: () -> Unit) {
+fun MockReplyPill(
+    containerHeight: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
-            .height(52.dp)
+            .height(containerHeight)
             .clickable(onClick = onClick)
-            .padding(horizontal = 22.dp),
+            .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
@@ -1007,12 +1384,15 @@ fun MockReplyPill(onClick: () -> Unit) {
 }
 
 @Composable
-fun MockForwardPill(onClick: () -> Unit) {
+fun MockForwardPill(
+    containerHeight: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
-            .height(52.dp)
+            .height(containerHeight)
             .clickable(onClick = onClick)
-            .padding(horizontal = 22.dp),
+            .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
@@ -1024,39 +1404,41 @@ fun MockForwardPill(onClick: () -> Unit) {
 
 @Composable
 fun MockCircleBack(
-    isScrolling: Boolean,
+    isCollapsed: Boolean,
+    containerHeight: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit
 ) {
-    val collapseFraction by animateFloatAsState(
-        targetValue = if (isScrolling) 0.88f else 1.0f,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "backCollapse"
+    val backSize by animateDpAsState(
+        targetValue = if (isCollapsed) (containerHeight - 10.dp) else containerHeight,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioNoBouncy),
+        label = "backSizeAnim"
     )
 
     Box(
         modifier = Modifier
-            .size((52 * collapseFraction).dp)
+            .size(backSize)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", modifier = Modifier.size(22.dp))
+        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", modifier = Modifier.size(24.dp))
     }
 }
 
 @Composable
 fun MockSettingsTitlePill(
     title: String,
-    isScrolling: Boolean
+    isCollapsed: Boolean,
+    containerHeight: androidx.compose.ui.unit.Dp
 ) {
     val collapsePadding by animateDpAsState(
-        targetValue = if (isScrolling) 16.dp else 26.dp,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "titleCollapse"
+        targetValue = if (isCollapsed) 16.dp else 28.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioNoBouncy),
+        label = "settingsTitlePaddingAnim"
     )
 
     Box(
         modifier = Modifier
-            .height(52.dp)
+            .height(containerHeight)
             .padding(horizontal = collapsePadding),
         contentAlignment = Alignment.Center
     ) {
