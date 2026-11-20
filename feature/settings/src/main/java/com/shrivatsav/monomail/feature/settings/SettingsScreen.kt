@@ -1,5 +1,6 @@
 package com.shrivatsav.monomail.feature.settings
 
+import com.shrivatsav.monomail.ui.components.clickableOnPress
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -399,31 +400,22 @@ private fun SettingsGroupSurface(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun SettingsGroupDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(start = 72.dp),
-        thickness = 0.5.dp,
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
-    )
-}
+private fun sectionColors(section: SettingsSection): Pair<Color, Color> {
+    val scheme = MaterialTheme.colorScheme
+    return when (section) {
+        SettingsSection.ACCOUNTS,
+        SettingsSection.INBOX,
+        SettingsSection.NAVIGATION -> scheme.primaryContainer to scheme.onPrimaryContainer
 
-private fun sectionColors(section: SettingsSection, isDark: Boolean): Pair<Color, Color> {
-    val base = when (section) {
-        SettingsSection.ACCOUNTS -> Color(0xFF2563EB)
-        SettingsSection.APPEARANCE -> Color(0xFF9333EA)
-        SettingsSection.INBOX -> Color(0xFF0284C7)
-        SettingsSection.READING -> Color(0xFFD97706)
-        SettingsSection.NAVIGATION -> Color(0xFF16A34A)
-        SettingsSection.COMPOSE -> Color(0xFF4F46E5)
-        SettingsSection.PRIVACY -> Color(0xFF0D9488)
-        SettingsSection.NOTIFICATIONS -> Color(0xFFE11D48)
-        SettingsSection.DEVELOPER -> Color(0xFF64748B)
-        SettingsSection.SUPPORT -> Color(0xFFDB2777)
-    }
-    return if (isDark) {
-        Pair(base.copy(alpha = 0.25f), base.copy(alpha = 0.95f))
-    } else {
-        Pair(base.copy(alpha = 0.14f), base)
+        SettingsSection.APPEARANCE,
+        SettingsSection.COMPOSE,
+        SettingsSection.PRIVACY -> scheme.secondaryContainer to scheme.onSecondaryContainer
+
+        SettingsSection.READING,
+        SettingsSection.NOTIFICATIONS,
+        SettingsSection.SUPPORT -> scheme.tertiaryContainer to scheme.onTertiaryContainer
+
+        SettingsSection.DEVELOPER -> scheme.surfaceContainerHighest to scheme.onSurfaceVariant
     }
 }
 
@@ -432,13 +424,12 @@ private fun SettingsHubItem(
     section: SettingsSection,
     onClick: (SettingsSection) -> Unit,
 ) {
-    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
-    val (containerColor, iconColor) = remember(section, isDark) { sectionColors(section, isDark) }
+    val (containerColor, iconColor) = sectionColors(section)
 
     ListItem(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(role = androidx.compose.ui.semantics.Role.Button) { onClick(section) },
+            .clickableOnPress { onClick(section) },
         leadingContent = {
             Box(
                 modifier = Modifier
