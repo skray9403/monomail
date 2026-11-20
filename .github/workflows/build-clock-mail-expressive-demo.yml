@@ -1,0 +1,39 @@
+name: Build Clock Mail Expressive Demo
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - experiment/motionlab-clock-mail-expressive
+
+concurrency:
+  group: clock-mail-expressive-demo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout isolated Clock Mail experiment
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Build standalone demo only
+        run: ./gradlew --no-daemon :motionlab-demo:assembleDebug
+      - name: Verify standalone APK
+        run: |
+          APK="motionlab-demo/build/outputs/apk/debug/motionlab-demo-debug.apk"
+          test -s "$APK"
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -V | tail -n 1)
+          "$AAPT2" dump badging "$APK" | sed -n '1p'
+      - name: Upload Clock Mail demo only
+        uses: actions/upload-artifact@v4
+        with:
+          name: monomail-clock-mail-expressive-demo
+          path: motionlab-demo/build/outputs/apk/debug/motionlab-demo-debug.apk
+          if-no-files-found: error
