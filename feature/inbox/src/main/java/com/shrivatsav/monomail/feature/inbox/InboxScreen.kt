@@ -1363,13 +1363,6 @@ private fun InboxTabList(
 
 
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
-@Composable
-
-@Composable
-
-@Composable
-
 private data class LongPressMenuActions(
     val onEmailClick: () -> Unit,
     val onStar: () -> Unit,

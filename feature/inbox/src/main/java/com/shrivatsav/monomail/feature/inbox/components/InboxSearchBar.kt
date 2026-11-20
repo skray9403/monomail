@@ -267,8 +267,6 @@ private fun BulkSelectionContent(bulkSelection: BulkSelectionState) {
 }
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-
-@Composable
 private fun SearchTrailingIcon(actions: SearchBarActions, display: SearchDisplayState) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
         if (actions.scheduledCount > 0) {

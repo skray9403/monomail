@@ -1192,10 +1192,6 @@ private fun QuotedBodySection(originalBody: String) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-
-@Composable
-
-@Composable
 fun AttachmentPreview(
     attachment: EmailAttachment,
     onRemove: () -> Unit

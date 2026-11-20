@@ -400,6 +400,15 @@ private fun SettingsGroupSurface(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
+private fun SettingsGroupDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 72.dp),
+        thickness = 0.5.dp,
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+    )
+}
+
+@Composable
 private fun sectionColors(section: SettingsSection): Pair<Color, Color> {
     val scheme = MaterialTheme.colorScheme
     return when (section) {
