@@ -28,6 +28,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "Mono mail"
 include(":app")
+include(":clockmail-demo")
 include(":core:model")
 include(":core:network")
 include(":core:designsystem", ":core:database", ":core:pgp", ":core:data", ":feature:auth", ":feature:inbox", ":feature:detail", ":feature:compose", ":feature:settings", ":feature:attachment")
