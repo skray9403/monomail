@@ -78,6 +78,8 @@ internal fun InboxSearchBar(
     onServerSearch: (String) -> Unit,
     actions: SearchBarActions,
     isRefreshing: Boolean,
+    isExpanded: Boolean = false,
+    onExpandedChange: (Boolean) -> Unit = {},
     bulkSelection: BulkSelectionState = BulkSelectionState(),
     unifiedInboxEnabled: Boolean = false,
     onFocusChange: ((Boolean) -> Unit)? = null,
@@ -91,11 +93,9 @@ internal fun InboxSearchBar(
         label = "SearchBarColor"
     )
 
-    var isExpanded by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-
     // Fluid collapse into search bar on back gesture / button
     androidx.activity.compose.BackHandler(enabled = isExpanded) {
-        isExpanded = false
+        onExpandedChange(false)
         onQueryChange("")
         onFocusChange?.invoke(false)
     }
@@ -103,7 +103,7 @@ internal fun InboxSearchBar(
     // If query is cleared externally, collapse if not focused
     LaunchedEffect(query) {
         if (query.isNotEmpty() && !isExpanded) {
-            isExpanded = true
+            onExpandedChange(true)
         }
     }
 
@@ -137,7 +137,7 @@ internal fun InboxSearchBar(
                         },
                         expanded = isExpanded,
                         onExpandedChange = {
-                            isExpanded = it
+                            onExpandedChange(it)
                             onFocusChange?.invoke(it)
                         },
                         placeholder = {
@@ -150,7 +150,7 @@ internal fun InboxSearchBar(
                         leadingIcon = {
                             if (isExpanded) {
                                 IconButton(onClick = {
-                                    isExpanded = false
+                                    onExpandedChange(false)
                                     onQueryChange("")
                                     onFocusChange?.invoke(false)
                                 }) {
@@ -193,7 +193,7 @@ internal fun InboxSearchBar(
             expanded = isExpanded && !bulkSelection.isBulkMode,
             onExpandedChange = {
                 if (!bulkSelection.isBulkMode) {
-                    isExpanded = it
+                    onExpandedChange(it)
                     onFocusChange?.invoke(it)
                 }
             },

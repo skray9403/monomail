@@ -190,15 +190,15 @@ fun InboxScreen(
     val isBulkMode by viewModel.isBulkSelectMode.collectAsStateWithLifecycle()
     val selectedThreadIds by viewModel.selectedThreadIds.collectAsStateWithLifecycle()
     val selectedCount by viewModel.selectedCount.collectAsStateWithLifecycle()
+    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     var isSearchFocused by remember { mutableStateOf(false) }
     val isSearchActive = searchFilters.query.isNotEmpty()
-    if (isSearchActive) {
+    if (isSearchExpanded || isSearchActive || isSearchFocused) {
         BackHandler {
-            viewModel.clearSearch()
-        }
-    } else if (isSearchFocused) {
-        BackHandler {
+            isSearchExpanded = false
+            isSearchFocused = false
             focusManager.clearFocus()
+            viewModel.clearSearch()
         }
     } else if (isBulkMode) {
         BackHandler { viewModel.exitBulkSelectMode() }
@@ -244,8 +244,8 @@ fun InboxScreen(
         }
     }
 
-    LaunchedEffect(isSearchFocused, isSearchActive, searchFilters.query) {
-        dockController.isSearchActive = isSearchFocused || isSearchActive || searchFilters.query.isNotEmpty()
+    LaunchedEffect(isSearchExpanded, isSearchFocused, isSearchActive, searchFilters.query) {
+        dockController.isSearchActive = isSearchExpanded || isSearchFocused || isSearchActive || searchFilters.query.isNotEmpty()
     }
 
     LaunchedEffect(isSearchActive) {
@@ -311,6 +311,11 @@ fun InboxScreen(
                         query = searchFilters.query,
                         onQueryChange = { viewModel.updateSearch(searchFilters.copy(query = it)) },
                         onServerSearch = { viewModel.searchServer(it) },
+                        isExpanded = isSearchExpanded,
+                        onExpandedChange = {
+                            isSearchExpanded = it
+                            isSearchFocused = it
+                        },
                         onFocusChange = { isSearchFocused = it },
                         actions = SearchBarActions(
                             onMarkAllRead = { viewModel.markAllAsRead() },
