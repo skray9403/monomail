@@ -329,7 +329,7 @@ fun NavGraph(
         currentRoute == Screen.Inbox.route -> DockMode.INBOX
         currentRoute?.startsWith("thread") == true -> DockMode.THREAD
         currentRoute?.startsWith("compose") == true -> DockMode.COMPOSE
-        currentRoute == Screen.Settings.route -> DockMode.SETTINGS
+        currentRoute?.startsWith("settings") == true -> DockMode.SETTINGS
         else -> DockMode.HIDDEN
     }
     dockController.mode = activeDockMode
@@ -560,6 +560,8 @@ fun NavGraph(
                 }
             }
             composable(Screen.Settings.route) {
+                dockController.settingsTitle = "Settings"
+                dockController.onBackClick = { navController.popBackStack() }
                 BackCardSurface(navController) {
                     val settingsViewModel: SettingsViewModel = hiltViewModel()
                     val ctx = LocalContext.current
@@ -584,6 +586,10 @@ fun NavGraph(
                 route = Screen.SettingsSection.route,
                 arguments = listOf(navArgument("section") { type = NavType.StringType })
             ) { backStackEntry ->
+                val sectionName = backStackEntry.arguments?.getString("section")
+                val formattedTitle = sectionName?.replaceFirstChar { it.uppercase() } ?: "Settings"
+                dockController.settingsTitle = formattedTitle
+                dockController.onBackClick = { navController.popBackStack() }
                 BackCardSurface(navController) {
                     val sectionName = backStackEntry.arguments?.getString("section")
                     val section = remember(sectionName) {
@@ -765,7 +771,7 @@ fun NavGraph(
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
                 .imePadding()
-                .padding(bottom = 12.dp)
+                .padding(bottom = 20.dp)
         )
     }
 }

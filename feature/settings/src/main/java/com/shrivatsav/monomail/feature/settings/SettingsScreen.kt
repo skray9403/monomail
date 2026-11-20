@@ -208,38 +208,9 @@ private fun SettingsHubScreen(
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val settings by viewModel.settings.collectAsState()
     var devTapCount by remember { mutableIntStateOf(0) }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.surface,
-        contentWindowInsets = WindowInsets(
-            top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-            bottom = 0.dp,
-        ),
-        topBar = {
-            LargeFlexibleTopAppBar(
-                title = {
-                    Text(
-                        "Settings",
-                        style = MaterialTheme.typography.headlineLarge,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Back",
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                ),
-            )
-        },
+        contentWindowInsets = WindowInsets.statusBars,
     ) { padding ->
         val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
         androidx.compose.runtime.DisposableEffect(Unit) {

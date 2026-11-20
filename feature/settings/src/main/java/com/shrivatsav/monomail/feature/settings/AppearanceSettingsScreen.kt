@@ -80,7 +80,6 @@ internal fun AppearanceSettingsScreen(
 }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ScrollableSettingsScaffold(
     title: String,
@@ -89,28 +88,15 @@ internal fun ScrollableSettingsScaffold(
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(
-            top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-            bottom = 0.dp
-        ),
-        topBar = {
-            TopAppBar(
-                title = { Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        }
+        contentWindowInsets = WindowInsets.statusBars
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             content = content
         )

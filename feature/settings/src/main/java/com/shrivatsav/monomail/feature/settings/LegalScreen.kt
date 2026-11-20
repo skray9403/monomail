@@ -49,28 +49,7 @@ fun LegalScreen(
         }
     }
     Scaffold(
-        contentWindowInsets = WindowInsets(
-            top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-            bottom = 0.dp
-        ),
-        topBar = {
-            TopAppBar(
-                title = { Text(title) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface
-                )
-            )
-        }
+        contentWindowInsets = WindowInsets.statusBars
     ) { padding ->
         Column(
             modifier = Modifier
@@ -78,6 +57,7 @@ fun LegalScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
+                .padding(bottom = 96.dp)
         ) {
             val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
             androidx.compose.ui.viewinterop.AndroidView(

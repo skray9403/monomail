@@ -187,8 +187,8 @@ internal fun InboxSearchBar(
             },
             modifier = Modifier.fillMaxWidth(),
             colors = SearchBarDefaults.colors(containerColor = containerColor),
-            shape = if (isExpanded) RoundedCornerShape(0.dp) else MaterialTheme.shapes.extraLarge,
-            windowInsets = if (isExpanded) WindowInsets.statusBars else WindowInsets(0.dp)
+            shape = if (isExpanded) RoundedCornerShape(0.dp) else CircleShape,
+            windowInsets = SearchBarDefaults.windowInsets
         ) {
             if (query.isNotEmpty()) {
                 ListItem(

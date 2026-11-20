@@ -214,6 +214,13 @@ fun InboxScreen(
         }
     }
 
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage + pagerState.currentPageOffsetFraction }
+            .collect { pos ->
+                dockController.continuousTabPosition = pos
+            }
+    }
+
     LaunchedEffect(pagerState.currentPage) {
         val targetTab = primaryTabs[pagerState.currentPage]
         if (immediateTab != targetTab) {
@@ -235,6 +242,10 @@ fun InboxScreen(
                 pagerState.animateScrollToPage(targetIdx)
             }
         }
+    }
+
+    LaunchedEffect(isSearchFocused, isSearchActive, searchFilters.query) {
+        dockController.isSearchActive = isSearchFocused || isSearchActive || searchFilters.query.isNotEmpty()
     }
 
     LaunchedEffect(isSearchActive) {
@@ -298,7 +309,6 @@ fun InboxScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
-                        .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
                 ) {
 
                     InboxSearchBar(

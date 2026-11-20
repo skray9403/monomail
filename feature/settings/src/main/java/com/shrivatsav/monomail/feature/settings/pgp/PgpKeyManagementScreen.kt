@@ -42,13 +42,7 @@ fun PgpKeyManagementScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(
-            top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-            bottom = 0.dp
-        ),
-        topBar = {
-            SettingsDetailTopBar(title = "PGP Keys", onNavigateBack = onNavigateBack)
-        },
+        contentWindowInsets = WindowInsets.statusBars,
         floatingActionButton = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SmallFloatingActionButton(

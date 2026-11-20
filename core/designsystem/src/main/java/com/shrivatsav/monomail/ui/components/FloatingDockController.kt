@@ -2,6 +2,7 @@ package com.shrivatsav.monomail.ui.components
 
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -27,8 +28,12 @@ class FloatingDockController {
     // Scroll collapse state (true when list is actively scrolling)
     var isScrolling by mutableStateOf(false)
 
+    // Search active state (true when search bar is focused/expanded or query entered)
+    var isSearchActive by mutableStateOf(false)
+
     // Inbox tab state
     var selectedTabIndex by mutableIntStateOf(0)
+    var continuousTabPosition by mutableFloatStateOf(0f)
     var onTabSelected by mutableStateOf<(Int) -> Unit>({})
 
     // Detail screen actions
@@ -42,7 +47,9 @@ class FloatingDockController {
     var canSend by mutableStateOf(false)
     var isSending by mutableStateOf(false)
 
-    // Settings screen actions
+    // Settings screen actions & title
+    var settingsTitle by mutableStateOf("Settings")
+    var onBackClick by mutableStateOf<(() -> Unit)?>(null)
     var settingsQuery by mutableStateOf("")
     var onSettingsQueryChange by mutableStateOf<(String) -> Unit>({})
 }
