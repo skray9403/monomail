@@ -1,7 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:allowBackup="false" android:label="MonoMail Motion Lab Demo"
+    <application
+        android:allowBackup="false"
+        android:label="MonoMail Clock Motion Demo"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
-        <activity android:name=".MotionLabActivity" android:exported="true" android:label="Motion Lab Demo">
+        <activity
+            android:name=".ClockMailDemoActivity"
+            android:exported="true"
+            android:label="Clock Mail Motion Demo">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
