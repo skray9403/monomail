@@ -15,6 +15,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -28,11 +29,15 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -61,7 +66,17 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Forward
 import androidx.compose.material.icons.automirrored.rounded.Reply
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.outlined.Alarm
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.HourglassBottom
+import androidx.compose.material.icons.outlined.Public
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material.icons.rounded.HourglassBottom
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
@@ -146,7 +161,8 @@ class MotionLabActivity : ComponentActivity() {
 enum class MorphingOption {
     OPTION_A_CROSSFADE,
     OPTION_B_ELEVATION_GLIDE,
-    OPTION_C_ELASTIC_SPLIT
+    OPTION_C_ELASTIC_SPLIT,
+    OPTION_D_CLOCK_EXPRESSIVE
 }
 
 enum class SimulatedScreen {
@@ -211,6 +227,7 @@ class DirectionalScrollConnection(
 fun MotionLabMainScreen() {
     var selectedOption by remember { mutableStateOf(MorphingOption.OPTION_A_CROSSFADE) }
     var activeScreen by remember { mutableStateOf(SimulatedScreen.HOME) }
+    var clockSelectedIndex by remember { mutableIntStateOf(0) }
     var showAddAccountDialog by remember { mutableStateOf(false) }
     var showComposeModal by remember { mutableStateOf(false) }
     var isSearchExpanded by remember { mutableStateOf(false) }
@@ -221,6 +238,10 @@ fun MotionLabMainScreen() {
     var crossfadeDelayMs by remember { mutableIntStateOf(30) }
     var crossfadeScale by remember { mutableFloatStateOf(0.94f) }
     var dockHeightDp by remember { mutableIntStateOf(56) }
+    var clockSpringStiffness by remember { mutableIntStateOf(560) }
+    var clockSpringDamping by remember { mutableFloatStateOf(0.68f) }
+    var clockSelectedScale by remember { mutableFloatStateOf(1.10f) }
+    var clockPressedScale by remember { mutableFloatStateOf(0.90f) }
 
     val coroutineScope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = 0) { 3 }
@@ -303,6 +324,11 @@ fun MotionLabMainScreen() {
                                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
                                     modifier = Modifier.clickable {
                                         activeScreen = screen
+                                        clockSelectedIndex = when (screen) {
+                                            SimulatedScreen.HOME -> 0
+                                            SimulatedScreen.THREAD_DETAIL -> 2
+                                            SimulatedScreen.SETTINGS -> 4
+                                        }
                                         homeScrollConnection.reset()
                                         settingsScrollConnection.reset()
                                     }
@@ -331,7 +357,11 @@ fun MotionLabMainScreen() {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             FilterChip(
                                 selected = selectedOption == MorphingOption.OPTION_A_CROSSFADE,
                                 onClick = { selectedOption = MorphingOption.OPTION_A_CROSSFADE },
@@ -346,6 +376,11 @@ fun MotionLabMainScreen() {
                                 selected = selectedOption == MorphingOption.OPTION_C_ELASTIC_SPLIT,
                                 onClick = { selectedOption = MorphingOption.OPTION_C_ELASTIC_SPLIT },
                                 label = { Text("C: Elastic", fontSize = 11.sp) }
+                            )
+                            FilterChip(
+                                selected = selectedOption == MorphingOption.OPTION_D_CLOCK_EXPRESSIVE,
+                                onClick = { selectedOption = MorphingOption.OPTION_D_CLOCK_EXPRESSIVE },
+                                label = { Text("D: Clock", fontSize = 11.sp) }
                             )
                         }
 
@@ -371,6 +406,43 @@ fun MotionLabMainScreen() {
                                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                                 .padding(12.dp)
                         ) {
+                            if (selectedOption == MorphingOption.OPTION_D_CLOCK_EXPRESSIVE) {
+                                Text(
+                                    "Clock Navigation Motion (Live)",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text("Spring stiffness: $clockSpringStiffness", style = MaterialTheme.typography.labelSmall)
+                                Slider(
+                                    value = clockSpringStiffness.toFloat(),
+                                    onValueChange = { clockSpringStiffness = it.roundToInt() },
+                                    valueRange = 280f..900f,
+                                    modifier = Modifier.height(28.dp)
+                                )
+                                Text("Damping: ${"%.2f".format(clockSpringDamping)}", style = MaterialTheme.typography.labelSmall)
+                                Slider(
+                                    value = clockSpringDamping,
+                                    onValueChange = { clockSpringDamping = it },
+                                    valueRange = 0.45f..1.0f,
+                                    modifier = Modifier.height(28.dp)
+                                )
+                                Text("Selected icon scale: ${"%.2f".format(clockSelectedScale)}x", style = MaterialTheme.typography.labelSmall)
+                                Slider(
+                                    value = clockSelectedScale,
+                                    onValueChange = { clockSelectedScale = it },
+                                    valueRange = 1.0f..1.24f,
+                                    modifier = Modifier.height(28.dp)
+                                )
+                                Text("Pressed scale: ${"%.2f".format(clockPressedScale)}x", style = MaterialTheme.typography.labelSmall)
+                                Slider(
+                                    value = clockPressedScale,
+                                    onValueChange = { clockPressedScale = it },
+                                    valueRange = 0.80f..0.98f,
+                                    modifier = Modifier.height(28.dp)
+                                )
+                            } else {
                             Text(
                                 "Tweak Crossfade Parameters (Live)",
                                 style = MaterialTheme.typography.labelMedium,
@@ -408,6 +480,7 @@ fun MotionLabMainScreen() {
                                 valueRange = 0.85f..1.0f,
                                 modifier = Modifier.height(28.dp)
                             )
+                            }
                         }
                     }
                 }
@@ -496,6 +569,12 @@ fun MotionLabMainScreen() {
                         delayMs = crossfadeDelayMs,
                         scaleFactor = crossfadeScale,
                         containerHeight = dockHeightDp.dp,
+                        clockSelectedIndex = clockSelectedIndex,
+                        onClockDestinationSelected = { index -> clockSelectedIndex = index },
+                        clockSpringStiffness = clockSpringStiffness.toFloat(),
+                        clockSpringDamping = clockSpringDamping,
+                        clockSelectedScale = clockSelectedScale,
+                        clockPressedScale = clockPressedScale,
                         onComposeClick = { showComposeModal = true },
                         onScreenChange = { activeScreen = it },
                         modifier = Modifier
@@ -681,6 +760,12 @@ fun InteractiveMorphingDock(
     delayMs: Int,
     scaleFactor: Float,
     containerHeight: androidx.compose.ui.unit.Dp,
+    clockSelectedIndex: Int,
+    onClockDestinationSelected: (Int) -> Unit,
+    clockSpringStiffness: Float,
+    clockSpringDamping: Float,
+    clockSelectedScale: Float,
+    clockPressedScale: Float,
     onComposeClick: () -> Unit,
     onScreenChange: (SimulatedScreen) -> Unit,
     modifier: Modifier = Modifier
@@ -876,6 +961,211 @@ fun InteractiveMorphingDock(
                             title = "Settings",
                             isCollapsed = isSettingsCollapsed,
                             containerHeight = containerHeight
+                        )
+                    }
+                }
+            }
+        }
+        MorphingOption.OPTION_D_CLOCK_EXPRESSIVE -> {
+            ClockExpressiveNavigationBar(
+                selectedIndex = clockSelectedIndex,
+                onDestinationSelected = onClockDestinationSelected,
+                springStiffness = clockSpringStiffness,
+                springDampingRatio = clockSpringDamping,
+                selectedIconScale = clockSelectedScale,
+                pressedIconScale = clockPressedScale,
+                modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp)
+            )
+        }
+    }
+}
+
+
+private data class ClockNavigationItem(
+    val label: String,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector
+)
+
+/**
+ * Clock-inspired compact navigation bar.
+ *
+ * The indicator tracks the selected destination with a spring and briefly stretches
+ * across longer travel distances. Icons compress while pressed and spring into their
+ * selected scale on release. Labels stay visible, matching the compact Clock layout.
+ */
+@Composable
+fun ClockExpressiveNavigationBar(
+    selectedIndex: Int,
+    onDestinationSelected: (Int) -> Unit,
+    springStiffness: Float,
+    springDampingRatio: Float,
+    selectedIconScale: Float,
+    pressedIconScale: Float,
+    modifier: Modifier = Modifier
+) {
+    val destinations = remember {
+        listOf(
+            ClockNavigationItem("Alarms", Icons.Rounded.Alarm, Icons.Outlined.Alarm),
+            ClockNavigationItem("World Clock", Icons.Rounded.Public, Icons.Outlined.Public),
+            ClockNavigationItem("Timers", Icons.Rounded.HourglassBottom, Icons.Outlined.HourglassBottom),
+            ClockNavigationItem("Stopwatch", Icons.Rounded.Timer, Icons.Outlined.Timer),
+            ClockNavigationItem("Bedtime", Icons.Rounded.Bedtime, Icons.Outlined.Bedtime)
+        )
+    }
+
+    val indicatorWidth = 44.dp
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(64.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = RoundedCornerShape(22.dp),
+        shadowElevation = 2.dp
+    ) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val density = LocalDensity.current
+            val totalWidthPx = with(density) { maxWidth.toPx() }
+            val indicatorWidthPx = with(density) { indicatorWidth.toPx() }
+            val initialIndicatorX = (totalWidthPx / destinations.size - indicatorWidthPx) / 2f
+            val indicatorOffset = remember(totalWidthPx) {
+                Animatable(initialIndicatorX)
+            }
+            val indicatorStretch = remember { Animatable(1f) }
+            val safeIndex = selectedIndex.coerceIn(destinations.indices)
+            val targetIndicatorX =
+                (totalWidthPx * (safeIndex + 0.5f) / destinations.size) - indicatorWidthPx / 2f
+
+            LaunchedEffect(targetIndicatorX, springStiffness, springDampingRatio) {
+                val travel = abs(targetIndicatorX - indicatorOffset.value)
+                if (travel > 0.5f) {
+                    launch {
+                        val stretch = 1f + (travel / (totalWidthPx / 2f).coerceAtLeast(1f))
+                            .coerceIn(0f, 0.18f)
+                        indicatorStretch.animateTo(
+                            targetValue = stretch,
+                            animationSpec = spring(
+                                stiffness = springStiffness * 1.35f,
+                                dampingRatio = springDampingRatio
+                            )
+                        )
+                        indicatorStretch.animateTo(
+                            targetValue = 1f,
+                            animationSpec = spring(
+                                stiffness = springStiffness,
+                                dampingRatio = springDampingRatio
+                            )
+                        )
+                    }
+                    indicatorOffset.animateTo(
+                        targetValue = targetIndicatorX,
+                        animationSpec = spring(
+                            stiffness = springStiffness,
+                            dampingRatio = springDampingRatio
+                        )
+                    )
+                } else {
+                    indicatorOffset.snapTo(targetIndicatorX)
+                    indicatorStretch.snapTo(1f)
+                }
+            }
+
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset {
+                        IntOffset(
+                            x = indicatorOffset.value.roundToInt(),
+                            y = with(density) { 6.dp.roundToPx() }
+                        )
+                    }
+                    .width(indicatorWidth)
+                    .height(30.dp)
+                    .graphicsLayer {
+                        scaleX = indicatorStretch.value
+                    },
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                shape = RoundedCornerShape(50),
+                shadowElevation = 0.dp
+            ) {}
+
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                destinations.forEachIndexed { index, destination ->
+                    val isSelected = index == safeIndex
+                    val interactionSource = remember { MutableInteractionSource() }
+                    val isPressed by interactionSource.collectIsPressedAsState()
+                    val iconScale by animateFloatAsState(
+                        targetValue = when {
+                            isPressed -> pressedIconScale
+                            isSelected -> selectedIconScale
+                            else -> 1f
+                        },
+                        animationSpec = spring(
+                            stiffness = springStiffness,
+                            dampingRatio = if (isPressed) {
+                                Spring.DampingRatioNoBouncy
+                            } else {
+                                springDampingRatio
+                            }
+                        ),
+                        label = "clockNavIconScale$index"
+                    )
+                    val contentColor by animateColorAsState(
+                        targetValue = if (isSelected) {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        animationSpec = spring(
+                            stiffness = springStiffness,
+                            dampingRatio = Spring.DampingRatioNoBouncy
+                        ),
+                        label = "clockNavContentColor$index"
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = ripple(bounded = true)
+                            ) {
+                                onDestinationSelected(index)
+                            },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isSelected) {
+                                destination.selectedIcon
+                            } else {
+                                destination.unselectedIcon
+                            },
+                            contentDescription = destination.label,
+                            tint = contentColor,
+                            modifier = Modifier
+                                .size(23.dp)
+                                .graphicsLayer {
+                                    scaleX = iconScale
+                                    scaleY = iconScale
+                                }
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            text = destination.label,
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Normal,
+                            maxLines = 1
                         )
                     }
                 }
