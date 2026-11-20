@@ -10,6 +10,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,8 +36,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Done
+import androidx.compose.material.icons.rounded.MarkEmailUnread
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Inbox
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +55,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -102,6 +109,7 @@ private fun DualMorphLabApp() {
             )
         }
         var selectedTab by remember { mutableIntStateOf(0) }
+        val selectedMessages = remember { mutableStateListOf<Int>() }
         var isScrolling by remember { mutableStateOf(false) }
         var scrollAccumulator by remember { mutableFloatStateOf(0f) }
 
@@ -150,12 +158,27 @@ private fun DualMorphLabApp() {
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 116.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) { items(messages) { mail -> MailCard(mail) } }
+                ) { items(messages) { mail ->
+                    val index = messages.indexOf(mail)
+                    MailCard(
+                        mail = mail,
+                        selected = index in selectedMessages,
+                        onClick = { if (selectedMessages.isNotEmpty()) {
+                            if (index in selectedMessages) selectedMessages.remove(index) else selectedMessages.add(index)
+                        } else selectedMessages.add(index) },
+                        onLongClick = { if (index !in selectedMessages) selectedMessages.add(index) }
+                    )
+                } }
             }
             MonoMailDock(
                 selectedTab = selectedTab,
                 onTabSelected = { selectedTab = it },
                 isScrolling = isScrolling,
+                selectedCount = selectedMessages.size,
+                onClearSelection = { selectedMessages.clear() },
+                onArchive = { selectedMessages.clear() },
+                onDelete = { selectedMessages.clear() },
+                onMarkUnread = { selectedMessages.clear() },
                 modifier = Modifier.align(Alignment.BottomCenter)
                     .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp)
             )
@@ -164,11 +187,11 @@ private fun DualMorphLabApp() {
 }
 
 @Composable
-private fun MailCard(mail: MailRow) {
+private fun MailCard(mail: MailRow, selected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick),
         shape = RoundedCornerShape(22.dp),
-        color = if (mail.unread) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else if (mail.unread) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 17.dp),
@@ -208,11 +231,17 @@ private fun MonoMailDock(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit,
     isScrolling: Boolean,
+    selectedCount: Int,
+    onClearSelection: () -> Unit,
+    onArchive: () -> Unit,
+    onDelete: () -> Unit,
+    onMarkUnread: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp
     val expandedDockWidth = (screenWidth - 32.dp) - 76.dp
     val collapsedDockWidth = 180.dp
+    val selectionMode = selectedCount > 0
 
     val collapseFraction by animateFloatAsState(
         targetValue = if (isScrolling) 1f else 0f,
@@ -259,11 +288,40 @@ private fun MonoMailDock(
             tonalElevation = 1.dp,
             shadowElevation = 0.dp
         ) {
+            androidx.compose.animation.AnimatedContent(
+                targetState = selectionMode,
+                transitionSpec = {
+                    (androidx.compose.animation.fadeIn(tween(180)) +
+                        androidx.compose.animation.scaleIn(initialScale = 0.92f, animationSpec = tween(220)))
+                        .togetherWith(androidx.compose.animation.fadeOut(tween(100)))
+                },
+                label = "dockContextMorph"
+            ) { contextual ->
             Row(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (contextual) {
+                    IconButton(onClick = onClearSelection, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Rounded.Close, contentDescription = "Clear selection")
+                    }
+                    Text(
+                        text = selectedCount.toString(),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1
+                    )
+                    IconButton(onClick = onArchive, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Rounded.Archive, contentDescription = "Archive selected")
+                    }
+                    IconButton(onClick = onMarkUnread, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Rounded.MarkEmailUnread, contentDescription = "Mark unread")
+                    }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Rounded.Delete, contentDescription = "Delete selected")
+                    }
+                } else {
                 dockTabs.forEachIndexed { index, tab ->
                     val selected = selectedTab == index
                     val bg by androidx.compose.animation.animateColorAsState(
@@ -300,9 +358,11 @@ private fun MonoMailDock(
                         }
                     }
                 }
+                }
+            }
             }
         }
-        if (fabWidth > 0.5.dp) {
+        if (!selectionMode && fabWidth > 0.5.dp) {
             Spacer(Modifier.width(fabSpacing))
             FilledIconButton(
                 onClick = { },
