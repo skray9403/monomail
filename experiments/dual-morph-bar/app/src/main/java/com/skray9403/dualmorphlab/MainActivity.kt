@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -37,7 +38,6 @@ import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material.icons.rounded.MarkEmailUnread
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Inbox
@@ -255,7 +255,7 @@ private fun MonoMailDock(
         dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium
     )
     val dockWidth by animateDpAsState(
-        targetValue = if (isScrolling) collapsedDockWidth else expandedDockWidth,
+        targetValue = if (isScrolling && !selectionMode) collapsedDockWidth else expandedDockWidth,
         animationSpec = springDp, label = "dockWidth"
     )
     val fabWidth by animateDpAsState(
