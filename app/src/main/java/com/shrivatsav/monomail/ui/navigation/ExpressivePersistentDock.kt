@@ -87,7 +87,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.awaitPointerEvent
 import com.shrivatsav.monomail.ui.components.DockMode
 import com.shrivatsav.monomail.ui.components.FloatingDockController
 
@@ -116,6 +115,11 @@ internal fun ExpressivePersistentDock(
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     var dockPressed by remember { mutableStateOf(false) }
     var dockTouchPoint by remember { mutableStateOf(Offset.Zero) }
+    val dockGlowColors = listOf(
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
+        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.09f),
+        Color.Transparent
+    )
 
     // Tighter footprint: retain room for the adjacent compose action without spanning nearly the screen.
     val expandedDockWidth = (screenWidth - 32.dp) - 104.dp
