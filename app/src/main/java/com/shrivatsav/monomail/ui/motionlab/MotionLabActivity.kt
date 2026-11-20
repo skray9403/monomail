@@ -60,6 +60,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RectangleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -581,7 +582,7 @@ fun MotionLabMainScreen() {
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()
                             .imePadding()
-                            .padding(bottom = 20.dp)
+                            .padding(bottom = if (selectedOption == MorphingOption.OPTION_D_CLOCK_EXPRESSIVE) 0.dp else 20.dp)
                     )
                 }
             }
@@ -974,7 +975,7 @@ fun InteractiveMorphingDock(
                 springDampingRatio = clockSpringDamping,
                 selectedIconScale = clockSelectedScale,
                 pressedIconScale = clockPressedScale,
-                modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                modifier = modifier.fillMaxWidth()
             )
         }
     }
@@ -1019,9 +1020,9 @@ fun ClockExpressiveNavigationBar(
         modifier = modifier
             .fillMaxWidth()
             .height(64.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(22.dp),
-        shadowElevation = 2.dp
+        color = MaterialTheme.colorScheme.surface,
+        shape = RectangleShape,
+        shadowElevation = 0.dp
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val density = LocalDensity.current
