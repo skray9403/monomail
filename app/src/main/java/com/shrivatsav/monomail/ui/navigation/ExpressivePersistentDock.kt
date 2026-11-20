@@ -82,7 +82,7 @@ internal fun ExpressivePersistentDock(
 ) {
     if (dockController.mode == DockMode.HIDDEN) return
 
-    val isHidden = dockController.isSearchActive
+    val isHidden = (dockController.mode == DockMode.INBOX) && dockController.isSearchActive
     val isScrolling = (dockController.mode == DockMode.INBOX) && dockController.isScrolling
 
     // Vertical hide/reveal offset on scroll fling or search focus

@@ -329,12 +329,18 @@ fun NavGraph(
         currentRoute == Screen.Inbox.route -> DockMode.INBOX
         currentRoute?.startsWith("thread") == true -> DockMode.THREAD
         currentRoute?.startsWith("compose") == true -> DockMode.COMPOSE
-        currentRoute?.startsWith("settings") == true -> DockMode.SETTINGS
+        currentRoute?.startsWith("settings") == true -> {
+            val sectionName = currentRoute.substringAfter("settings/", "").takeIf { it.isNotEmpty() }
+            dockController.settingsTitle = sectionName?.replaceFirstChar { it.uppercase() } ?: "Settings"
+            DockMode.SETTINGS
+        }
         else -> DockMode.HIDDEN
     }
     dockController.mode = activeDockMode
+    dockController.onBackClick = { navController.popBackStack() }
     if (activeDockMode != DockMode.INBOX) {
         dockController.isScrolling = false
+        dockController.isSearchActive = false
     }
 
     CompositionLocalProvider(LocalFloatingDockController provides dockController) {
