@@ -1,13 +1,31 @@
 package com.skray9403.dualmorphlab
 
 import android.os.Bundle
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.ripple
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Inbox
+import androidx.compose.material.icons.rounded.Archive
+import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandHorizontally
@@ -25,6 +43,8 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -33,26 +53,41 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.Archive
+import androidx.compose.material.icons.rounded.Inbox
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ripple
 import androidx.compose.material3.Text
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -96,8 +131,8 @@ private fun DualMorphLabApp() {
                 MailRow("Riya Shah", "One last thing about the prototype", "Thu", false)
             )
         }
-
-        var expandedAction by remember { mutableStateOf(ExpandedAction.COMPOSE) }
+        var selectedTab by remember { mutableIntStateOf(0) }
+        var isScrolling by remember { mutableStateOf(false) }
         var scrollAccumulator by remember { mutableFloatStateOf(0f) }
 
         val scrollConnection = remember {
@@ -108,13 +143,16 @@ private fun DualMorphLabApp() {
                     source: NestedScrollSource
                 ): androidx.compose.ui.geometry.Offset {
                     val delta = consumed.y
-                    if (delta != 0f) {
-                        scrollAccumulator += delta
-                        if (scrollAccumulator < -7f) {
-                            expandedAction = ExpandedAction.SEARCH
+                    if (delta < 0f) {
+                        scrollAccumulator += -delta
+                        if (scrollAccumulator >= 7f) {
+                            isScrolling = true
                             scrollAccumulator = 0f
-                        } else if (scrollAccumulator > 7f) {
-                            expandedAction = ExpandedAction.COMPOSE
+                        }
+                    } else if (delta > 0f) {
+                        scrollAccumulator -= delta
+                        if (scrollAccumulator <= -7f) {
+                            isScrolling = false
                             scrollAccumulator = 0f
                         }
                     }
@@ -124,65 +162,36 @@ private fun DualMorphLabApp() {
         }
 
         Box(
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = Modifier.fillMaxSize()
                 .background(MaterialTheme.colorScheme.surface)
                 .nestedScroll(scrollConnection)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth()
                         .padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 18.dp)
                 ) {
-                    Text(
-                        text = "MonoMail",
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Text("MonoMail", color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 30.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(5.dp))
-                    Text(
-                        text = "Inbox · 4 unread",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 14.sp
-                    )
+                    Text("Inbox · 4 unread", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                 }
-
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 116.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(messages) { mail ->
-                        MailCard(mail)
-                    }
-                }
+                ) { items(messages) { mail -> MailCard(mail) } }
             }
-
-            DualMorphActionBar(
-                expandedAction = expandedAction,
-                onSearch = { expandedAction = ExpandedAction.SEARCH },
-                onCompose = { expandedAction = ExpandedAction.COMPOSE },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(
-                        end = 20.dp,
-                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
-                    )
+            MonoMailDock(
+                selectedTab = selectedTab,
+                onTabSelected = { selectedTab = it },
+                isScrolling = isScrolling,
+                modifier = Modifier.align(Alignment.BottomCenter)
+                    .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp)
             )
         }
     }
 }
-
-private enum class ExpandedAction { SEARCH, COMPOSE }
-
-private data class MailRow(
-    val sender: String,
-    val subject: String,
-    val time: String,
-    val unread: Boolean
-)
 
 @Composable
 private fun MailCard(mail: MailRow) {
@@ -220,120 +229,130 @@ private fun MailCard(mail: MailRow) {
     }
 }
 
+/**
+ * Mirrors MonoMail's persistent inbox dock: wide three-tab pill + separate
+ * Compose FAB. Scroll collapses the dock in place; the controls never swap.
+ */
 @Composable
-private fun DualMorphActionBar(
-    expandedAction: ExpandedAction,
-    onSearch: () -> Unit,
-    onCompose: () -> Unit,
+private fun MonoMailDock(
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit,
+    isScrolling: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val searchExpanded = expandedAction == ExpandedAction.SEARCH
+    val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp
+    val expandedDockWidth = (screenWidth - 32.dp) - 76.dp
+    val collapsedDockWidth = 180.dp
 
-    val searchWidth by animateDpAsState(
-        targetValue = if (searchExpanded) 168.dp else 56.dp,
-        animationSpec = tween(420, easing = FastOutSlowInEasing),
-        label = "searchWidth"
+    val collapseFraction by animateFloatAsState(
+        targetValue = if (isScrolling) 1f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
+        label = "dockCollapseFraction"
     )
-    val composeWidth by animateDpAsState(
-        targetValue = if (searchExpanded) 56.dp else 168.dp,
-        animationSpec = tween(420, easing = FastOutSlowInEasing),
-        label = "composeWidth"
+    val springDp = spring<androidx.compose.ui.unit.Dp>(
+        dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium
     )
-    val searchX by animateDpAsState(
-        targetValue = if (searchExpanded) 0.dp else 176.dp,
-        animationSpec = tween(460, easing = FastOutSlowInEasing),
-        label = "searchPosition"
+    val springFloat = spring<Float>(
+        dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium
     )
-    val composeX by animateDpAsState(
-        targetValue = if (searchExpanded) 176.dp else 0.dp,
-        animationSpec = tween(460, easing = FastOutSlowInEasing),
-        label = "composePosition"
+    val dockWidth by animateDpAsState(
+        targetValue = if (isScrolling) collapsedDockWidth else expandedDockWidth,
+        animationSpec = springDp, label = "dockWidth"
     )
-
-    Box(modifier = modifier.width(232.dp).height(64.dp)) {
-        MorphAction(
-            label = "Search",
-            expanded = searchExpanded,
-            width = searchWidth,
-            x = searchX,
-            onClick = onSearch,
-            modifier = Modifier.align(Alignment.CenterStart)
-        )
-        MorphAction(
-            label = "Compose",
-            expanded = !searchExpanded,
-            width = composeWidth,
-            x = composeX,
-            onClick = onCompose,
-            modifier = Modifier.align(Alignment.CenterStart)
-        )
-    }
-}
-
-@Composable
-private fun MorphAction(
-    label: String,
-    expanded: Boolean,
-    width: androidx.compose.ui.unit.Dp,
-    x: androidx.compose.ui.unit.Dp,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val corner by animateDpAsState(
-        targetValue = if (expanded) 28.dp else 20.dp,
-        animationSpec = tween(420, easing = FastOutSlowInEasing),
-        label = "${label}Corner"
+    val fabWidth by animateDpAsState(
+        targetValue = if (isScrolling) 0.dp else 64.dp,
+        animationSpec = springDp, label = "fabWidth"
     )
-    val elevation by animateDpAsState(
-        targetValue = if (expanded) 5.dp else 2.dp,
-        animationSpec = tween(300),
-        label = "${label}Elevation"
+    val fabSpacing by animateDpAsState(
+        targetValue = if (isScrolling) 0.dp else 12.dp,
+        animationSpec = springDp, label = "fabSpacing"
     )
-    val tint by animateFloatAsState(
-        targetValue = if (expanded) 1f else 0f,
-        animationSpec = tween(360),
-        label = "${label}Tint"
-    )
-    val container = androidx.compose.ui.graphics.lerp(
-        MaterialTheme.colorScheme.surfaceContainerHigh,
-        MaterialTheme.colorScheme.primaryContainer,
-        tint
-    )
-    val content = androidx.compose.ui.graphics.lerp(
-        MaterialTheme.colorScheme.onSurface,
-        MaterialTheme.colorScheme.onPrimaryContainer,
-        tint
+    val fabAlpha by animateFloatAsState(
+        targetValue = if (isScrolling) 0f else 1f,
+        animationSpec = springFloat, label = "fabAlpha"
     )
 
-    Surface(
-        onClick = onClick,
-        modifier = modifier
-            .offset { IntOffset(x.roundToPx(), 0) }
-            .width(width)
-            .height(56.dp)
-            .shadow(elevation, RoundedCornerShape(corner)),
-        shape = RoundedCornerShape(corner),
-        color = container,
-        contentColor = content
+    Row(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            modifier = Modifier.width(dockWidth).height(64.dp).graphicsLayer {
+                shape = CircleShape
+                clip = false
+                shadowElevation = 6.dp.toPx()
+            },
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            tonalElevation = 1.dp,
+            shadowElevation = 0.dp
         ) {
-            androidx.compose.material3.Icon(
-                imageVector = if (label == "Search") Icons.Default.Search else Icons.Default.Edit,
-                contentDescription = label,
-                modifier = Modifier.size(22.dp)
-            )
-            AnimatedVisibility(
-                visible = expanded,
-                enter = fadeIn(tween(180, delayMillis = 70)) + expandHorizontally(tween(260, delayMillis = 40)),
-                exit = fadeOut(tween(100)) + shrinkHorizontally(tween(180))
+            Row(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row {
-                    Spacer(Modifier.width(9.dp))
-                    Text(label, fontWeight = FontWeight.Medium, fontSize = 14.sp, maxLines = 1)
+                dockTabs.forEachIndexed { index, tab ->
+                    val selected = selectedTab == index
+                    val bg by androidx.compose.animation.animateColorAsState(
+                        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                        animationSpec = tween(180), label = "tabBg_$index"
+                    )
+                    val content by androidx.compose.animation.animateColorAsState(
+                        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                        animationSpec = tween(180), label = "tabContent_$index"
+                    )
+                    Box(
+                        modifier = Modifier.weight(1f).fillMaxHeight()
+                            .clip(CircleShape).background(bg)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = ripple(bounded = true)
+                            ) { onTabSelected(index) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                            Icon(tab.icon, contentDescription = tab.label, tint = content, modifier = Modifier.size(20.dp))
+                            val textAlpha = (1f - collapseFraction * 2.5f).coerceIn(0f, 1f)
+                            if (textAlpha > 0.01f) {
+                                Spacer(Modifier.width((6.dp * (1f - collapseFraction)).coerceAtLeast(0.dp)))
+                                Text(
+                                    text = tab.label, maxLines = 1, softWrap = false,
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                                    ),
+                                    color = content.copy(alpha = textAlpha),
+                                    modifier = Modifier.graphicsLayer { alpha = textAlpha }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (fabWidth > 0.5.dp) {
+            Spacer(Modifier.width(fabSpacing))
+            FilledIconButton(
+                onClick = { },
+                modifier = Modifier.size(fabWidth).graphicsLayer {
+                    alpha = fabAlpha
+                    val scale = (fabWidth / 64.dp).coerceIn(0f, 1f)
+                    scaleX = scale
+                    scaleY = scale
+                    shape = CircleShape
+                    clip = false
+                    shadowElevation = (6.dp * fabAlpha).toPx()
+                },
+                shape = CircleShape,
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            ) {
+                if (fabAlpha > 0.15f && fabWidth > 24.dp) {
+                    Icon(Icons.Rounded.Edit, contentDescription = "Compose", modifier = Modifier.size(24.dp))
                 }
             }
         }
