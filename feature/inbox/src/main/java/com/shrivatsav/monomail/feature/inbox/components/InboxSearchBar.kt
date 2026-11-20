@@ -93,16 +93,11 @@ internal fun InboxSearchBar(
 
     var isExpanded by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
 
-    // Fluid collapse into search bar on system back / predictive back gesture
-    androidx.activity.compose.PredictiveBackHandler(enabled = isExpanded) { progressFlow ->
-        try {
-            progressFlow.collect { }
-            isExpanded = false
-            onQueryChange("")
-            onFocusChange?.invoke(false)
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            // Cancelled
-        }
+    // Fluid collapse into search bar on back gesture / button
+    androidx.activity.compose.BackHandler(enabled = isExpanded) {
+        isExpanded = false
+        onQueryChange("")
+        onFocusChange?.invoke(false)
     }
 
     // If query is cleared externally, collapse if not focused
@@ -465,7 +460,7 @@ private fun AvatarButton(
         contentAlignment = Alignment.Center
     ) {
         AnimatedContent(
-            targetState = userProfile?.accountId ?: "",
+            targetState = userProfile?.id ?: "",
             transitionSpec = {
                 if (swipeDirection >= 0) {
                     (slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { -it } + fadeIn())

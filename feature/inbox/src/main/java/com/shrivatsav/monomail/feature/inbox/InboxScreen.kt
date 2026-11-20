@@ -321,14 +321,14 @@ fun InboxScreen(
                             onOpenFolders = { activeModal = ModalType.FOLDERS },
                             showMarkAllRead = appSettings.showMarkAllRead,
                             onCycleAccount = { direction ->
-                                val curIdx = accounts.indexOfFirst { it.accountId == userProfile?.accountId }
+                                val curIdx = accounts.indexOfFirst { it.id == userProfile?.id }
                                 if (curIdx != -1 && accounts.size > 1) {
                                     val nextIdx = if (direction > 0) {
                                         (curIdx + 1) % accounts.size
                                     } else {
                                         (curIdx - 1 + accounts.size) % accounts.size
                                     }
-                                    viewModel.switchAccount(accounts[nextIdx].accountId)
+                                    viewModel.switchAccount(accounts[nextIdx].id)
                                 }
                             }
                         ),
