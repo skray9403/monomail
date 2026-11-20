@@ -103,6 +103,22 @@ internal fun backCardExit(density: Float = 1f): ExitTransition {
         fadeOut(tween(BackMs - FadeStartMs, delayMillis = FadeStartMs, easing = LinearEasing))
 }
 
+/**
+ * Bottom-sheet style leaving (e.g. Compose page): slides downwards out of screen with subtle scale & fade.
+ */
+internal fun backSheetExit(): ExitTransition {
+    return androidx.compose.animation.slideOutVertically(
+        animationSpec = tween(BackMs, easing = BackEasing),
+        targetOffsetY = { fullHeight -> fullHeight }
+    ) +
+        scaleOut(
+            animationSpec = tween(BackMs, easing = BackEasing),
+            targetScale = ExitScale,
+            transformOrigin = TransformOrigin(0.5f, 0.5f)
+        ) +
+        fadeOut(tween(BackMs - FadeStartMs, delayMillis = FadeStartMs, easing = LinearEasing))
+}
+
 /** Screen underneath: settles from small recessed depth (92%) up to 100% as the card leaves. */
 internal fun backRevealEnter(): EnterTransition =
     scaleIn(

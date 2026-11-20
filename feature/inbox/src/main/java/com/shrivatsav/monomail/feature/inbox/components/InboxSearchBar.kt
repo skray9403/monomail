@@ -3,12 +3,16 @@ package com.shrivatsav.monomail.feature.inbox.components
 import com.shrivatsav.monomail.feature.inbox.*
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.FocusInteraction
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,7 +48,8 @@ data class SearchBarActions(
     val onUndo: () -> Unit,
     val onOpenProfile: () -> Unit,
     val onOpenFolders: () -> Unit = {},
-    val showMarkAllRead: Boolean = true
+    val showMarkAllRead: Boolean = true,
+    val onCycleAccount: ((Int) -> Unit)? = null,
 )
 
 data class BulkSelectionState(
@@ -87,6 +92,18 @@ internal fun InboxSearchBar(
     )
 
     var isExpanded by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+
+    // Fluid collapse into search bar on system back / predictive back gesture
+    androidx.activity.compose.PredictiveBackHandler(enabled = isExpanded) { progressFlow ->
+        try {
+            progressFlow.collect { }
+            isExpanded = false
+            onQueryChange("")
+            onFocusChange?.invoke(false)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // Cancelled
+        }
+    }
 
     // If query is cleared externally, collapse if not focused
     LaunchedEffect(query) {
@@ -331,7 +348,11 @@ private fun SearchTrailingIcon(actions: SearchBarActions, display: SearchDisplay
         if (display.unifiedInboxEnabled && display.accounts.size > 1) {
             StackedAccountAvatars(accounts = display.accounts, onClick = actions.onOpenProfile)
         } else {
-            AvatarButton(userProfile = display.userProfile, onClick = actions.onOpenProfile)
+            AvatarButton(
+                userProfile = display.userProfile,
+                onClick = actions.onOpenProfile,
+                onCycleAccount = actions.onCycleAccount
+            )
         }
     }
 }
@@ -411,31 +432,76 @@ private fun AvatarButton(
     userProfile: UserProfile?,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
+    onCycleAccount: ((Int) -> Unit)? = null,
 ) {
-    if (userProfile != null && !userProfile.photoUrl.isNullOrEmpty()) {
-        AsyncImage(
-            model = userProfile.photoUrl,
-            contentDescription = "Profile",
-            modifier = modifier
-                .size(30.dp)
-                .clip(CircleShape)
-                .clickable(onClick = onClick)
-        )
-    } else {
-        val initial = userProfile?.displayName?.firstOrNull()?.uppercase() ?: "?"
-        Box(
-            modifier = modifier
-                .size(30.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.onSurface)
-                .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                initial,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.background
-            )
+    var dragAccumulator by remember { mutableFloatStateOf(0f) }
+    var swipeDirection by remember { mutableIntStateOf(1) }
+
+    Box(
+        modifier = modifier
+            .size(34.dp)
+            .clip(CircleShape)
+            .pointerInput(userProfile) {
+                if (onCycleAccount != null) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            dragAccumulator += dragAmount
+                        },
+                        onDragEnd = {
+                            if (dragAccumulator > 16f) {
+                                swipeDirection = 1
+                                onCycleAccount(1)
+                            } else if (dragAccumulator < -16f) {
+                                swipeDirection = -1
+                                onCycleAccount(-1)
+                            }
+                            dragAccumulator = 0f
+                        }
+                    )
+                }
+            }
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        AnimatedContent(
+            targetState = userProfile?.accountId ?: "",
+            transitionSpec = {
+                if (swipeDirection >= 0) {
+                    (slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { -it } + fadeIn())
+                        .togetherWith(slideOutVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it } + fadeOut())
+                } else {
+                    (slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it } + fadeIn())
+                        .togetherWith(slideOutVertically(spring(stiffness = Spring.StiffnessMediumLow)) { -it } + fadeOut())
+                }
+            },
+            label = "googleAvatarSwipe"
+        ) { _ ->
+            if (userProfile != null && !userProfile.photoUrl.isNullOrEmpty()) {
+                AsyncImage(
+                    model = userProfile.photoUrl,
+                    contentDescription = "Profile",
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                )
+            } else {
+                val initial = userProfile?.displayName?.firstOrNull()?.uppercase() ?: "?"
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        initial,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
         }
     }
 }

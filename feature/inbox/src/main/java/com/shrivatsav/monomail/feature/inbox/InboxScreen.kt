@@ -294,16 +294,10 @@ fun InboxScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // ModalBottomSheet and Material dialogs provide their own scrim.
-            // Keep the inbox sharp beneath them; applying RenderEffect blur here
-            // made account switching look washed out and added unnecessary GPU work.
-            val shouldBlur =
-                longPressedThread != null || threadToDelete != null || showWelcomePrompt
-
+            // Standard Material 3 scrims on ModalBottomSheet and Dialogs
+            // keep the inbox sharp and responsive beneath modal overlays.
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(if (shouldBlur) Modifier.blur(12.dp) else Modifier)
+                modifier = Modifier.fillMaxSize()
             ) {
                 Column(
                     modifier = Modifier
@@ -325,7 +319,18 @@ fun InboxScreen(
                             onUndo = { viewModel.undoAction() },
                             onOpenProfile = { activeModal = ModalType.PROFILE },
                             onOpenFolders = { activeModal = ModalType.FOLDERS },
-                            showMarkAllRead = appSettings.showMarkAllRead
+                            showMarkAllRead = appSettings.showMarkAllRead,
+                            onCycleAccount = { direction ->
+                                val curIdx = accounts.indexOfFirst { it.accountId == userProfile?.accountId }
+                                if (curIdx != -1 && accounts.size > 1) {
+                                    val nextIdx = if (direction > 0) {
+                                        (curIdx + 1) % accounts.size
+                                    } else {
+                                        (curIdx - 1 + accounts.size) % accounts.size
+                                    }
+                                    viewModel.switchAccount(accounts[nextIdx].accountId)
+                                }
+                            }
                         ),
                         isRefreshing = isRefreshing,
                         bulkSelection = BulkSelectionState(

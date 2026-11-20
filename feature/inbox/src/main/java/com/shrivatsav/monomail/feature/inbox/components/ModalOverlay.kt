@@ -2,10 +2,15 @@ package com.shrivatsav.monomail.feature.inbox.components
 
 import com.shrivatsav.monomail.feature.inbox.*
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FolderOpen
@@ -67,11 +72,25 @@ internal fun ModalOverlay(
     when (activeModal) {
         ModalType.ADD_ACCOUNT -> {
             val vm: com.shrivatsav.monomail.feature.auth.SignInViewModel = hiltViewModel()
-            com.shrivatsav.monomail.feature.auth.ProviderSelectionDialog(
-                viewModel = vm,
-                onSuccess = callbacks.onDismiss,
-                onNavigateToImapSetup = callbacks.onNavigateToImapSetup,
-            )
+            Dialog(
+                onDismissRequest = callbacks.onDismiss,
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false
+                )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    com.shrivatsav.monomail.feature.auth.ProviderSelectionDialog(
+                        viewModel = vm,
+                        onSuccess = callbacks.onDismiss,
+                        onNavigateToImapSetup = callbacks.onNavigateToImapSetup,
+                    )
+                }
+            }
         }
         ModalType.PROFILE, ModalType.SWITCH_ACCOUNT, ModalType.FOLDERS -> {
             ModalBottomSheet(

@@ -338,7 +338,7 @@ fun NavGraph(
     }
     dockController.mode = activeDockMode
     dockController.onBackClick = { navController.popBackStack() }
-    if (activeDockMode != DockMode.INBOX) {
+    if (activeDockMode != DockMode.INBOX && activeDockMode != DockMode.SETTINGS) {
         dockController.isScrolling = false
         dockController.isSearchActive = false
     }
@@ -368,7 +368,8 @@ fun NavGraph(
             },
             popExitTransition = {
                 when (routeType(initialState.destination.route)) {
-                    "drill", "compose" -> backCardExit(density)
+                    "compose" -> backSheetExit()
+                    "drill" -> backCardExit(density)
                     else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
                 }
             },

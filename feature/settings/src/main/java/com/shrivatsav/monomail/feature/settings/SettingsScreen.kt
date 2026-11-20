@@ -213,10 +213,34 @@ private fun SettingsHubScreen(
         contentWindowInsets = WindowInsets.statusBars,
     ) { padding ->
         val dockController = com.shrivatsav.monomail.ui.components.LocalFloatingDockController.current
+        val scrollConnection = remember {
+            object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+                private var accumulated = 0f
+                private val threshold = 28f
+
+                override fun onPreScroll(
+                    available: androidx.compose.ui.geometry.Offset,
+                    source: androidx.compose.ui.input.nestedscroll.NestedScrollSource
+                ): androidx.compose.ui.geometry.Offset {
+                    val dy = available.y
+                    accumulated += dy
+                    if (accumulated < -threshold) {
+                        dockController.isScrolling = true
+                        accumulated = 0f
+                    } else if (accumulated > threshold) {
+                        dockController.isScrolling = false
+                        accumulated = 0f
+                    }
+                    return androidx.compose.ui.geometry.Offset.Zero
+                }
+            }
+        }
         androidx.compose.runtime.DisposableEffect(Unit) {
             dockController.onSettingsQueryChange = { dockController.settingsQuery = it }
+            dockController.isScrolling = false
             onDispose {
                 dockController.settingsQuery = ""
+                dockController.isScrolling = false
             }
         }
         val searchQuery = dockController.settingsQuery
@@ -224,6 +248,7 @@ private fun SettingsHubScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .nestedScroll(scrollConnection)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .padding(bottom = 96.dp),

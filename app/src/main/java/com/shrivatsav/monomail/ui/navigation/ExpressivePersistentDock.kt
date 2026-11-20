@@ -56,12 +56,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.shrivatsav.monomail.ui.components.DockMode
 import com.shrivatsav.monomail.ui.components.FloatingDockController
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -69,10 +73,13 @@ import kotlin.math.roundToInt
  *
  * Implements:
  * 1. Dual separate floating elements without background container clutter.
- * 2. 1:1 continuous touch-synchronized sliding tab indicator for Inbox, Sent, and Archived.
- * 3. Surface with CircleShape & 6.dp soft shadow elevation, perfectly elevated above system insets.
- * 4. Smooth morphing transitions across Home, Thread Detail, Settings, and Compose.
- * 5. Automatic fluid slide-down dismissal when search is active or list is scrolling.
+ * 2. 56dp height substantial architecture across all destinations.
+ * 3. Dynamic 1:1 continuous swipe tab pill: selected = [Icon + Bold Label], unselected = [Icon].
+ * 4. Directional scroll contraction: scrolling down into content contracts tabs into compact 3-icon pill
+ *    [Icon] [Icon] [Icon] and FAB to 46dp; stopping retains collapsed shape; scrolling in opposite direction expands.
+ * 5. Surface with CircleShape & 6.dp soft shadow elevation, perfectly elevated above system insets.
+ * 6. Calm Crossfade morphing transitions across Home, Thread Detail, Settings, and Compose.
+ * 7. Clean slide-down dismissal strictly when search is active.
  */
 @Composable
 internal fun ExpressivePersistentDock(
@@ -83,11 +90,10 @@ internal fun ExpressivePersistentDock(
     if (dockController.mode == DockMode.HIDDEN) return
 
     val isHidden = (dockController.mode == DockMode.INBOX) && dockController.isSearchActive
-    val isScrolling = (dockController.mode == DockMode.INBOX) && dockController.isScrolling
 
-    // Vertical hide/reveal offset on scroll fling or search focus
+    // Vertical hide offset ONLY when search is active (scrolling contracts rather than hides)
     val animatedOffsetY by animateDpAsState(
-        targetValue = if (isHidden || isScrolling) 140.dp else 0.dp,
+        targetValue = if (isHidden) 140.dp else 0.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMedium
@@ -137,46 +143,53 @@ private fun LeftDockElement(
         shape = CircleShape,
         color = containerColor,
         shadowElevation = 6.dp,
-        modifier = modifier.animateContentSize(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessMediumLow
-            )
-        )
+        modifier = modifier
     ) {
-        AnimatedContent(
-            targetState = mode,
-            transitionSpec = {
-                (fadeIn(tween(160, delayMillis = 40)) + scaleIn(tween(160, delayMillis = 40), initialScale = 0.92f))
-                    .togetherWith(fadeOut(tween(90)) + scaleOut(tween(90), targetScale = 0.92f))
-            },
-            label = "leftDockContent"
-        ) { targetMode ->
-            when (targetMode) {
-                DockMode.INBOX -> {
-                    InboxSlidingTabs(
-                        continuousPosition = dockController.continuousTabPosition,
-                        onTabClick = { dockController.onTabSelected(it) }
-                    )
+        Box(
+            modifier = Modifier.animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
+        ) {
+            AnimatedContent(
+                targetState = mode,
+                transitionSpec = {
+                    (fadeIn(tween(160, delayMillis = 30)) + scaleIn(tween(160, delayMillis = 30), initialScale = 0.94f))
+                        .togetherWith(fadeOut(tween(100)) + scaleOut(tween(100), targetScale = 0.94f))
+                },
+                label = "leftDockContent"
+            ) { targetMode ->
+                when (targetMode) {
+                    DockMode.INBOX -> {
+                        DynamicSwipeTabPill(
+                            continuousPosition = dockController.continuousTabPosition,
+                            isCollapsed = dockController.isScrolling,
+                            containerHeight = 56.dp,
+                            onTabClick = { dockController.onTabSelected(it) }
+                        )
+                    }
+                    DockMode.THREAD -> {
+                        ReplyActionPill(
+                            onClick = { dockController.onReplyAction?.invoke() }
+                        )
+                    }
+                    DockMode.SETTINGS -> {
+                        SettingsBackBubble(
+                            isCollapsed = dockController.isScrolling,
+                            onClick = { dockController.onBackClick?.invoke() }
+                        )
+                    }
+                    DockMode.COMPOSE -> {
+                        ComposeLeftActions(
+                            onDrafts = { dockController.onDraftsAction?.invoke() },
+                            onAttach = { dockController.onAttachAction?.invoke() },
+                            isSending = dockController.isSending
+                        )
+                    }
+                    else -> Spacer(Modifier.size(0.dp))
                 }
-                DockMode.THREAD -> {
-                    ReplyActionPill(
-                        onClick = { dockController.onReplyAction?.invoke() }
-                    )
-                }
-                DockMode.SETTINGS -> {
-                    SettingsBackBubble(
-                        onClick = { dockController.onBackClick?.invoke() }
-                    )
-                }
-                DockMode.COMPOSE -> {
-                    ComposeLeftActions(
-                        onDrafts = { dockController.onDraftsAction?.invoke() },
-                        onAttach = { dockController.onAttachAction?.invoke() },
-                        isSending = dockController.isSending
-                    )
-                }
-                else -> Spacer(Modifier.size(0.dp))
             }
         }
     }
@@ -203,144 +216,155 @@ private fun RightDockElement(
         shape = CircleShape,
         color = containerColor,
         shadowElevation = 6.dp,
-        modifier = modifier.animateContentSize(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessMediumLow
-            )
-        )
+        modifier = modifier
     ) {
-        AnimatedContent(
-            targetState = mode,
-            transitionSpec = {
-                (fadeIn(tween(160, delayMillis = 40)) + scaleIn(tween(160, delayMillis = 40), initialScale = 0.92f))
-                    .togetherWith(fadeOut(tween(90)) + scaleOut(tween(90), targetScale = 0.92f))
-            },
-            label = "rightDockContent"
-        ) { targetMode ->
-            when (targetMode) {
-                DockMode.INBOX -> {
-                    IconButton(
-                        onClick = onComposeClick,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Edit,
-                            contentDescription = "Compose",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(22.dp)
+        Box(
+            modifier = Modifier.animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
+        ) {
+            AnimatedContent(
+                targetState = mode,
+                transitionSpec = {
+                    (fadeIn(tween(160, delayMillis = 30)) + scaleIn(tween(160, delayMillis = 30), initialScale = 0.94f))
+                        .togetherWith(fadeOut(tween(100)) + scaleOut(tween(100), targetScale = 0.94f))
+                },
+                label = "rightDockContent"
+            ) { targetMode ->
+                when (targetMode) {
+                    DockMode.INBOX -> {
+                        val fabSize by animateDpAsState(
+                            targetValue = if (dockController.isScrolling) 46.dp else 56.dp,
+                            animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                            label = "composeFabSize"
+                        )
+                        IconButton(
+                            onClick = onComposeClick,
+                            modifier = Modifier.size(fabSize)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Edit,
+                                contentDescription = "Compose",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(if (dockController.isScrolling) 20.dp else 22.dp)
+                            )
+                        }
+                    }
+                    DockMode.THREAD -> {
+                        ForwardActionPill(
+                            onClick = { dockController.onForwardAction?.invoke() }
                         )
                     }
+                    DockMode.SETTINGS -> {
+                        SettingsTitlePill(
+                            title = dockController.settingsTitle,
+                            isCollapsed = dockController.isScrolling
+                        )
+                    }
+                    DockMode.COMPOSE -> {
+                        ComposeSendPill(
+                            canSend = dockController.canSend,
+                            isSending = dockController.isSending,
+                            onSend = { dockController.onSendAction?.invoke() }
+                        )
+                    }
+                    else -> Spacer(Modifier.size(0.dp))
                 }
-                DockMode.THREAD -> {
-                    ForwardActionPill(
-                        onClick = { dockController.onForwardAction?.invoke() }
-                    )
-                }
-                DockMode.SETTINGS -> {
-                    SettingsTitlePill(
-                        title = dockController.settingsTitle
-                    )
-                }
-                DockMode.COMPOSE -> {
-                    ComposeSendPill(
-                        canSend = dockController.canSend,
-                        isSending = dockController.isSending,
-                        onSend = { dockController.onSendAction?.invoke() }
-                    )
-                }
-                else -> Spacer(Modifier.size(0.dp))
             }
         }
     }
 }
 
 /**
- * 1:1 Continuous Sliding Tab Indicator matching Google Messages.
- * Tracks pager touch swipes in real time via continuous position interpolation.
+ * Dynamic 1:1 Continuous Swipe Tab Pill:
+ * - At rest: Selected tab = [Icon + Bold Label], unselected = [Icon only].
+ * - During swipe: Shifts through compact 3-icon state [Icon] [Icon] [Icon], smoothly expanding target label.
+ * - Directional scroll: Collapses into compact 3-icon state when scrolling down; stays collapsed; regains full shape on opposite swipe!
  */
 @Composable
-private fun InboxSlidingTabs(
+private fun DynamicSwipeTabPill(
     continuousPosition: Float,
+    isCollapsed: Boolean,
+    containerHeight: androidx.compose.ui.unit.Dp,
     onTabClick: (Int) -> Unit
 ) {
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val tabWidthDp = 76.dp
-    val tabHeightDp = 40.dp
-    val tabWidthPx = with(density) { tabWidthDp.toPx() }
+    val clampedPos = continuousPosition.coerceIn(0f, 2f)
 
+    data class TabInfo(val label: String, val icon: ImageVector, val index: Int)
     val tabs = remember {
         listOf(
-            Triple("Inbox", Icons.Rounded.Inbox, 0),
-            Triple("Sent", Icons.AutoMirrored.Rounded.Send, 1),
-            Triple("Archived", Icons.Rounded.Archive, 2),
+            TabInfo("Inbox", Icons.Rounded.Inbox, 0),
+            TabInfo("Sent", Icons.AutoMirrored.Rounded.Send, 1),
+            TabInfo("Archived", Icons.Rounded.Archive, 2)
         )
     }
 
-    Box(
+    val itemHeight = containerHeight - 12.dp
+
+    Row(
         modifier = Modifier
-            .padding(horizontal = 4.dp, vertical = 4.dp)
-            .height(tabHeightDp),
-        contentAlignment = Alignment.CenterStart
+            .height(containerHeight)
+            .animateContentSize(spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioNoBouncy))
+            .padding(horizontal = 6.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        // Continuous 1:1 Sliding Pill Indicator
-        val clampedPosition = continuousPosition.coerceIn(0f, 2f)
-        val indicatorOffsetPx = clampedPosition * tabWidthPx
+        tabs.forEach { tab ->
+            val dist = abs(clampedPos - tab.index)
+            val baseExpansion = (1f - dist * 2.2f).coerceIn(0f, 1f)
+            val labelExpansion = if (isCollapsed) 0f else baseExpansion
+            val isCurrentSelected = dist < 0.5f
 
-        Box(
-            modifier = Modifier
-                .offset { IntOffset(x = indicatorOffsetPx.roundToInt(), y = 0) }
-                .width(tabWidthDp)
-                .height(tabHeightDp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer)
-        )
+            val containerColor by animateColorAsState(
+                targetValue = if (isCurrentSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                label = "tabContainerColor"
+            )
+            val contentColor by animateColorAsState(
+                targetValue = if (isCurrentSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                label = "tabContentColor"
+            )
 
-        // Tab items on top of sliding indicator
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            tabs.forEach { (label, icon, index) ->
-                val distance = kotlin.math.abs(clampedPosition - index)
-                val activeFraction = (1f - distance).coerceIn(0f, 1f)
-
-                val contentColor = androidx.compose.ui.graphics.lerp(
-                    MaterialTheme.colorScheme.onSurfaceVariant,
-                    MaterialTheme.colorScheme.onPrimaryContainer,
-                    activeFraction
-                )
-
-                Box(
-                    modifier = Modifier
-                        .width(tabWidthDp)
-                        .height(tabHeightDp)
-                        .clip(CircleShape)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(bounded = true),
-                            onClick = { onTabClick(index) }
-                        ),
-                    contentAlignment = Alignment.Center
+            Box(
+                modifier = Modifier
+                    .height(itemHeight)
+                    .clip(CircleShape)
+                    .background(containerColor)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(bounded = true)
+                    ) { onTabClick(tab.index) },
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = (12 + (8 * labelExpansion)).dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = label,
-                            tint = contentColor,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
+                    Icon(
+                        imageVector = tab.icon,
+                        contentDescription = tab.label,
+                        tint = contentColor,
+                        modifier = Modifier.size((20 + (2 * labelExpansion)).dp)
+                    )
+
+                    if (labelExpansion > 0.05f) {
+                        Spacer(Modifier.width((6 * labelExpansion).dp))
                         Text(
-                            text = label,
-                            maxLines = 1,
-                            softWrap = false,
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = if (activeFraction > 0.5f) FontWeight.Bold else FontWeight.Medium
-                            ),
-                            color = contentColor
+                            text = tab.label,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = contentColor,
+                            modifier = Modifier.graphicsLayer {
+                                alpha = labelExpansion
+                                scaleX = 0.85f + (0.15f * labelExpansion)
+                                scaleY = 0.85f + (0.15f * labelExpansion)
+                            },
+                            maxLines = 1
                         )
                     }
                 }
@@ -355,14 +379,14 @@ private fun ReplyActionPill(
 ) {
     Box(
         modifier = Modifier
-            .height(48.dp)
+            .height(56.dp)
             .clip(CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(bounded = true),
                 onClick = onClick
             )
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -378,7 +402,7 @@ private fun ReplyActionPill(
             Spacer(Modifier.width(8.dp))
             Text(
                 text = "Reply",
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
         }
@@ -391,14 +415,14 @@ private fun ForwardActionPill(
 ) {
     Box(
         modifier = Modifier
-            .height(48.dp)
+            .height(56.dp)
             .clip(CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(bounded = true),
                 onClick = onClick
             )
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -414,7 +438,7 @@ private fun ForwardActionPill(
             Spacer(Modifier.width(8.dp))
             Text(
                 text = "Forward",
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -423,11 +447,17 @@ private fun ForwardActionPill(
 
 @Composable
 private fun SettingsBackBubble(
+    isCollapsed: Boolean,
     onClick: () -> Unit
 ) {
+    val bubbleSize by animateDpAsState(
+        targetValue = if (isCollapsed) 46.dp else 56.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "settingsBubbleSize"
+    )
     IconButton(
         onClick = onClick,
-        modifier = Modifier.size(48.dp)
+        modifier = Modifier.size(bubbleSize)
     ) {
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
@@ -440,12 +470,18 @@ private fun SettingsBackBubble(
 
 @Composable
 private fun SettingsTitlePill(
-    title: String
+    title: String,
+    isCollapsed: Boolean
 ) {
+    val horizPadding by animateDpAsState(
+        targetValue = if (isCollapsed) 16.dp else 28.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "settingsTitlePadding"
+    )
     Box(
         modifier = Modifier
-            .height(48.dp)
-            .padding(horizontal = 24.dp),
+            .height(56.dp)
+            .padding(horizontal = horizPadding),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -466,12 +502,12 @@ private fun ComposeLeftActions(
 ) {
     Row(
         modifier = Modifier
-            .height(48.dp)
+            .height(56.dp)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        IconButton(onClick = onDrafts, enabled = !isSending, modifier = Modifier.size(40.dp)) {
+        IconButton(onClick = onDrafts, enabled = !isSending, modifier = Modifier.size(44.dp)) {
             Icon(
                 imageVector = Icons.Rounded.Drafts,
                 contentDescription = "Drafts",
@@ -479,7 +515,7 @@ private fun ComposeLeftActions(
                 modifier = Modifier.size(20.dp)
             )
         }
-        IconButton(onClick = onAttach, enabled = !isSending, modifier = Modifier.size(40.dp)) {
+        IconButton(onClick = onAttach, enabled = !isSending, modifier = Modifier.size(44.dp)) {
             Icon(
                 imageVector = Icons.Rounded.AttachFile,
                 contentDescription = "Attach",
@@ -498,7 +534,7 @@ private fun ComposeSendPill(
 ) {
     Box(
         modifier = Modifier
-            .height(48.dp)
+            .height(56.dp)
             .clip(CircleShape)
             .clickable(
                 enabled = canSend && !isSending,
@@ -506,12 +542,12 @@ private fun ComposeSendPill(
                 indication = ripple(bounded = true),
                 onClick = onSend
             )
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center
     ) {
         if (isSending) {
             LoadingIndicator(
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(22.dp),
                 color = MaterialTheme.colorScheme.onPrimary
             )
         } else {
@@ -523,12 +559,12 @@ private fun ComposeSendPill(
                     imageVector = Icons.AutoMirrored.Rounded.Send,
                     contentDescription = "Send",
                     tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(20.dp)
                 )
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(8.dp))
                 Text(
                     text = "Send",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
                 )
             }
