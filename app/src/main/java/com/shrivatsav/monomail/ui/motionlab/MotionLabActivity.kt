@@ -456,7 +456,7 @@ fun MotionLabMainScreen() {
                 }
 
                 // Floating Toast for Account Switch (Google apps style)
-                AnimatedVisibility(
+                androidx.compose.animation.AnimatedVisibility(
                     visible = accountSwitchedToast != null,
                     enter = fadeIn(tween(120)) + slideInVertically(spring(stiffness = Spring.StiffnessMedium)) { -40 },
                     exit = fadeOut(tween(120)) + slideOutVertically(spring(stiffness = Spring.StiffnessMedium)) { -40 },
