@@ -190,7 +190,7 @@ fun InboxScreen(
     val isBulkMode by viewModel.isBulkSelectMode.collectAsStateWithLifecycle()
     val selectedThreadIds by viewModel.selectedThreadIds.collectAsStateWithLifecycle()
     val selectedCount by viewModel.selectedCount.collectAsStateWithLifecycle()
-    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
+    var isSearchExpanded by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var isSearchFocused by remember { mutableStateOf(false) }
     val isSearchActive = searchFilters.query.isNotEmpty()
     if (isSearchExpanded || isSearchActive || isSearchFocused) {
