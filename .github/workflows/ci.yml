@@ -36,14 +36,30 @@ jobs:
           assembleGithubDebug assemblePlaystoreDebug
           --stacktrace
 
-      - name: Upload debug APKs
+      - name: Package changed Kotlin source files
+        if: success()
+        run: |
+          zip -j monomail-changed-kt-files.zip \
+            app/src/main/java/com/shrivatsav/monomail/ui/navigation/ExpressivePersistentDock.kt \
+            app/src/main/java/com/shrivatsav/monomail/ui/navigation/NavGraph.kt \
+            core/designsystem/src/main/java/com/shrivatsav/monomail/ui/components/FloatingDockController.kt \
+            core/designsystem/src/main/java/com/shrivatsav/monomail/ui/components/InstantPress.kt \
+            feature/compose/src/main/java/com/shrivatsav/monomail/feature/compose/ComposeScreen.kt \
+            feature/detail/src/main/java/com/shrivatsav/monomail/feature/detail/EmailDetailScreen.kt \
+            feature/inbox/src/main/java/com/shrivatsav/monomail/feature/inbox/InboxScreen.kt \
+            feature/settings/src/main/java/com/shrivatsav/monomail/feature/settings/InboxSettingsScreen.kt \
+            feature/settings/src/main/java/com/shrivatsav/monomail/feature/settings/SettingsComponents.kt \
+            feature/settings/src/main/java/com/shrivatsav/monomail/feature/settings/SettingsScreen.kt
+
+      - name: Upload APKs and Kotlin source archive
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: monomail-debug-apks
+          name: monomail-build-outputs
           path: |
             app/build/outputs/apk/github/debug/*.apk
             app/build/outputs/apk/playstore/debug/*.apk
+            monomail-changed-kt-files.zip
           if-no-files-found: error
           retention-days: 14
 
