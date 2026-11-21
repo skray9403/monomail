@@ -28,6 +28,11 @@ class FloatingDockController {
     // Suppress the dock while a modal or bulk-selection surface owns the bottom edge.
     var isSuppressed by mutableStateOf(false)
     var isSpamTab by mutableStateOf(false)
+    var isCollapsed by mutableStateOf(false)
+    var isBulkMode by mutableStateOf(false)
+    var bulkSelectionCount by mutableIntStateOf(0)
+    var onExitBulkMode by mutableStateOf<(() -> Unit)?>(null)
+    var bulkActions by mutableStateOf<List<DockBulkAction>>(emptyList())
 
     // Configurable inbox navigation, preserving the user's primary/overflow tab setup.
     var primaryTabs by mutableStateOf<List<DockTabItem>>(emptyList())
@@ -70,3 +75,10 @@ data class DockTabItem(
 )
 
 val LocalFloatingDockController = compositionLocalOf { FloatingDockController() }
+
+
+data class DockBulkAction(
+    val label: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val onClick: () -> Unit
+)
