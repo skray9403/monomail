@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
@@ -244,6 +245,48 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
     else -> fadeOut(animationSpec = tween(300))
 }
 
+private fun applyComposeIntent(intent: Intent, context: Context, viewModel: com.shrivatsav.monomail.feature.compose.ComposeViewModel) {
+    val resolver = context.contentResolver
+
+    fun addAttachment(uri: Uri) {
+        var name = "attachment"
+        var size = 0L
+        resolver.query(uri, null, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (nameIndex >= 0) name = cursor.getString(nameIndex) ?: name
+                if (sizeIndex >= 0) size = cursor.getLong(sizeIndex)
+            }
+        }
+        val mimeType = resolver.getType(uri) ?: "application/octet-stream"
+        viewModel.addAttachment(EmailAttachment(uri = uri, name = name, size = size, mimeType = mimeType))
+    }
+
+    val sharedText = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty()
+    val sharedSubject = intent.getStringExtra(Intent.EXTRA_SUBJECT).orEmpty()
+    if (sharedSubject.isNotBlank()) viewModel.updateSubject(sharedSubject)
+    if (sharedText.isNotBlank()) viewModel.updateBody(sharedText)
+
+    val mailto = intent.data?.takeIf { it.scheme.equals("mailto", ignoreCase = true) }
+    if (mailto != null) {
+        val address = mailto.schemeSpecificPart.substringBefore("?").trim()
+        if (address.isNotBlank()) viewModel.updateTo(Uri.decode(address))
+        mailto.getQueryParameter("subject")?.let(viewModel::updateSubject)
+        mailto.getQueryParameter("body")?.let(viewModel::updateBody)
+    }
+
+    val attachmentUris = LinkedHashSet<Uri>()
+    (intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri)?.let(attachmentUris::add)
+    intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.forEach(attachmentUris::add)
+    intent.clipData?.let { clip ->
+        for (index in 0 until clip.itemCount) {
+            clip.getItemAt(index).uri?.let(attachmentUris::add)
+        }
+    }
+    attachmentUris.forEach(::addAttachment)
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun NavGraph(
@@ -304,12 +347,13 @@ fun NavGraph(
     ) {
         ReauthDialog(authManager, navController, scope)
 
+        val motionScheme = MaterialTheme.motionScheme
         NavHost(
             navController = navController,
             startDestination = startDestination,
-            enterTransition = { slideInForRoute(MaterialTheme.motionScheme) },
-            exitTransition = { slideOutForRoute(MaterialTheme.motionScheme) },
-            popEnterTransition = { fadeIn(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()) },
+            enterTransition = { slideInForRoute(motionScheme) },
+            exitTransition = { slideOutForRoute(motionScheme) },
+            popEnterTransition = { fadeIn(animationSpec = motionScheme.fastEffectsSpec()) },
             popExitTransition = { popExitForRoute() }
         ) {
             composable(Screen.Onboarding.route) {
