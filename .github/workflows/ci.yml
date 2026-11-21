@@ -36,6 +36,17 @@ jobs:
           assembleGithubDebug assemblePlaystoreDebug
           --stacktrace
 
+      - name: Upload debug APKs
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: monomail-debug-apks
+          path: |
+            app/build/outputs/apk/github/debug/*.apk
+            app/build/outputs/apk/playstore/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
   backend:
     name: Backend typecheck and tests
     runs-on: blacksmith-4vcpu-ubuntu-2404
