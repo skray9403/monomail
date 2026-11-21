@@ -319,7 +319,7 @@ private fun DynamicSwipeTabPill(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(CircleShape)
-                            .clickableOnPress { showOverflow = !showOverflow },
+                            .clickableOnRelease { showOverflow = !showOverflow },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -426,7 +426,7 @@ private fun ForwardActionPill(onClick: () -> Unit) {
         modifier = Modifier
             .height(56.dp)
             .clip(CircleShape)
-            .clickableOnPress(onPressDown = onClick)
+            .clickableOnRelease(onClick = onClick)
             .padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center
     ) {
