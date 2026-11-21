@@ -28,6 +28,19 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@41ad77ca97e46ee2e825d5e6b9a95d8169fcc44c # v4.4.2
 
+      - name: Restore persistent debug signing key
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEBUG_KEYSTORE_BASE64:-}" ]; then
+            echo "::error::DEBUG_KEYSTORE_BASE64 secret is required so OAuth SHA-1 remains stable across CI builds."
+            exit 1
+          fi
+          mkdir -p "$HOME/.android"
+          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+          test -s "$HOME/.android/debug.keystore"
+
       # The Play Store flavor reads its OAuth client ID from secrets.properties.
       # Without this step CI would still build a valid APK, but Gmail sign-in
       # would fail at runtime because both app/core:pgp BuildConfig fields are blank.
@@ -50,6 +63,15 @@ jobs:
           testGithubDebugUnitTest testPlaystoreDebugUnitTest
           assembleGithubDebug assemblePlaystoreDebug
           --stacktrace
+
+      - name: Report APK signing certificate fingerprints
+        run: |
+          set -euo pipefail
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
+          for APK in app/build/outputs/apk/github/debug/*.apk app/build/outputs/apk/playstore/debug/*.apk; do
+            echo "### $(basename "$APK")" >> "$GITHUB_STEP_SUMMARY"
+            "$APKSIGNER" verify --print-certs "$APK" >> "$GITHUB_STEP_SUMMARY"
+          done
 
       - name: Verify Play Store OAuth client ID was compiled
         run: |
