@@ -441,7 +441,7 @@ private fun CategoryCard(
         tonalElevation = 0.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .clickableOnPress(onPressDown = onClick)
+            .clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier
