@@ -175,6 +175,14 @@ fun InboxScreen(
             coroutineScope.launch { snackbarHostState.showSnackbar("No spam to move") }
         }
     }
+    val latestDockTabAction = rememberUpdatedState<(String) -> Unit> { id ->
+        DockTabId.entries.firstOrNull { it.name == id }?.let { viewModel.switchTab(it.toInboxTab()) }
+    }
+    val latestDockComposeAction = rememberUpdatedState(
+        if (immediateTab == InboxTab.SPAM) onMoveSpamToTrash else navActions.onCompose
+    )
+    val stableDockTabAction = remember(dockController) { { id: String -> latestDockTabAction.value(id) } }
+    val stableDockComposeAction = remember(dockController) { { latestDockComposeAction.value() } }
     SideEffect {
         val primaryIds = appSettings.dockConfig.primaryTabs
         val allIds = DockTabId.entries.filter { it != DockTabId.UNIFIED }
@@ -198,14 +206,8 @@ fun InboxScreen(
             threadToDelete != null || showBackfillDialog ||
             showPerformanceWarningDialog || showWelcomePrompt
         dockController.isSpamTab = immediateTab == InboxTab.SPAM
-        dockController.onTabSelected = { id ->
-            DockTabId.entries.firstOrNull { it.name == id }?.let { viewModel.switchTab(it.toInboxTab()) }
-        }
-        dockController.onComposeAction = if (immediateTab == InboxTab.SPAM) {
-            onMoveSpamToTrash
-        } else {
-            navActions.onCompose
-        }
+        dockController.onTabSelected = stableDockTabAction
+        dockController.onComposeAction = stableDockComposeAction
     }
 
     LaunchedEffect(viewModel) {

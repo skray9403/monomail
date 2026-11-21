@@ -444,10 +444,18 @@ fun ComposeScreen(
     val contentResolver = context.contentResolver
     var showAttachmentPicker by remember { mutableStateOf(false) }
     val dockController = LocalFloatingDockController.current
+    val latestDraftsAction = rememberUpdatedState<() -> Unit> { showDrafts = true }
+    val latestAttachAction = rememberUpdatedState<() -> Unit> { showAttachmentPicker = true }
+    val latestSendAction = rememberUpdatedState<() -> Unit> {
+        if (canSend && !state.isSending && !state.isSent) viewModel.send()
+    }
+    val stableDraftsAction = remember(dockController) { { latestDraftsAction.value() } }
+    val stableAttachAction = remember(dockController) { { latestAttachAction.value() } }
+    val stableSendAction = remember(dockController) { { latestSendAction.value() } }
     SideEffect {
-        dockController.onDraftsAction = { showDrafts = true }
-        dockController.onAttachAction = { showAttachmentPicker = true }
-        dockController.onSendAction = { if (canSend && !state.isSending && !state.isSent) viewModel.send() }
+        dockController.onDraftsAction = stableDraftsAction
+        dockController.onAttachAction = stableAttachAction
+        dockController.onSendAction = stableSendAction
         dockController.canSend = canSend && !state.isSent
         dockController.isSending = state.isSending
     }

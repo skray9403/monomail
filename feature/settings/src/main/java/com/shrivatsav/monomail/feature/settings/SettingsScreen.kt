@@ -62,11 +62,13 @@ fun SettingsScreen(
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
     val dockController = LocalFloatingDockController.current
+    val latestSettingsBackAction = rememberUpdatedState<() -> Unit> {
+        if (currentSection != null) currentSection = null else onNavigateBack()
+    }
+    val stableSettingsBackAction = remember(dockController) { { latestSettingsBackAction.value() } }
     SideEffect {
         dockController.settingsTitle = currentSection?.title ?: "Settings"
-        dockController.onBackClick = {
-            if (currentSection != null) currentSection = null else onNavigateBack()
-        }
+        dockController.onBackClick = stableSettingsBackAction
     }
 
     val DetailScreen: @Composable (SettingsSection) -> Unit = { section ->

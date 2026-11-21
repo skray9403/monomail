@@ -174,13 +174,17 @@ fun EmailDetailScreen(
             it.isNotBlank() && !it.equals(currentUserEmail, ignoreCase = true)
         }.joinToString(", ").ifEmpty { latest.to }
     }.orEmpty()
+    val latestReplyAction = rememberUpdatedState<(() -> Unit)?>(latestEmail?.let { email ->
+        { onReply(replyTarget, email.subject, latestBody, email.threadId, email.id) }
+    })
+    val latestForwardAction = rememberUpdatedState<(() -> Unit)?>(latestEmail?.let { email ->
+        { onForward(email.subject, latestBody, email.threadId, email.id) }
+    })
+    val stableReplyAction = remember(dockController) { { latestReplyAction.value?.invoke() } }
+    val stableForwardAction = remember(dockController) { { latestForwardAction.value?.invoke() } }
     SideEffect {
-        dockController.onReplyAction = latestEmail?.let { email ->
-            { onReply(replyTarget, email.subject, latestBody, email.threadId, email.id) }
-        }
-        dockController.onForwardAction = latestEmail?.let { email ->
-            { onForward(email.subject, latestBody, email.threadId, email.id) }
-        }
+        dockController.onReplyAction = if (latestReplyAction.value == null) null else stableReplyAction
+        dockController.onForwardAction = if (latestForwardAction.value == null) null else stableForwardAction
     }
 
     Scaffold(
