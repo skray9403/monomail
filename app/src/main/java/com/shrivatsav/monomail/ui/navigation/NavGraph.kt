@@ -6,10 +6,14 @@ import android.provider.OpenableColumns
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -239,10 +243,18 @@ private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.popExitForRoute() = when (routeType(initialState.destination.route)) {
-    "compose" -> slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Down, animationSpec = tween(300)) + fadeOut(animationSpec = tween(300))
-    "drill" -> slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right, animationSpec = tween(300)) + fadeOut(animationSpec = tween(300))
-    else -> fadeOut(animationSpec = tween(300))
+private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.popExitForRoute(
+    motionScheme: MotionScheme
+) = when (routeType(initialState.destination.route)) {
+    "compose" -> slideOutOfContainer(
+        AnimatedContentTransitionScope.SlideDirection.Down,
+        animationSpec = motionScheme.defaultSpatialSpec()
+    ) + fadeOut(animationSpec = motionScheme.fastEffectsSpec())
+    "drill" -> slideOutOfContainer(
+        AnimatedContentTransitionScope.SlideDirection.Right,
+        animationSpec = motionScheme.defaultSpatialSpec()
+    ) + fadeOut(animationSpec = motionScheme.fastEffectsSpec())
+    else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
 }
 
 private fun applyComposeIntent(intent: Intent, context: Context, viewModel: com.shrivatsav.monomail.feature.compose.ComposeViewModel) {
@@ -354,7 +366,7 @@ fun NavGraph(
             enterTransition = { slideInForRoute(motionScheme) },
             exitTransition = { slideOutForRoute(motionScheme) },
             popEnterTransition = { fadeIn(animationSpec = motionScheme.fastEffectsSpec()) },
-            popExitTransition = { popExitForRoute() }
+            popExitTransition = { popExitForRoute(motionScheme) }
         ) {
             composable(Screen.Onboarding.route) {
                 val onboardingScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -690,6 +702,20 @@ fun NavGraph(
             }
         }
 
+        if (dockController.mode != DockMode.HIDDEN && !dockController.isSuppressed) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(144.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.96f))
+                        )
+                    )
+            )
+        }
+
         ExpressivePersistentDock(
             dockController = dockController,
             onComposeClick = {
@@ -699,6 +725,7 @@ fun NavGraph(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
+                .then(if (dockController.mode == DockMode.COMPOSE) Modifier.imePadding() else Modifier)
                 .padding(bottom = 8.dp)
         )
     }
