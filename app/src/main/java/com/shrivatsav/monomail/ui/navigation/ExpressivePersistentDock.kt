@@ -377,8 +377,14 @@ private fun BulkActionsPill(actions: List<com.shrivatsav.monomail.ui.components.
         horizontalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         actions.forEach { action ->
-            IconButton(onClick = action.onClick, modifier = Modifier.size(40.dp)) {
-                Icon(action.icon, contentDescription = action.label, tint = MaterialTheme.colorScheme.onSurface)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .clickableOnRelease(onClick = action.onClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(action.icon, contentDescription = action.label, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
             }
         }
     }
