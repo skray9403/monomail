@@ -583,48 +583,42 @@ internal fun DockBarEditor(
     onConfigChanged: (DockConfig) -> Unit
 ) {
     val allTabs = DockTabId.values().filter { it != DockTabId.UNIFIED }
-    val availableTabs = allTabs.filter { it !in dockConfig.primaryTabs }
+    val primaryTabs = remember(dockConfig.primaryTabs) { dockConfig.visibleTabs() }
+    val availableTabs = allTabs.filter { it !in primaryTabs }
 
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
-            text = "Dock tabs (${dockConfig.primaryTabs.size}/$maxSlots)",
+            text = "Dock tabs (${primaryTabs.size}/$maxSlots)",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp)
         )
         PrimaryTabList(
-            primaryTabs = dockConfig.primaryTabs,
+            primaryTabs = primaryTabs,
+            availableTabs = availableTabs,
             onReorder = { index, direction ->
-                val list = dockConfig.primaryTabs.toMutableList()
+                val list = primaryTabs.toMutableList()
                 val swapIndex = index + direction
                 list[index] = list[swapIndex].also { list[swapIndex] = list[index] }
                 onConfigChanged(DockConfig(primaryTabs = list))
             },
-            onRemove = { index ->
-                val list = dockConfig.primaryTabs.toMutableList().apply { removeAt(index) }
+            onReplace = { index, tabId ->
+                val list = primaryTabs.toMutableList().apply { set(index, tabId) }
                 onConfigChanged(DockConfig(primaryTabs = list))
             }
         )
-        if (availableTabs.isNotEmpty()) {
-            AvailableTabList(
-                availableTabs = availableTabs,
-                canAdd = dockConfig.primaryTabs.size < maxSlots,
-                onAdd = { tabId ->
-                    val list = dockConfig.primaryTabs.toMutableList().apply { add(tabId) }
-                    onConfigChanged(DockConfig(primaryTabs = list))
-                }
-            )
-        }
     }
 }
 
 @Composable
 private fun PrimaryTabList(
     primaryTabs: List<DockTabId>,
+    availableTabs: List<DockTabId>,
     onReorder: (index: Int, direction: Int) -> Unit,
-    onRemove: (index: Int) -> Unit,
+    onReplace: (index: Int, DockTabId) -> Unit,
 ) {
     primaryTabs.forEachIndexed { index, tabId ->
+        var menuExpanded by remember(tabId) { mutableStateOf(false) }
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -632,37 +626,27 @@ private fun PrimaryTabList(
             Icon(dockTabIcon(tabId), contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
             Text(dockTabLabel(tabId), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-            IconButton(onClick = { onReorder(index, -1) }, modifier = Modifier.size(32.dp), enabled = index > 0) {
+            IconButton(onClick = { onReorder(index, -1) }, modifier = Modifier.size(48.dp), enabled = index > 0) {
                 Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Move up", modifier = Modifier.size(18.dp))
             }
-            IconButton(onClick = { onReorder(index, 1) }, modifier = Modifier.size(32.dp), enabled = index < primaryTabs.lastIndex) {
+            IconButton(onClick = { onReorder(index, 1) }, modifier = Modifier.size(48.dp), enabled = index < primaryTabs.lastIndex) {
                 Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Move down", modifier = Modifier.size(18.dp))
             }
-            if (primaryTabs.size > 1) {
-                IconButton(onClick = { onRemove(index) }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Rounded.RemoveCircleOutline, contentDescription = "Remove", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+            Box {
+                IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Rounded.SwapHoriz, contentDescription = "Change ${dockTabLabel(tabId)} destination", modifier = Modifier.size(20.dp))
                 }
-            } else Spacer(Modifier.size(32.dp))
-        }
-    }
-}
-
-@Composable
-private fun AvailableTabList(
-    availableTabs: List<DockTabId>,
-    canAdd: Boolean,
-    onAdd: (DockTabId) -> Unit,
-) {
-    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), thickness = 0.5.dp)
-    Text("Available", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 4.dp))
-    availableTabs.forEach { tabId ->
-        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(dockTabIcon(tabId), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(10.dp))
-            Text(dockTabLabel(tabId), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            if (canAdd) {
-                IconButton(onClick = { onAdd(tabId) }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Rounded.AddCircleOutline, contentDescription = "Add", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    availableTabs.forEach { availableTab ->
+                        DropdownMenuItem(
+                            text = { Text(dockTabLabel(availableTab)) },
+                            leadingIcon = { Icon(dockTabIcon(availableTab), contentDescription = null) },
+                            onClick = {
+                                onReplace(index, availableTab)
+                                menuExpanded = false
+                            }
+                        )
+                    }
                 }
             }
         }

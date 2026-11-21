@@ -57,6 +57,18 @@ data class DockConfig(
         fun normalized(tabs: List<DockTabId>): DockConfig =
             DockConfig(tabs.filter { it != DockTabId.UNIFIED }.distinct().take(MAX_SLOTS).ifEmpty { defaults().primaryTabs })
     }
+
+    /** Returns exactly three visible destinations, filling legacy short configs with defaults. */
+    fun visibleTabs(): List<DockTabId> {
+        val configured = primaryTabs
+            .asSequence()
+            .filter { it != DockTabId.UNIFIED }
+            .distinct()
+            .take(MAX_SLOTS)
+            .toList()
+        return (configured + defaults().primaryTabs.filterNot(configured::contains))
+            .take(MAX_SLOTS)
+    }
 }
 data class EmailTemplate(
     val name: String,

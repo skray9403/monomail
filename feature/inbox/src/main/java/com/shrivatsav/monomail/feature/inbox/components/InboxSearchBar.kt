@@ -28,6 +28,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -300,7 +303,11 @@ private fun SearchTrailingIcon(actions: SearchBarActions, display: SearchDisplay
             }
         }
         if (display.unifiedInboxEnabled && display.accounts.size > 1) {
-            StackedAccountAvatars(accounts = display.accounts, onClick = actions.onOpenProfile)
+            StackedAccountAvatars(
+                accounts = display.accounts,
+                onClick = actions.onOpenProfile,
+                onCycleAccount = actions.onCycleAccount,
+            )
         } else {
             AvatarButton(
                 userProfile = display.userProfile,
@@ -315,16 +322,44 @@ private fun SearchTrailingIcon(actions: SearchBarActions, display: SearchDisplay
 private fun StackedAccountAvatars(
     accounts: List<UserProfile>,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onCycleAccount: ((Int) -> Unit)?,
 ) {
     val maxVisible = 3
     val visible = accounts.take(maxVisible)
     val overflow = accounts.size - maxVisible
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val dragThresholdPx = with(density) { 32.dp.toPx() }
+    val latestOnCycleAccount by rememberUpdatedState(onCycleAccount)
 
     Box(
         modifier = modifier
             .size(48.dp)
-            .clickable(onClick = onClick),
+            .pointerInput(accounts, dragThresholdPx) {
+                var dragAccumulator = 0f
+                detectVerticalDragGestures(
+                    onVerticalDrag = { change, dragAmount ->
+                        change.consume()
+                        dragAccumulator += dragAmount
+                    },
+                    onDragEnd = {
+                        when {
+                            dragAccumulator > dragThresholdPx -> latestOnCycleAccount?.invoke(1)
+                            dragAccumulator < -dragThresholdPx -> latestOnCycleAccount?.invoke(-1)
+                        }
+                        dragAccumulator = 0f
+                    },
+                    onDragCancel = { dragAccumulator = 0f },
+                )
+            }
+            .semantics {
+                contentDescription = "Accounts. Swipe vertically to switch accounts."
+            }
+            .clickable(
+                onClickLabel = "Open account options",
+                role = Role.Button,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center
     ) {
         visible.forEachIndexed { index, account ->
@@ -388,34 +423,40 @@ private fun AvatarButton(
     onClick: () -> Unit,
     onCycleAccount: ((Int) -> Unit)? = null,
 ) {
-    var dragAccumulator by remember { mutableFloatStateOf(0f) }
     var swipeDirection by remember { mutableIntStateOf(1) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val dragThresholdPx = with(density) { 32.dp.toPx() }
+    val latestOnCycleAccount by rememberUpdatedState(onCycleAccount)
 
     Box(
         modifier = modifier
             .size(48.dp)
             .clip(CircleShape)
-            .pointerInput(userProfile) {
-                if (onCycleAccount != null) {
-                    detectVerticalDragGestures(
-                        onVerticalDrag = { change, dragAmount ->
-                            change.consume()
-                            dragAccumulator += dragAmount
-                        },
-                        onDragEnd = {
-                            if (dragAccumulator > 16f) {
+            .pointerInput(userProfile, dragThresholdPx) {
+                var dragAccumulator = 0f
+                detectVerticalDragGestures(
+                    onVerticalDrag = { change, dragAmount ->
+                        change.consume()
+                        dragAccumulator += dragAmount
+                    },
+                    onDragEnd = {
+                        when {
+                            dragAccumulator > dragThresholdPx -> {
                                 swipeDirection = 1
-                                onCycleAccount(1)
-                            } else if (dragAccumulator < -16f) {
-                                swipeDirection = -1
-                                onCycleAccount(-1)
+                                latestOnCycleAccount?.invoke(1)
                             }
-                            dragAccumulator = 0f
+                            dragAccumulator < -dragThresholdPx -> {
+                                swipeDirection = -1
+                                latestOnCycleAccount?.invoke(-1)
+                            }
                         }
-                    )
-                }
+                        dragAccumulator = 0f
+                    },
+                    onDragCancel = { dragAccumulator = 0f },
+                )
             }
-            .clickable(onClick = onClick),
+            .semantics { contentDescription = "Account. Swipe vertically to switch accounts." }
+            .clickable(onClickLabel = "Open account options", role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         AnimatedContent(

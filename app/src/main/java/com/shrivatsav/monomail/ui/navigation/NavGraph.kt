@@ -717,8 +717,15 @@ fun NavGraph(
         }
 
         if (currentRoute == Screen.Inbox.route) {
-            StockInboxNavigationBar(
+            MorphingInboxNavigationBar(
                 selectedIndex = appNavigationState.selectedTabIndex,
+                tabs = appNavigationState.navigationTabs,
+                pagerPosition = {
+                    appNavigationState.pagerState?.let { pagerState ->
+                        pagerState.currentPage + pagerState.currentPageOffsetFraction
+                    } ?: appNavigationState.selectedTabIndex.toFloat()
+                },
+                dockCollapsed = appNavigationState.dockCollapsed,
                 onTabSelected = { appNavigationState.onTabSelected(it) },
                 onCompose = {
                     navController.navigate(Screen.Compose.createRoute()) { launchSingleTop = true }

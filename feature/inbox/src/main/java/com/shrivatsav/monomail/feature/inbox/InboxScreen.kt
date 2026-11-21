@@ -38,6 +38,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.ui.window.DialogProperties
@@ -53,6 +54,10 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.geometry.Offset
 
 import android.net.ConnectivityManager
 import android.net.Network
@@ -68,6 +73,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
 import com.shrivatsav.monomail.core.data.auth.UserProfile
+import com.shrivatsav.monomail.core.data.settings.DockTabId
+import com.shrivatsav.monomail.ui.components.AppNavigationTab
 import com.shrivatsav.monomail.data.model.EmailThread
 import kotlinx.coroutines.launch
 import com.shrivatsav.monomail.core.data.repository.BodyBackfillState
@@ -82,6 +89,62 @@ data class InboxNavActions(
     val onScheduledClick: () -> Unit = {},
     val onNavigateToImapSetup: (String?, String?) -> Unit = { _, _ -> }
 )
+
+private fun DockTabId.toInboxTab(): InboxTab = when (this) {
+    DockTabId.UNIFIED -> InboxTab.UNIFIED
+    DockTabId.INBOX -> InboxTab.INBOX
+    DockTabId.SENT -> InboxTab.SENT
+    DockTabId.ARCHIVED -> InboxTab.ARCHIVED
+    DockTabId.SNOOZED -> InboxTab.SNOOZED
+    DockTabId.STARRED -> InboxTab.STARRED
+    DockTabId.TRASH -> InboxTab.TRASH
+    DockTabId.SPAM -> InboxTab.SPAM
+}
+
+private fun InboxTab.toNavigationTab(): AppNavigationTab = when (this) {
+    InboxTab.UNIFIED, InboxTab.INBOX -> AppNavigationTab(name, "Inbox", Icons.Rounded.Inbox)
+    InboxTab.SENT -> AppNavigationTab(name, "Sent", Icons.AutoMirrored.Rounded.Send)
+    InboxTab.ARCHIVED -> AppNavigationTab(name, "Archived", Icons.Rounded.Archive)
+    InboxTab.SNOOZED -> AppNavigationTab(name, "Snoozed", Icons.Rounded.Schedule)
+    InboxTab.STARRED -> AppNavigationTab(name, "Starred", Icons.Rounded.Star)
+    InboxTab.TRASH -> AppNavigationTab(name, "Trash", Icons.Rounded.Delete)
+    InboxTab.SPAM -> AppNavigationTab(name, "Spam", Icons.Rounded.Report)
+    InboxTab.DRAFTS -> AppNavigationTab(name, "Drafts", Icons.Rounded.Edit)
+}
+
+private class InboxDockScrollConnection(
+    private val collapseThresholdPx: Float,
+    private val expandThresholdPx: Float,
+    private val onCollapse: () -> Unit,
+    private val onExpand: () -> Unit,
+) : NestedScrollConnection {
+    private var accumulatedScroll = 0f
+
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+        val dy = consumed.y
+        if (dy == 0f) return Offset.Zero
+        if (accumulatedScroll != 0f && (accumulatedScroll > 0f) != (dy > 0f)) {
+            accumulatedScroll = 0f
+        }
+        accumulatedScroll += dy
+        when {
+            accumulatedScroll < -collapseThresholdPx -> {
+                onCollapse()
+                accumulatedScroll = 0f
+            }
+            accumulatedScroll > expandThresholdPx -> {
+                onExpand()
+                accumulatedScroll = 0f
+            }
+        }
+        return Offset.Zero
+    }
+
+    fun reset() {
+        accumulatedScroll = 0f
+        onExpand()
+    }
+}
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -98,24 +161,28 @@ fun InboxScreen(
     val syncState by viewModel.inboxSyncState.collectAsStateWithLifecycle()
     val immediateTab by viewModel.currentTab.collectAsStateWithLifecycle()
     val threadsByTab by viewModel.threadsByTab.collectAsStateWithLifecycle()
-    val primaryTabs = remember { listOf(InboxTab.INBOX, InboxTab.SENT, InboxTab.ARCHIVED) }
-    val initialPage = remember {
-        when (immediateTab) {
-            InboxTab.SENT -> 1
-            InboxTab.ARCHIVED -> 2
-            else -> 0
-        }
+    val appSettings by viewModel.appSettingsState.collectAsStateWithLifecycle()
+    val primaryTabs = remember(appSettings.dockConfig.primaryTabs) {
+        appSettings.dockConfig.visibleTabs().map(DockTabId::toInboxTab)
     }
+    val navigationTabs = remember(primaryTabs) { primaryTabs.map(InboxTab::toNavigationTab) }
+    val initialPage = primaryTabs.indexOf(immediateTab).takeIf { it >= 0 } ?: 0
     val pagerState = rememberPagerState(
         initialPage = initialPage,
         pageCount = { primaryTabs.size }
     )
-    val inboxListState = rememberLazyListState()
-    val sentListState = rememberLazyListState()
-    val archivedListState = rememberLazyListState()
     val otherListState = rememberLazyListState()
     val appNavigationState = com.shrivatsav.monomail.ui.components.LocalAppNavigationState.current
     val coroutineScope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val dockScrollConnection = remember(appNavigationState, density) {
+        InboxDockScrollConnection(
+            collapseThresholdPx = with(density) { 28.dp.toPx() },
+            expandThresholdPx = with(density) { 12.dp.toPx() },
+            onCollapse = { appNavigationState.dockCollapsed.value = true },
+            onExpand = { appNavigationState.dockCollapsed.value = false },
+        )
+    }
     var showBackfillDialog by remember { mutableStateOf(false) }
 
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
@@ -135,7 +202,6 @@ fun InboxScreen(
     }
 
     var threadToDelete by remember { mutableStateOf<EmailThread?>(null) }
-    val appSettings by viewModel.appSettingsState.collectAsStateWithLifecycle()
     val is24HourTime = AndroidDateFormat.is24HourFormat(LocalContext.current)
     val searchFilters by viewModel.searchFilters.collectAsStateWithLifecycle()
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
@@ -157,6 +223,29 @@ fun InboxScreen(
     var isSearchExpanded by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var isSearchFocused by remember { mutableStateOf(false) }
     val isSearchActive = searchFilters.query.isNotEmpty()
+    var previousPrimaryTabs by remember { mutableStateOf(primaryTabs) }
+    SideEffect {
+        if (appNavigationState.navigationTabs != navigationTabs) {
+            appNavigationState.navigationTabs = navigationTabs
+        }
+    }
+    DisposableEffect(appNavigationState, pagerState, immediateTab in primaryTabs) {
+        appNavigationState.pagerState = if (immediateTab in primaryTabs) pagerState else null
+        onDispose {
+            if (appNavigationState.pagerState === pagerState) {
+                appNavigationState.pagerState = null
+                appNavigationState.dockCollapsed.value = false
+            }
+        }
+    }
+
+    LaunchedEffect(primaryTabs, immediateTab) {
+        if (immediateTab in previousPrimaryTabs && immediateTab !in primaryTabs) {
+            viewModel.switchTab(primaryTabs.first())
+        }
+        previousPrimaryTabs = primaryTabs
+    }
+
     if (isSearchExpanded || isSearchActive || isSearchFocused) {
         BackHandler {
             isSearchExpanded = false
@@ -166,10 +255,10 @@ fun InboxScreen(
         }
     } else if (isBulkMode) {
         BackHandler { viewModel.exitBulkSelectMode() }
-    } else if (immediateTab != InboxTab.INBOX) {
+    } else if (immediateTab != primaryTabs.first()) {
         BackHandler {
             if (immediateTab !in primaryTabs) {
-                viewModel.switchTab(InboxTab.INBOX)
+                viewModel.switchTab(primaryTabs.first())
             } else {
                 coroutineScope.launch {
                     pagerState.animateScrollToPage(0)
@@ -178,37 +267,43 @@ fun InboxScreen(
         }
     }
 
-    LaunchedEffect(pagerState.currentPage) {
-        val targetTab = primaryTabs[pagerState.currentPage]
+    LaunchedEffect(pagerState.currentPage, primaryTabs) {
+        val targetTab = primaryTabs[pagerState.currentPage.coerceIn(0, primaryTabs.lastIndex)]
         if (immediateTab != targetTab) {
             viewModel.switchTab(targetTab)
         }
-        appNavigationState.selectedTabIndex = pagerState.currentPage
+        appNavigationState.selectedTabIndex = pagerState.currentPage.coerceIn(0, primaryTabs.lastIndex)
     }
-    LaunchedEffect(immediateTab) {
+    LaunchedEffect(immediateTab, primaryTabs) {
         val targetIdx = primaryTabs.indexOf(immediateTab)
         if (targetIdx >= 0 && targetIdx != pagerState.currentPage) {
             pagerState.animateScrollToPage(targetIdx)
         }
         appNavigationState.selectedTabIndex = if (targetIdx >= 0) targetIdx else 0
     }
+    LaunchedEffect(otherListState, immediateTab !in primaryTabs) {
+        if (immediateTab !in primaryTabs) {
+            snapshotFlow {
+                otherListState.firstVisibleItemIndex == 0 && otherListState.firstVisibleItemScrollOffset == 0
+            }.collect { atTop ->
+                if (atTop) dockScrollConnection.reset()
+            }
+        }
+    }
     val motionScheme = MaterialTheme.motionScheme
 
-    val latestImmediateTab by rememberUpdatedState(immediateTab)
-    DisposableEffect(pagerState, viewModel) {
+    DisposableEffect(pagerState, viewModel, primaryTabs) {
         appNavigationState.onTabSelected = { targetIdx ->
-            val targetTab = primaryTabs.getOrNull(targetIdx) ?: InboxTab.INBOX
-            if (latestImmediateTab != targetTab) {
-                viewModel.switchTab(targetTab)
-            }
-            coroutineScope.launch {
-                if (kotlin.math.abs(pagerState.currentPage - targetIdx) > 1) {
-                    pagerState.scrollToPage(targetIdx)
-                } else {
-                    pagerState.animateScrollToPage(
-                        page = targetIdx,
-                        animationSpec = motionScheme.defaultSpatialSpec()
-                    )
+            if (targetIdx in primaryTabs.indices) {
+                coroutineScope.launch {
+                    if (kotlin.math.abs(pagerState.currentPage - targetIdx) > 1) {
+                        pagerState.scrollToPage(targetIdx)
+                    } else {
+                        pagerState.animateScrollToPage(
+                            page = targetIdx,
+                            animationSpec = motionScheme.defaultSpatialSpec()
+                        )
+                    }
                 }
             }
         }
@@ -382,19 +477,27 @@ fun InboxScreen(
                             if (immediateTab in primaryTabs) {
                                 HorizontalPager(
                                     state = pagerState,
+                                    key = { page -> primaryTabs[page] },
                                     modifier = Modifier.fillMaxSize(),
                                     userScrollEnabled = !isSearchActive && !isBulkMode
                                 ) { page ->
                                     val tab = primaryTabs[page]
+                                    val listState = rememberLazyListState()
+                                    val isActivePage = pagerState.currentPage == page
+                                    LaunchedEffect(listState, isActivePage) {
+                                        if (isActivePage) {
+                                            snapshotFlow {
+                                                listState.firstVisibleItemIndex == 0 &&
+                                                    listState.firstVisibleItemScrollOffset == 0
+                                            }.collect { atTop ->
+                                                if (atTop) dockScrollConnection.reset()
+                                            }
+                                        }
+                                    }
                                     val threads = if (isSearchActive && tab == immediateTab) {
                                         searchResults
                                     } else {
                                         threadsByTab[tab] ?: if (tab == immediateTab) s.threads else emptyList()
-                                    }
-                                    val listState = when (tab) {
-                                        InboxTab.SENT -> sentListState
-                                        InboxTab.ARCHIVED -> archivedListState
-                                        else -> inboxListState
                                     }
                                     InboxTabList(
                                         tab = tab,
@@ -411,6 +514,7 @@ fun InboxScreen(
                                         selectedThreadIds = selectedThreadIds,
                                         navBarHeight = navBarHeight,
                                         is24HourTime = is24HourTime,
+                                        modifier = Modifier.nestedScroll(dockScrollConnection),
                                         onEmailClick = { accId, tId, mId -> navActions.onEmailClick(accId, tId, mId) },
                                         onLongClick = { thread ->
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -439,6 +543,7 @@ fun InboxScreen(
                                     selectedThreadIds = selectedThreadIds,
                                     navBarHeight = navBarHeight,
                                     is24HourTime = is24HourTime,
+                                    modifier = Modifier.nestedScroll(dockScrollConnection),
                                     onEmailClick = { accId, tId, mId -> navActions.onEmailClick(accId, tId, mId) },
                                     onLongClick = { thread ->
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -914,9 +1019,9 @@ private fun InboxTabList(
     onThreadToDeleteChange: (EmailThread?) -> Unit,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
-    onSearchServer: (String) -> Unit
+    onSearchServer: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val density = LocalDensity.current
     val shouldLoadMore by remember {
         derivedStateOf {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -961,31 +1066,28 @@ private fun InboxTabList(
         }
     }
     val searchFeatherColor = MaterialTheme.colorScheme.background
-    val searchFeatherBrush = remember(searchFeatherColor) {
-        Brush.verticalGradient(
-            colorStops = arrayOf(
-                0.0f to searchFeatherColor.copy(alpha = 0.96f),
-                0.45f to searchFeatherColor.copy(alpha = 0.72f),
-                1.0f to searchFeatherColor.copy(alpha = 0.0f),
-            ),
-            startY = 0f,
-            endY = with(density) { 30.dp.toPx() },
-        )
-    }
     val pullToRefreshState = rememberPullToRefreshState()
     PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
         state = pullToRefreshState,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
-            .drawWithContent {
-                drawContent()
-                val featherHeight = 30.dp.toPx()
-                drawRect(
-                    brush = searchFeatherBrush,
-                    size = Size(size.width, featherHeight),
+            .drawWithCache {
+                val featherHeight = 36.dp.toPx()
+                val featherBrush = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0.0f to searchFeatherColor.copy(alpha = 0.98f),
+                        0.42f to searchFeatherColor.copy(alpha = 0.70f),
+                        1.0f to searchFeatherColor.copy(alpha = 0f),
+                    ),
+                    startY = 0f,
+                    endY = featherHeight,
                 )
+                onDrawWithContent {
+                    drawContent()
+                    drawRect(brush = featherBrush, size = Size(size.width, featherHeight))
+                }
             },
         indicator = {
             if (pullToRefreshState.distanceFraction > 0f || isRefreshing) {
