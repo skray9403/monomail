@@ -426,6 +426,7 @@ fun ComposeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val canSend = state.to.isNotBlank()
+    val isTablet = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600
     val showSentAnimation = remember { mutableStateOf(false) }
     var showDrafts by remember { mutableStateOf(false) }
     var showQuotedBody by remember(state.originalBody) { mutableStateOf(false) }
@@ -569,6 +570,18 @@ fun ComposeScreen(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             )
+        },
+        bottomBar = {
+            if (isTablet) {
+                ComposeBottomBar(
+                    isSending = state.isSending,
+                    isSent = state.isSent,
+                    canSend = canSend,
+                    onAttach = { showAttachmentPicker = true },
+                    onDraftsClick = { showDrafts = true },
+                    onSend = { viewModel.send() }
+                )
+            }
         },
         snackbarHost = {
             SnackbarHost(hostState = snackbarHostState) {
@@ -1194,6 +1207,73 @@ private fun QuotedBodySection(originalBody: String) {
                 }
             }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ComposeBottomBar(
+    isSending: Boolean,
+    isSent: Boolean,
+    canSend: Boolean,
+    onAttach: () -> Unit,
+    onDraftsClick: () -> Unit,
+    onSend: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(top = 8.dp, bottom = 28.dp)
+    ) {
+        Surface(
+            shape = cornerShape(28.dp),
+            tonalElevation = 6.dp,
+            shadowElevation = 8.dp,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 4.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDraftsClick, enabled = !isSending && !isSent) {
+                    Icon(
+                        imageVector = Icons.Rounded.Drafts,
+                        contentDescription = "Drafts",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                IconButton(onClick = onAttach, enabled = !isSending && !isSent) {
+                    Icon(
+                        imageVector = Icons.Rounded.AttachFile,
+                        contentDescription = "Attach",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.weight(1f))
+                when {
+                    isSending -> LoadingIndicator(
+                        modifier = Modifier.size(36.dp),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    !isSent -> IconButton(
+                        onClick = onSend,
+                        enabled = canSend
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.Send,
+                            contentDescription = "Send",
+                            tint = if (canSend) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

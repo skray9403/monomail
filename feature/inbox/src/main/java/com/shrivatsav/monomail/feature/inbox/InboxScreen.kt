@@ -92,6 +92,7 @@ fun InboxScreen(
     val accounts by viewModel.accounts.collectAsState()
     val syncState by viewModel.inboxSyncState.collectAsState()
     val immediateTab by viewModel.currentTab.collectAsState()
+    val isTablet = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600
     var showBackfillDialog by remember { mutableStateOf(false) }
 
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
@@ -736,6 +737,39 @@ fun InboxScreen(
             }
 
 
+            if (isTablet) AnimatedVisibility(
+                visible = longPressedThread == null && activeModal == null && !isBulkMode,
+                enter = fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.9f),
+                exit = fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.9f),
+                modifier = Modifier.align(Alignment.BottomCenter)
+            ) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 16.dp)
+                    ) {
+                        BottomFabArea(
+                            immediateTab = immediateTab,
+                            appSettings = appSettings,
+                            unifiedInboxEnabled = unifiedInboxEnabled,
+                            navActions = navActions,
+                            viewModel = viewModel,
+                            navBarHeight = navBarHeight,
+                            onMoveSpamToTrash = {
+                            val hasSpamThreads = currentThreads.isNotEmpty()
+                            if (hasSpamThreads) {
+                                showMoveToTrashDialog = true
+                            } else {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("No spam to move")
+                                }
+                            }
+                        },
+                        )
+                    }
+            }
+
+
             AnimatedVisibility(
                 visible = isBulkMode,
                 enter = fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.9f),
@@ -1203,6 +1237,95 @@ fun InboxScreen(
 }
 
 
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun BottomFabArea(
+    immediateTab: InboxTab,
+    appSettings: com.shrivatsav.monomail.core.data.settings.AppSettings,
+    unifiedInboxEnabled: Boolean,
+    navActions: InboxNavActions,
+    viewModel: InboxViewModel,
+    navBarHeight: Dp,
+    onMoveSpamToTrash: () -> Unit,
+) {
+    val tabForDock = immediateTab
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = navBarHeight + 8.dp)
+    ) {
+        BottomDockBar(
+            currentTab = tabForDock,
+            dockConfig = appSettings.dockConfig,
+            unifiedInboxEnabled = unifiedInboxEnabled,
+            appSettings = appSettings,
+            onTabClick = { viewModel.switchTab(it) },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 12.dp, top = 12.dp)
+        ) {
+            AnimatedContent(
+                targetState = when (immediateTab) {
+                    InboxTab.SPAM -> "spam"
+                    else -> "default"
+                },
+                label = "FabIconMorph",
+                transitionSpec = {
+                    (fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.85f)) togetherWith
+                            (fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.85f))
+                }
+            ) { state ->
+                when (state) {
+                    "spam" -> MoveToTrashFab(appSettings) { onMoveSpamToTrash() }
+                    else -> ComposeFab(appSettings, navActions.onCompose)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MoveToTrashFab(appSettings: com.shrivatsav.monomail.core.data.settings.AppSettings, onClick: () -> Unit) {
+    FloatingActionButton(
+        onClick = onClick,
+        containerColor = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shape = CircleShape,
+        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp),
+        modifier = Modifier.height((42 * appSettings.navScale).dp)
+    ) {
+        Row(modifier = Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Icon(Icons.Rounded.Delete, contentDescription = "Move all to trash", modifier = Modifier.size((22 * appSettings.navScale).dp))
+            Text("Trash", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onErrorContainer)
+        }
+    }
+}
+
+@Composable
+private fun ComposeFab(appSettings: com.shrivatsav.monomail.core.data.settings.AppSettings, onClick: () -> Unit) {
+    val fabInteractionSource = remember { MutableInteractionSource() }
+    val isFabPressed by fabInteractionSource.collectIsPressedAsState()
+    val fabScale by animateFloatAsState(
+        targetValue = if (isFabPressed) 0.92f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "fabScale"
+    )
+    FloatingActionButton(
+        onClick = onClick,
+        interactionSource = fabInteractionSource,
+        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        shape = CircleShape,
+        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp),
+        modifier = Modifier.size((52 * appSettings.navScale).dp).graphicsLayer(scaleX = fabScale, scaleY = fabScale)
+    ) {
+        Icon(Icons.Rounded.Edit, contentDescription = "Compose")
+    }
+}
 
 private data class LongPressMenuActions(
     val onEmailClick: () -> Unit,
@@ -1907,24 +2030,4 @@ private fun InboxTab.toDockTabId(): DockTabId = when (this) {
     InboxTab.SPAM -> DockTabId.SPAM
 }
 
-private fun DockTabId.icon(unifiedInboxEnabled: Boolean): ImageVector = when (this) {
-    DockTabId.UNIFIED -> Icons.Rounded.Inbox
-    DockTabId.INBOX -> if (unifiedInboxEnabled) Icons.Rounded.Home else Icons.Rounded.Inbox
-    DockTabId.SENT -> Icons.AutoMirrored.Rounded.Send
-    DockTabId.ARCHIVED -> Icons.Rounded.Archive
-    DockTabId.SNOOZED -> Icons.Rounded.Schedule
-    DockTabId.STARRED -> Icons.Rounded.Star
-    DockTabId.TRASH -> Icons.Rounded.Delete
-    DockTabId.SPAM -> Icons.Rounded.Report
-}
 
-private fun DockTabId.label(unifiedInboxEnabled: Boolean): String = when (this) {
-    DockTabId.UNIFIED -> "Unified"
-    DockTabId.INBOX -> if (unifiedInboxEnabled) "All Mail" else "Inbox"
-    DockTabId.SENT -> "Sent"
-    DockTabId.ARCHIVED -> "Archived"
-    DockTabId.SNOOZED -> "Snoozed"
-    DockTabId.STARRED -> "Starred"
-    DockTabId.TRASH -> "Trash"
-    DockTabId.SPAM -> "Spam"
-}
