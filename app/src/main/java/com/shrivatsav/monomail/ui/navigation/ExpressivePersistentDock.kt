@@ -8,6 +8,7 @@ package com.shrivatsav.monomail.ui.navigation
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -25,8 +26,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.foundation.shape.CircleShape
@@ -43,6 +42,7 @@ import androidx.compose.material.icons.rounded.Inbox
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -67,6 +67,7 @@ import com.shrivatsav.monomail.ui.components.DockMode
 import com.shrivatsav.monomail.ui.components.FloatingDockController
 import com.shrivatsav.monomail.ui.components.DockTabItem
 import com.shrivatsav.monomail.ui.components.clickableOnPress
+import com.shrivatsav.monomail.ui.components.clickableOnRelease
 import kotlin.math.abs
 
 @Composable
@@ -81,7 +82,7 @@ internal fun ExpressivePersistentDock(
     val isHidden = (dockController.mode == DockMode.INBOX) && dockController.isSearchActive
 
     val animatedOffsetY by animateDpAsState(
-        targetValue = if (isHidden) 140.dp else 0.dp,
+        targetValue = if (isHidden || dockController.isCollapsed) 140.dp else 0.dp,
         animationSpec = motionScheme.defaultSpatialSpec(),
         label = "dockOffsetY"
     )
@@ -142,10 +143,11 @@ private fun LeftDockElement(
         ) { targetMode ->
             when (targetMode) {
                 DockMode.INBOX -> {
-                    DynamicSwipeTabPill(
-                        dockController = dockController,
-                        containerHeight = 56.dp
-                    )
+                    if (dockController.isBulkMode) {
+                        BulkSelectionPill(count = dockController.bulkSelectionCount, onExit = { dockController.onExitBulkMode?.invoke() })
+                    } else {
+                        DynamicSwipeTabPill(dockController = dockController, containerHeight = 56.dp)
+                    }
                 }
                 DockMode.THREAD -> {
                     ReplyActionPill(
@@ -211,13 +213,15 @@ private fun RightDockElement(
         ) { targetMode ->
             when (targetMode) {
                 DockMode.INBOX -> {
-                    Box(
+                    if (dockController.isBulkMode) {
+                        BulkActionsPill(actions = dockController.bulkActions)
+                    } else Box(
                         modifier = Modifier
                             .size(56.dp)
                             .clip(CircleShape)
-                            .clickableOnPress(onPressDown = {
+                            .clickableOnRelease {
                                 dockController.onComposeAction?.invoke() ?: onComposeClick()
-                            }),
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -262,8 +266,6 @@ private fun DynamicSwipeTabPill(
         Row(
             modifier = Modifier
                 .height(containerHeight)
-                .widthIn(max = 260.dp)
-                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 4.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -280,34 +282,32 @@ private fun DynamicSwipeTabPill(
                     animationSpec = motionScheme.fastEffectsSpec(),
                     label = "dockTabContent"
                 )
-                Box(
+                Row(
                     modifier = Modifier
-                        .size(width = 76.dp, height = 48.dp)
+                        .height(48.dp)
+                        .animateContentSize(motionScheme.defaultSpatialSpec())
                         .clip(CircleShape)
                         .background(containerColor)
-                        .clickableOnPress { dockController.onTabSelected(tab.id) },
-                    contentAlignment = Alignment.Center
+                        .clickableOnPress { dockController.onTabSelected(tab.id) }
+                        .padding(horizontal = if (selected) 13.dp else 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = tab.icon,
-                            contentDescription = tab.label,
-                            tint = contentColor,
-                            modifier = Modifier.size(19.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
+                    Icon(
+                        imageVector = tab.icon,
+                        contentDescription = tab.label,
+                        tint = contentColor,
+                        modifier = Modifier.size(19.dp)
+                    )
+                    if (selected) {
+                        Spacer(Modifier.width(7.dp))
                         Text(
                             text = tab.label,
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            fontWeight = FontWeight.Bold,
                             color = contentColor,
                             maxLines = 1,
-                            overflow = TextOverflow.Clip,
-                            modifier = Modifier.graphicsLayer { alpha = if (selected) 1f else 0f }
+                            overflow = TextOverflow.Clip
                         )
                     }
                 }
@@ -348,13 +348,48 @@ private fun DynamicSwipeTabPill(
     }
 }
 
+
+@Composable
+private fun BulkSelectionPill(count: Int, onExit: () -> Unit) {
+    Row(
+        modifier = Modifier.height(56.dp).padding(start = 16.dp, end = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "${count} selected",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        IconButton(onClick = onExit, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Rounded.Close, contentDescription = "Exit selection", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun BulkActionsPill(actions: List<com.shrivatsav.monomail.ui.components.DockBulkAction>) {
+    Row(
+        modifier = Modifier.height(56.dp).padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(0.dp)
+    ) {
+        actions.forEach { action ->
+            IconButton(onClick = action.onClick, modifier = Modifier.size(40.dp)) {
+                Icon(action.icon, contentDescription = action.label, tint = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+    }
+}
+
 @Composable
 private fun ReplyActionPill(onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .height(56.dp)
             .clip(CircleShape)
-            .clickableOnPress(onPressDown = onClick)
+            .clickableOnRelease(onClick = onClick)
             .padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -461,7 +496,7 @@ private fun ComposeLeftActions(
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape)
-                .clickableOnPress(enabled = !isSending, onPressDown = onDrafts),
+                .clickableOnRelease(enabled = !isSending, onClick = onDrafts),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -475,7 +510,7 @@ private fun ComposeLeftActions(
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape)
-                .clickableOnPress(enabled = !isSending, onPressDown = onAttach),
+                .clickableOnRelease(enabled = !isSending, onClick = onAttach),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -498,9 +533,9 @@ private fun ComposeSendPill(
         modifier = Modifier
             .height(56.dp)
             .clip(CircleShape)
-            .clickableOnPress(
+            .clickableOnRelease(
                 enabled = canSend && !isSending,
-                onPressDown = onSend
+                onClick = onSend
             )
             .padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center
