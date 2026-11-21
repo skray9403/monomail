@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import kotlinx.coroutines.launch
 
 /**
  * Immediate-action variant for navigation tabs and other reversible selection controls.
@@ -80,12 +81,15 @@ private fun Modifier.pressFeedback(
                 val press = PressInteraction.Press(down.position)
                 interactionSource.tryEmit(press)
                 if (haptic) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                pressScale.animateTo(
-                    targetValue = 0.94f,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
-                )
+                val pressAnimation = launch {
+                    pressScale.animateTo(
+                        targetValue = 0.94f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+                    )
+                }
                 if (fireOnDown) action()
                 val up = waitForUpOrCancellation()
+                pressAnimation.cancel()
                 if (up != null) {
                     interactionSource.tryEmit(PressInteraction.Release(press))
                     if (!fireOnDown) action()
