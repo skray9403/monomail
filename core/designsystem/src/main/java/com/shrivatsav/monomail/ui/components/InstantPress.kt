@@ -1,5 +1,8 @@
 package com.shrivatsav.monomail.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -10,6 +13,7 @@ import androidx.compose.material3.ripple
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -19,47 +23,79 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 
 /**
- * Triggers [onPressDown] immediately on finger contact (pointer-down) rather than
- * waiting for finger lift, matching 1st-party navigation bar / floating pill responsiveness.
- * Use ONLY on stationary chrome (dock pills, FABs, non-scrolling hub items), NOT inside
- * vertically scrollable message lists.
+ * Immediate-action variant for navigation tabs and other reversible selection controls.
+ * The action runs on pointer-down; use clickableOnRelease for destructive/irreversible actions.
  */
 fun Modifier.clickableOnPress(
     enabled: Boolean = true,
     haptic: Boolean = true,
     onPressDown: () -> Unit,
+): Modifier = pressFeedback(
+    enabled = enabled,
+    haptic = haptic,
+    fireOnDown = true,
+    onClick = onPressDown
+)
+
+/** Press feedback starts on contact, but the action only runs on a successful finger lift. */
+fun Modifier.clickableOnRelease(
+    enabled: Boolean = true,
+    haptic: Boolean = true,
+    onClick: () -> Unit,
+): Modifier = pressFeedback(
+    enabled = enabled,
+    haptic = haptic,
+    fireOnDown = false,
+    onClick = onClick
+)
+
+private fun Modifier.pressFeedback(
+    enabled: Boolean,
+    haptic: Boolean,
+    fireOnDown: Boolean,
+    onClick: () -> Unit
 ): Modifier = composed {
     val interactionSource = remember { MutableInteractionSource() }
     val haptics = LocalHapticFeedback.current
+    val pressScale = remember { Animatable(1f) }
 
     this
+        .graphicsLayer {
+            scaleX = pressScale.value
+            scaleY = pressScale.value
+        }
         .semantics(mergeDescendants = true) {
             role = Role.Button
-            if (enabled) {
-                onClick {
-                    onPressDown()
-                    true
-                }
+            if (enabled) onClick {
+                onClick()
+                true
             }
         }
         .indication(interactionSource, ripple(bounded = true))
-        .pointerInput(enabled, onPressDown) {
+        .pointerInput(enabled, fireOnDown, onClick) {
             if (!enabled) return@pointerInput
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
                 down.consume()
                 val press = PressInteraction.Press(down.position)
                 interactionSource.tryEmit(press)
-                if (haptic) {
-                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                }
-                onPressDown()
+                if (haptic) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                pressScale.animateTo(
+                    targetValue = 0.94f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+                )
+                if (fireOnDown) onClick()
                 val up = waitForUpOrCancellation()
                 if (up != null) {
                     interactionSource.tryEmit(PressInteraction.Release(press))
+                    if (!fireOnDown) onClick()
                 } else {
                     interactionSource.tryEmit(PressInteraction.Cancel(press))
                 }
+                pressScale.animateTo(
+                    targetValue = 1f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+                )
             }
         }
 }
