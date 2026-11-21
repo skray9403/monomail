@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.*
 import com.shrivatsav.monomail.core.data.auth.UserProfile
 import com.shrivatsav.monomail.core.data.settings.DockTabId
 import com.shrivatsav.monomail.ui.components.DockTabItem
+import com.shrivatsav.monomail.ui.components.DockMode
 import com.shrivatsav.monomail.ui.components.LocalFloatingDockController
 import com.shrivatsav.monomail.data.model.EmailThread
 import kotlinx.coroutines.launch
@@ -201,10 +202,11 @@ fun InboxScreen(
         )
             .takeIf { it >= 0 }?.toFloat() ?: 0f
         dockController.isSearchActive = isSearchActive || isSearchFocused
-        dockController.isSuppressed = isBulkMode || longPressedThread != null ||
-            activeModal != null || showSnoozePicker || showMoveToTrashDialog ||
-            threadToDelete != null || showBackfillDialog ||
-            showPerformanceWarningDialog || showWelcomePrompt
+        dockController.isSuppressed = dockController.mode == DockMode.INBOX && (
+            isBulkMode || longPressedThread != null || activeModal != null ||
+                showSnoozePicker || showMoveToTrashDialog || threadToDelete != null ||
+                showBackfillDialog || showPerformanceWarningDialog || showWelcomePrompt
+        )
         dockController.isSpamTab = immediateTab == InboxTab.SPAM
         dockController.onTabSelected = stableDockTabAction
         dockController.onComposeAction = stableDockComposeAction
