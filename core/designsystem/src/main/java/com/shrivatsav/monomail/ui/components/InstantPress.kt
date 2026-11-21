@@ -34,7 +34,7 @@ fun Modifier.clickableOnPress(
     enabled = enabled,
     haptic = haptic,
     fireOnDown = true,
-    onClick = onPressDown
+    action = onPressDown
 )
 
 /** Press feedback starts on contact, but the action only runs on a successful finger lift. */
@@ -46,14 +46,14 @@ fun Modifier.clickableOnRelease(
     enabled = enabled,
     haptic = haptic,
     fireOnDown = false,
-    onClick = onClick
+    action = onClick
 )
 
 private fun Modifier.pressFeedback(
     enabled: Boolean,
     haptic: Boolean,
     fireOnDown: Boolean,
-    onClick: () -> Unit
+    action: () -> Unit
 ): Modifier = composed {
     val interactionSource = remember { MutableInteractionSource() }
     val haptics = LocalHapticFeedback.current
@@ -67,12 +67,12 @@ private fun Modifier.pressFeedback(
         .semantics(mergeDescendants = true) {
             role = Role.Button
             if (enabled) onClick {
-                onClick()
+                action()
                 true
             }
         }
         .indication(interactionSource, ripple(bounded = true))
-        .pointerInput(enabled, fireOnDown, onClick) {
+        .pointerInput(enabled, fireOnDown, action) {
             if (!enabled) return@pointerInput
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
@@ -84,11 +84,11 @@ private fun Modifier.pressFeedback(
                     targetValue = 0.94f,
                     animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
                 )
-                if (fireOnDown) onClick()
+                if (fireOnDown) action()
                 val up = waitForUpOrCancellation()
                 if (up != null) {
                     interactionSource.tryEmit(PressInteraction.Release(press))
-                    if (!fireOnDown) onClick()
+                    if (!fireOnDown) action()
                 } else {
                     interactionSource.tryEmit(PressInteraction.Cancel(press))
                 }
