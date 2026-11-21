@@ -340,6 +340,7 @@ fun NavGraph(
     val currentRoute = currentBackStackEntry?.destination?.route
     val isTablet = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600
     LaunchedEffect(currentRoute, isTablet) {
+        dockController.isCollapsed = false
         dockController.isSuppressed = false
         dockController.mode = when {
             isTablet -> DockMode.HIDDEN
