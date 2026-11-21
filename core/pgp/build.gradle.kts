@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.ksp)
@@ -27,7 +29,7 @@ android {
             dimension = "distribution"
             val secretsFile = rootProject.file("secrets.properties")
             val googleClientId = if (secretsFile.exists()) {
-                val props = java.util.Properties()
+                val props = Properties()
                 secretsFile.inputStream().use(props::load)
                 props.getProperty("GOOGLE_CLIENT_ID")?.trim()?.removeSurrounding("\"") ?: ""
             } else ""
