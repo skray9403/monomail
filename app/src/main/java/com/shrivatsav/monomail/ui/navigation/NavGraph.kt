@@ -4,18 +4,27 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -25,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -32,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.composable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
@@ -63,6 +74,9 @@ import com.shrivatsav.monomail.feature.settings.pgp.PgpKeyManagementScreen
 import com.shrivatsav.monomail.feature.settings.SettingsScreen
 import com.shrivatsav.monomail.feature.settings.SettingsViewModel
 import com.shrivatsav.monomail.feature.attachment.AttachmentViewerScreen
+import com.shrivatsav.monomail.ui.components.DockMode
+import com.shrivatsav.monomail.ui.components.FloatingDockController
+import com.shrivatsav.monomail.ui.components.LocalFloatingDockController
 
 sealed class Screen(val route: String) {
     object Onboarding   : Screen("onboarding")
@@ -195,29 +209,94 @@ private fun ReauthDialog(
 
 private fun routeType(route: String?): String = when {
     route?.startsWith("compose") == true -> "compose"
-    route?.startsWith("thread") == true || route?.startsWith("settings") == true -> "thread"
+    route?.startsWith("thread") == true || route?.startsWith("settings") == true -> "drill"
     else -> ""
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.slideInForRoute() = when (routeType(targetState.destination.route)) {
-    "compose" -> slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Up, animationSpec = tween(300)) + fadeIn(animationSpec = tween(300))
-    "thread" -> slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left, animationSpec = tween(300)) + fadeIn(animationSpec = tween(300))
-    else -> fadeIn(animationSpec = tween(300))
+private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.slideInForRoute(
+    motionScheme: MotionScheme
+): EnterTransition = when (routeType(targetState.destination.route)) {
+    "compose" ->
+        slideIntoContainer(
+            AnimatedContentTransitionScope.SlideDirection.Up,
+            animationSpec = motionScheme.defaultSpatialSpec()
+        ) + fadeIn(animationSpec = motionScheme.fastEffectsSpec())
+    "drill" ->
+        slideIntoContainer(
+            AnimatedContentTransitionScope.SlideDirection.Start,
+            animationSpec = motionScheme.defaultSpatialSpec()
+        ) + fadeIn(animationSpec = motionScheme.fastEffectsSpec())
+    else -> fadeIn(animationSpec = motionScheme.fastEffectsSpec())
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.slideOutForRoute() = when (routeType(initialState.destination.route)) {
-    "compose" -> slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Down, animationSpec = tween(300)) + fadeOut(animationSpec = tween(300))
-    "thread" -> slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left, animationSpec = tween(300)) + fadeOut(animationSpec = tween(300))
-    else -> fadeOut(animationSpec = tween(300))
+private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.slideOutForRoute(
+    motionScheme: MotionScheme
+): ExitTransition = when (routeType(targetState.destination.route)) {
+    "compose", "drill" ->
+        fadeOut(
+            animationSpec = motionScheme.fastEffectsSpec(),
+            targetAlpha = 0.92f
+        )
+    else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.popExitForRoute() = when (routeType(initialState.destination.route)) {
-    "compose" -> slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Down, animationSpec = tween(300)) + fadeOut(animationSpec = tween(300))
-    "thread" -> slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right, animationSpec = tween(300)) + fadeOut(animationSpec = tween(300))
-    else -> fadeOut(animationSpec = tween(300))
+private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.popExitForRoute(
+    motionScheme: MotionScheme
+) = when (routeType(initialState.destination.route)) {
+    "compose" -> slideOutOfContainer(
+        AnimatedContentTransitionScope.SlideDirection.Down,
+        animationSpec = motionScheme.defaultSpatialSpec()
+    ) + fadeOut(animationSpec = motionScheme.fastEffectsSpec())
+    "drill" -> slideOutOfContainer(
+        AnimatedContentTransitionScope.SlideDirection.Right,
+        animationSpec = motionScheme.defaultSpatialSpec()
+    ) + fadeOut(animationSpec = motionScheme.fastEffectsSpec())
+    else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
+}
+
+private fun applyComposeIntent(intent: Intent, context: Context, viewModel: com.shrivatsav.monomail.feature.compose.ComposeViewModel) {
+    val resolver = context.contentResolver
+
+    fun addAttachment(uri: Uri) {
+        var name = "attachment"
+        var size = 0L
+        resolver.query(uri, null, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (nameIndex >= 0) name = cursor.getString(nameIndex) ?: name
+                if (sizeIndex >= 0) size = cursor.getLong(sizeIndex)
+            }
+        }
+        val mimeType = resolver.getType(uri) ?: "application/octet-stream"
+        viewModel.addAttachment(EmailAttachment(uri = uri, name = name, size = size, mimeType = mimeType))
+    }
+
+    val sharedText = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty()
+    val sharedSubject = intent.getStringExtra(Intent.EXTRA_SUBJECT).orEmpty()
+    if (sharedSubject.isNotBlank()) viewModel.updateSubject(sharedSubject)
+    if (sharedText.isNotBlank()) viewModel.updateBody(sharedText)
+
+    val mailto = intent.data?.takeIf { it.scheme.equals("mailto", ignoreCase = true) }
+    if (mailto != null) {
+        val address = mailto.schemeSpecificPart.substringBefore("?").trim()
+        if (address.isNotBlank()) viewModel.updateTo(Uri.decode(address))
+        mailto.getQueryParameter("subject")?.let(viewModel::updateSubject)
+        mailto.getQueryParameter("body")?.let(viewModel::updateBody)
+    }
+
+    val attachmentUris = LinkedHashSet<Uri>()
+    (intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri)?.let(attachmentUris::add)
+    intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.forEach(attachmentUris::add)
+    intent.clipData?.let { clip ->
+        for (index in 0 until clip.itemCount) {
+            clip.getItemAt(index).uri?.let(attachmentUris::add)
+        }
+    }
+    attachmentUris.forEach(::addAttachment)
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -256,7 +335,24 @@ fun NavGraph(
         !hasSeenWelcomePrompt -> Screen.Onboarding.route
         else -> Screen.SignIn.route
     }
+    val dockController = remember { FloatingDockController() }
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStackEntry?.destination?.route
+    val isTablet = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600
+    LaunchedEffect(currentRoute, isTablet) {
+        dockController.isCollapsed = false
+        dockController.isSuppressed = false
+        dockController.mode = when {
+            isTablet -> DockMode.HIDDEN
+            currentRoute == Screen.Inbox.route -> DockMode.INBOX
+            currentRoute?.startsWith("thread") == true -> DockMode.THREAD
+            currentRoute?.startsWith("compose") == true -> DockMode.COMPOSE
+            currentRoute == Screen.Settings.route -> DockMode.SETTINGS
+            else -> DockMode.HIDDEN
+        }
+    }
 
+    CompositionLocalProvider(LocalFloatingDockController provides dockController) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -264,13 +360,14 @@ fun NavGraph(
     ) {
         ReauthDialog(authManager, navController, scope)
 
+        val motionScheme = MaterialTheme.motionScheme
         NavHost(
             navController = navController,
             startDestination = startDestination,
-            enterTransition = { slideInForRoute() },
-            exitTransition = { slideOutForRoute() },
-            popEnterTransition = { fadeIn(animationSpec = tween(300)) },
-            popExitTransition = { popExitForRoute() }
+            enterTransition = { slideInForRoute(motionScheme) },
+            exitTransition = { slideOutForRoute(motionScheme) },
+            popEnterTransition = { fadeIn(animationSpec = motionScheme.fastEffectsSpec()) },
+            popExitTransition = { popExitForRoute(motionScheme) }
         ) {
             composable(Screen.Onboarding.route) {
                 val onboardingScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -605,59 +702,33 @@ fun NavGraph(
                 )
             }
         }
-    }
-}
 
-/**
- * Reads display name, size and mime type for a shared content URI.
- */
-private fun readSharedAttachment(context: Context, uri: Uri): EmailAttachment {
-    val resolver = context.contentResolver
-    var name = "attachment"
-    var size = 0L
-    val mime = resolver.getType(uri) ?: "application/octet-stream"
-    resolver.query(uri, null, null, null, null)?.use { c ->
-        if (c.moveToFirst()) {
-            val nameIndex = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            val sizeIndex = c.getColumnIndex(OpenableColumns.SIZE)
-            if (nameIndex != -1) name = c.getString(nameIndex) ?: name
-            if (sizeIndex != -1) size = c.getLong(sizeIndex)
+        if (dockController.mode != DockMode.HIDDEN && !dockController.isSuppressed) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(144.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.96f))
+                        )
+                    )
+            )
         }
-    }
-    return EmailAttachment(uri, name, size, mime)
-}
 
-/**
- * Populates the compose screen from a share-sheet / mailto deep link intent.
- */
-private fun applyComposeIntent(intent: Intent, context: Context, vm: ComposeViewModel) {
-    val action = intent.action
-    if (action == Intent.ACTION_SENDTO || action == Intent.ACTION_VIEW) {
-        intent.data?.takeIf { it.scheme.equals("mailto", ignoreCase = true) }?.let { uri ->
-            uri.schemeSpecificPart?.let { ssp ->
-                val parts = ssp.split("?", limit = 2)
-                vm.updateTo(parts[0])
-                if (parts.size > 1) {
-                    val query = parts[1]
-                    val params = query.split("&").associate {
-                        val kv = it.split("=", limit = 2)
-                        kv[0] to kv.getOrElse(1) { "" }
-                    }
-                    params["subject"]?.let { vm.updateSubject(android.net.Uri.decode(it)) }
-                    params["body"]?.let { vm.updateBody(android.net.Uri.decode(it)) }
-                }
-            }
-        }
+        ExpressivePersistentDock(
+            dockController = dockController,
+            onComposeClick = {
+                dockController.onComposeAction?.invoke()
+                    ?: navController.navigate(Screen.Compose.createRoute())
+            },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .then(if (dockController.mode == DockMode.COMPOSE) Modifier.imePadding() else Modifier)
+                .padding(bottom = 8.dp)
+        )
     }
-    intent.getStringExtra(Intent.EXTRA_EMAIL)?.let { vm.updateTo(it) }
-    intent.getStringArrayExtra(Intent.EXTRA_EMAIL)?.firstOrNull()?.let { vm.updateTo(it) }
-    intent.getStringExtra(Intent.EXTRA_SUBJECT)?.let { vm.updateSubject(it) }
-    intent.getStringExtra(Intent.EXTRA_TEXT)?.let { vm.updateBody(it) }
-
-    val streamUris = if (action == Intent.ACTION_SEND_MULTIPLE) {
-        intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM).orEmpty()
-    } else {
-        listOfNotNull(intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))
     }
-    streamUris.forEach { vm.addAttachment(readSharedAttachment(context, it)) }
 }

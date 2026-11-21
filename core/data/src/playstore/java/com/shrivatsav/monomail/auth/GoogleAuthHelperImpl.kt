@@ -4,6 +4,7 @@ import android.accounts.Account
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.util.Log
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
@@ -17,6 +18,18 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import java.security.SecureRandom
 
 object GoogleAuthHelperImpl : GoogleAuthHelper {
+    private const val TAG = "MonoMailGoogleAuth"
+
+    private fun describeAuthError(stage: String, error: Throwable): String {
+        val chain = generateSequence(error) { it.cause }
+            .take(4)
+            .joinToString(" -> ") { cause ->
+                "${cause::class.java.simpleName}: ${cause.message ?: "no message"}"
+            }
+        Log.e(TAG, "$stage failed: $chain", error)
+        return "$stage failed [$chain]"
+    }
+
     private fun Context.findActivity(): Activity? = when (this) {
         is Activity -> this
         is ContextWrapper -> baseContext.findActivity()
@@ -56,7 +69,10 @@ object GoogleAuthHelperImpl : GoogleAuthHelper {
             )
         } catch (e: Exception) {
             if (e is GetCredentialCancellationException) {
-                throw GoogleAuthException("Sign-in cancelled")
+                throw GoogleAuthException(
+                    "Google sign-in was cancelled by the credential provider. " +
+                        describeAuthError("GetSignInWithGoogle", e)
+                )
             }
             try {
                 val googleIdOption = GetGoogleIdOption.Builder()
@@ -74,12 +90,16 @@ object GoogleAuthHelperImpl : GoogleAuthHelper {
                 )
             } catch (fallbackError: Exception) {
                 if (fallbackError is GetCredentialCancellationException) {
-                    throw GoogleAuthException("Sign-in cancelled")
+                    throw GoogleAuthException(
+                        "Google sign-in was cancelled by the credential provider. " +
+                            describeAuthError("GetSignInWithGoogle", e) + "; " +
+                            describeAuthError("GetGoogleIdOption fallback", fallbackError)
+                    )
                 }
-                val errorMsg = e.message ?: fallbackError.message ?: e::class.java.simpleName
                 throw GoogleAuthException(
-                    "Google sign-in failed: $errorMsg. " +
-                    "Make sure a Google account is added in Settings > Accounts."
+                    describeAuthError("GetSignInWithGoogle", e) + "; " +
+                        describeAuthError("GetGoogleIdOption fallback", fallbackError) +
+                        ". Check that a Google account is added in Settings > Accounts."
                 )
             }
         }
@@ -93,7 +113,7 @@ object GoogleAuthHelperImpl : GoogleAuthHelper {
                 photoUrl = googleIdTokenCredential.profilePictureUri?.toString()
             )
         } catch (e: Exception) {
-            throw GoogleAuthException("Failed to parse Google sign-in response: ${e.message}")
+            throw GoogleAuthException(describeAuthError("Parse Google sign-in response", e))
         }
     }
 

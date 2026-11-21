@@ -14,7 +14,7 @@ concurrency:
 jobs:
   android:
     name: Android lint, tests, and debug builds
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -28,6 +28,34 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@41ad77ca97e46ee2e825d5e6b9a95d8169fcc44c # v4.4.2
 
+      - name: Restore persistent debug signing key
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEBUG_KEYSTORE_BASE64:-}" ]; then
+            echo "::error::DEBUG_KEYSTORE_BASE64 secret is required so OAuth SHA-1 remains stable across CI builds."
+            exit 1
+          fi
+          mkdir -p "$HOME/.android"
+          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+          test -s "$HOME/.android/debug.keystore"
+
+      # The Play Store flavor reads its OAuth client ID from secrets.properties.
+      # Without this step CI would still build a valid APK, but Gmail sign-in
+      # would fail at runtime because both app/core:pgp BuildConfig fields are blank.
+      - name: Inject and validate Play Store OAuth configuration
+        env:
+          RAW_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          CLEAN_CLIENT_ID=$(printf '%s' "$RAW_CLIENT_ID" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" -e 's#^https://##' -e 's#^http://##' -e 's#/$##')
+          if [ -z "$CLEAN_CLIENT_ID" ] || [[ "$CLEAN_CLIENT_ID" != *.apps.googleusercontent.com ]]; then
+            echo "::error::GOOGLE_CLIENT_ID is missing or invalid. Configure the GOOGLE_CLIENT_ID GitHub Actions secret before building the Play Store flavor."
+            exit 1
+          fi
+          printf 'GOOGLE_CLIENT_ID=%s\n' "$CLEAN_CLIENT_ID" > secrets.properties
+
       - name: Run Android checks and build both flavors
         run: >-
           ./gradlew
@@ -36,9 +64,57 @@ jobs:
           assembleGithubDebug assemblePlaystoreDebug
           --stacktrace
 
+      - name: Report APK signing certificate fingerprints
+        run: |
+          set -euo pipefail
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
+          for APK in app/build/outputs/apk/github/debug/*.apk app/build/outputs/apk/playstore/debug/*.apk; do
+            echo "### $(basename "$APK")" >> "$GITHUB_STEP_SUMMARY"
+            "$APKSIGNER" verify --print-certs "$APK" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Verify Play Store OAuth client ID was compiled
+        run: |
+          set -euo pipefail
+          PGP_BC="core/pgp/build/generated/source/buildConfig/playstore/debug/com/shrivatsav/monomail/core/pgp/BuildConfig.java"
+          APP_BC="app/build/generated/source/buildConfig/playstore/debug/com/shrivatsav/monomail/BuildConfig.java"
+          for file in "$PGP_BC" "$APP_BC"; do
+            if [ ! -f "$file" ] || ! grep -Eq 'GOOGLE_CLIENT_ID = "[^"]+\.apps\.googleusercontent\.com"' "$file"; then
+              echo "::error::Google OAuth client ID is missing from $file. Refusing to publish a broken Play Store APK."
+              exit 1
+            fi
+          done
+
+      - name: Package changed Kotlin source files
+        if: success()
+        run: |
+          zip -j monomail-changed-kt-files.zip \
+            app/src/main/java/com/shrivatsav/monomail/ui/navigation/ExpressivePersistentDock.kt \
+            app/src/main/java/com/shrivatsav/monomail/ui/navigation/NavGraph.kt \
+            core/designsystem/src/main/java/com/shrivatsav/monomail/ui/components/FloatingDockController.kt \
+            core/designsystem/src/main/java/com/shrivatsav/monomail/ui/components/InstantPress.kt \
+            feature/compose/src/main/java/com/shrivatsav/monomail/feature/compose/ComposeScreen.kt \
+            feature/detail/src/main/java/com/shrivatsav/monomail/feature/detail/EmailDetailScreen.kt \
+            feature/inbox/src/main/java/com/shrivatsav/monomail/feature/inbox/InboxScreen.kt \
+            feature/settings/src/main/java/com/shrivatsav/monomail/feature/settings/InboxSettingsScreen.kt \
+            feature/settings/src/main/java/com/shrivatsav/monomail/feature/settings/SettingsComponents.kt \
+            feature/settings/src/main/java/com/shrivatsav/monomail/feature/settings/SettingsScreen.kt
+
+      - name: Upload APKs and Kotlin source archive
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: monomail-build-outputs
+          path: |
+            app/build/outputs/apk/github/debug/*.apk
+            app/build/outputs/apk/playstore/debug/*.apk
+            monomail-changed-kt-files.zip
+          if-no-files-found: error
+          retention-days: 14
+
   backend:
     name: Backend typecheck and tests
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend

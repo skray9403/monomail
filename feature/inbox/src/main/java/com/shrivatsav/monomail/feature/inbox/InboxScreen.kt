@@ -31,8 +31,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -58,6 +63,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
 import com.shrivatsav.monomail.core.data.auth.UserProfile
+import com.shrivatsav.monomail.core.data.settings.DockTabId
+import com.shrivatsav.monomail.ui.components.DockTabItem
+import com.shrivatsav.monomail.ui.components.DockBulkAction
+import com.shrivatsav.monomail.ui.components.DockMode
+import com.shrivatsav.monomail.ui.components.LocalFloatingDockController
 import com.shrivatsav.monomail.data.model.EmailThread
 import kotlinx.coroutines.launch
 import com.shrivatsav.monomail.core.data.repository.BodyBackfillState
@@ -87,6 +97,7 @@ fun InboxScreen(
     val accounts by viewModel.accounts.collectAsState()
     val syncState by viewModel.inboxSyncState.collectAsState()
     val immediateTab by viewModel.currentTab.collectAsState()
+    val isTablet = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600
     var showBackfillDialog by remember { mutableStateOf(false) }
 
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
@@ -163,6 +174,91 @@ fun InboxScreen(
     val navBarHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val dockController = LocalFloatingDockController.current
+    val onMoveSpamToTrash: () -> Unit = {
+        if (currentThreads.isNotEmpty()) {
+            showMoveToTrashDialog = true
+        } else {
+            coroutineScope.launch { snackbarHostState.showSnackbar("No spam to move") }
+        }
+    }
+    val latestDockTabAction = rememberUpdatedState<(String) -> Unit> { id ->
+        DockTabId.entries.firstOrNull { it.name == id }?.let { viewModel.switchTab(it.toInboxTab()) }
+    }
+    val latestDockComposeAction = rememberUpdatedState(
+        if (immediateTab == InboxTab.SPAM) onMoveSpamToTrash else navActions.onCompose
+    )
+    val stableDockTabAction = remember(dockController) { { id: String -> latestDockTabAction.value(id) } }
+    val stableDockComposeAction = remember(dockController) { { latestDockComposeAction.value() } }
+    val stableExitBulkAction = remember(viewModel) { { viewModel.exitBulkSelectMode() } }
+    val stableBulkActions = remember(immediateTab, viewModel) { when (immediateTab) {
+            InboxTab.ARCHIVED -> listOf(
+                DockBulkAction("Unarchive", Icons.Rounded.Unarchive) { viewModel.bulkUnarchive() },
+                DockBulkAction("Delete", Icons.Rounded.Delete) { viewModel.bulkDelete() },
+                DockBulkAction("Read", Icons.Rounded.CheckCircle) { viewModel.bulkMarkRead() },
+                DockBulkAction("Unread", Icons.Rounded.MarkEmailUnread) { viewModel.bulkMarkUnread() },
+                DockBulkAction("Star", Icons.Rounded.Star) { viewModel.bulkToggleStar() }
+            )
+            InboxTab.TRASH -> listOf(
+                DockBulkAction("Restore", Icons.Rounded.Restore) { viewModel.bulkRestore() },
+                DockBulkAction("Delete", Icons.Rounded.Delete) { viewModel.bulkDelete() },
+                DockBulkAction("Read", Icons.Rounded.CheckCircle) { viewModel.bulkMarkRead() },
+                DockBulkAction("Unread", Icons.Rounded.MarkEmailUnread) { viewModel.bulkMarkUnread() },
+                DockBulkAction("Star", Icons.Rounded.Star) { viewModel.bulkToggleStar() }
+            )
+            InboxTab.STARRED -> listOf(
+                DockBulkAction("Archive", Icons.Rounded.Archive) { viewModel.bulkArchive() },
+                DockBulkAction("Delete", Icons.Rounded.Delete) { viewModel.bulkDelete() },
+                DockBulkAction("Read", Icons.Rounded.CheckCircle) { viewModel.bulkMarkRead() },
+                DockBulkAction("Unread", Icons.Rounded.MarkEmailUnread) { viewModel.bulkMarkUnread() },
+                DockBulkAction("Unstar", Icons.Rounded.StarOutline) { viewModel.bulkToggleStar() }
+            )
+            InboxTab.SPAM -> listOf(
+                DockBulkAction("Delete", Icons.Rounded.Delete) { viewModel.bulkDelete() },
+                DockBulkAction("Read", Icons.Rounded.CheckCircle) { viewModel.bulkMarkRead() },
+                DockBulkAction("Unread", Icons.Rounded.MarkEmailUnread) { viewModel.bulkMarkUnread() },
+                DockBulkAction("Star", Icons.Rounded.Star) { viewModel.bulkToggleStar() }
+            )
+            else -> listOf(
+                DockBulkAction("Archive", Icons.Rounded.Archive) { viewModel.bulkArchive() },
+                DockBulkAction("Delete", Icons.Rounded.Delete) { viewModel.bulkDelete() },
+                DockBulkAction("Read", Icons.Rounded.CheckCircle) { viewModel.bulkMarkRead() },
+                DockBulkAction("Unread", Icons.Rounded.MarkEmailUnread) { viewModel.bulkMarkUnread() },
+                DockBulkAction("Star", Icons.Rounded.Star) { viewModel.bulkToggleStar() }
+            )
+        } }
+
+    SideEffect {
+        val primaryIds = appSettings.dockConfig.primaryTabs
+        val allIds = DockTabId.entries.filter { it != DockTabId.UNIFIED }
+        dockController.primaryTabs = primaryIds.map { id ->
+            DockTabItem(id.name, id.label(unifiedInboxEnabled), id.icon(unifiedInboxEnabled))
+        }
+        dockController.overflowTabs = allIds
+            .filter { it !in primaryIds && it.toInboxTab() != immediateTab }
+            .map { id -> DockTabItem(id.name, id.label(unifiedInboxEnabled), id.icon(unifiedInboxEnabled)) }
+        dockController.selectedTabId = if (
+            immediateTab == InboxTab.UNIFIED && DockTabId.UNIFIED in primaryIds
+        ) DockTabId.UNIFIED.name else immediateTab.toDockTabId().name
+        dockController.continuousTabPosition = primaryIds.indexOf(
+            if (immediateTab == InboxTab.UNIFIED && DockTabId.UNIFIED in primaryIds) DockTabId.UNIFIED
+            else immediateTab.toDockTabId()
+        )
+            .takeIf { it >= 0 }?.toFloat() ?: 0f
+        dockController.isSearchActive = isSearchActive || isSearchFocused
+        dockController.isSuppressed = dockController.mode == DockMode.INBOX && (
+            longPressedThread != null || activeModal != null ||
+                showSnoozePicker || showMoveToTrashDialog || threadToDelete != null ||
+                showBackfillDialog || showPerformanceWarningDialog || showWelcomePrompt
+        )
+        dockController.isBulkMode = isBulkMode
+        dockController.bulkSelectionCount = selectedCount
+        dockController.onExitBulkMode = stableExitBulkAction
+        dockController.bulkActions = stableBulkActions
+        dockController.isSpamTab = immediateTab == InboxTab.SPAM
+        dockController.onTabSelected = stableDockTabAction
+        dockController.onComposeAction = stableDockComposeAction
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.uiError.collect { errorMsg ->
@@ -304,7 +400,7 @@ fun InboxScreen(
                         is InboxState.Success -> {
                             val currentTab = s.currentTab
                             key(currentTab) {
-                            val savedPos = viewModel.scrollPositions.collectAsState().value[currentTab] ?: (0 to 0)
+                            val savedPos = remember(currentTab) { viewModel.scrollPositions.value[currentTab] ?: (0 to 0) }
                             val listState = rememberLazyListState(
                                 initialFirstVisibleItemIndex = savedPos.first,
                                 initialFirstVisibleItemScrollOffset = savedPos.second
@@ -486,7 +582,19 @@ fun InboxScreen(
                                     LazyColumn(
                                         state = listState,
                                         modifier = Modifier
-                                            .fillMaxSize(),
+                                            .fillMaxSize()
+                                            .nestedScroll(remember(dockController) {
+                                                object : NestedScrollConnection {
+                                                    override fun onPreScroll(
+                                                        available: Offset,
+                                                        source: NestedScrollSource
+                                                    ): Offset {
+                                                        if (available.y < -1f) dockController.isCollapsed = true
+                                                        else if (available.y > 1f) dockController.isCollapsed = false
+                                                        return Offset.Zero
+                                                    }
+                                                }
+                                            }),
                                         contentPadding = PaddingValues(bottom = 100.dp)
                                     ) {
                                         itemsIndexed(displayItems, key = { _, it -> itemKeyFn(it) }) { index, displayItem ->
@@ -688,7 +796,7 @@ fun InboxScreen(
             }
 
 
-            AnimatedVisibility(
+            if (isTablet) AnimatedVisibility(
                 visible = longPressedThread == null && activeModal == null && !isBulkMode,
                 enter = fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.9f),
                 exit = fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.9f),
@@ -721,27 +829,7 @@ fun InboxScreen(
             }
 
 
-            AnimatedVisibility(
-                visible = isBulkMode,
-                enter = fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.9f),
-                exit = fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.9f),
-                modifier = Modifier.align(Alignment.BottomCenter)
-            ) {
-                BulkActionBar(
-                    currentTab = immediateTab,
-                    callbacks = BulkActionBarCallbacks(
-                        onArchive = { viewModel.bulkArchive() },
-                        onDelete = { viewModel.bulkDelete() },
-                        onMarkRead = { viewModel.bulkMarkRead() },
-                        onMarkUnread = { viewModel.bulkMarkUnread() },
-                        onToggleStar = { viewModel.bulkToggleStar() },
-                        onUnarchive = { viewModel.bulkUnarchive() },
-                        onRestore = { viewModel.bulkRestore() },
-                        onReportNotSpam = { viewModel.bulkReportNotSpam() },
-                    ),
-                    modifier = Modifier.padding(bottom = navBarHeight + 8.dp)
-                )
-            }
+
 
             
             var displayedThread by remember { mutableStateOf<EmailThread?>(null) }
@@ -1957,3 +2045,29 @@ private fun TopAlertBanner(
         }
     }
 }
+
+
+private fun DockTabId.toInboxTab(): InboxTab = when (this) {
+    DockTabId.UNIFIED -> InboxTab.UNIFIED
+    DockTabId.INBOX -> InboxTab.INBOX
+    DockTabId.SENT -> InboxTab.SENT
+    DockTabId.ARCHIVED -> InboxTab.ARCHIVED
+    DockTabId.SNOOZED -> InboxTab.SNOOZED
+    DockTabId.STARRED -> InboxTab.STARRED
+    DockTabId.TRASH -> InboxTab.TRASH
+    DockTabId.SPAM -> InboxTab.SPAM
+}
+
+private fun InboxTab.toDockTabId(): DockTabId = when (this) {
+    InboxTab.UNIFIED -> DockTabId.INBOX
+    InboxTab.INBOX -> DockTabId.INBOX
+    InboxTab.DRAFTS -> DockTabId.INBOX
+    InboxTab.SENT -> DockTabId.SENT
+    InboxTab.ARCHIVED -> DockTabId.ARCHIVED
+    InboxTab.SNOOZED -> DockTabId.SNOOZED
+    InboxTab.STARRED -> DockTabId.STARRED
+    InboxTab.TRASH -> DockTabId.TRASH
+    InboxTab.SPAM -> DockTabId.SPAM
+}
+
+
