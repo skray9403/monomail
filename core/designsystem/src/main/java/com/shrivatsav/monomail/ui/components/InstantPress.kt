@@ -11,6 +11,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.graphicsLayer
@@ -59,6 +60,7 @@ private fun Modifier.pressFeedback(
     val interactionSource = remember { MutableInteractionSource() }
     val haptics = LocalHapticFeedback.current
     val pressScale = remember { Animatable(1f) }
+    val animationScope = rememberCoroutineScope()
 
     this
         .graphicsLayer {
@@ -81,7 +83,7 @@ private fun Modifier.pressFeedback(
                 val press = PressInteraction.Press(down.position)
                 interactionSource.tryEmit(press)
                 if (haptic) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                val pressAnimation = launch {
+                val pressAnimation = animationScope.launch {
                     pressScale.animateTo(
                         targetValue = 0.94f,
                         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
@@ -96,10 +98,12 @@ private fun Modifier.pressFeedback(
                 } else {
                     interactionSource.tryEmit(PressInteraction.Cancel(press))
                 }
-                pressScale.animateTo(
-                    targetValue = 1f,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
-                )
+                animationScope.launch {
+                    pressScale.animateTo(
+                        targetValue = 1f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+                    )
+                }
             }
         }
 }
