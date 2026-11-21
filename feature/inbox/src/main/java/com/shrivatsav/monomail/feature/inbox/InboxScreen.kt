@@ -2022,6 +2022,7 @@ private fun DockTabId.toInboxTab(): InboxTab = when (this) {
 private fun InboxTab.toDockTabId(): DockTabId = when (this) {
     InboxTab.UNIFIED -> DockTabId.INBOX
     InboxTab.INBOX -> DockTabId.INBOX
+    InboxTab.DRAFTS -> DockTabId.INBOX
     InboxTab.SENT -> DockTabId.SENT
     InboxTab.ARCHIVED -> DockTabId.ARCHIVED
     InboxTab.SNOOZED -> DockTabId.SNOOZED
