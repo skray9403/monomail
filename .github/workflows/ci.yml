@@ -28,6 +28,21 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@41ad77ca97e46ee2e825d5e6b9a95d8169fcc44c # v4.4.2
 
+      # The Play Store flavor reads its OAuth client ID from secrets.properties.
+      # Without this step CI would still build a valid APK, but Gmail sign-in
+      # would fail at runtime because both app/core:pgp BuildConfig fields are blank.
+      - name: Inject and validate Play Store OAuth configuration
+        env:
+          RAW_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          CLEAN_CLIENT_ID=$(printf '%s' "$RAW_CLIENT_ID" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" -e 's#^https://##' -e 's#^http://##' -e 's#/$##')
+          if [ -z "$CLEAN_CLIENT_ID" ] || [[ "$CLEAN_CLIENT_ID" != *.apps.googleusercontent.com ]]; then
+            echo "::error::GOOGLE_CLIENT_ID is missing or invalid. Configure the GOOGLE_CLIENT_ID GitHub Actions secret before building the Play Store flavor."
+            exit 1
+          fi
+          printf 'GOOGLE_CLIENT_ID=%s\n' "$CLEAN_CLIENT_ID" > secrets.properties
+
       - name: Run Android checks and build both flavors
         run: >-
           ./gradlew
@@ -35,6 +50,18 @@ jobs:
           testGithubDebugUnitTest testPlaystoreDebugUnitTest
           assembleGithubDebug assemblePlaystoreDebug
           --stacktrace
+
+      - name: Verify Play Store OAuth client ID was compiled
+        run: |
+          set -euo pipefail
+          PGP_BC="core/pgp/build/generated/source/buildConfig/playstore/debug/com/shrivatsav/monomail/core/pgp/BuildConfig.java"
+          APP_BC="app/build/generated/source/buildConfig/playstore/debug/com/shrivatsav/monomail/BuildConfig.java"
+          for file in "$PGP_BC" "$APP_BC"; do
+            if [ ! -f "$file" ] || ! grep -Eq 'GOOGLE_CLIENT_ID = "[^"]+\.apps\.googleusercontent\.com"' "$file"; then
+              echo "::error::Google OAuth client ID is missing from $file. Refusing to publish a broken Play Store APK."
+              exit 1
+            fi
+          done
 
       - name: Package changed Kotlin source files
         if: success()
