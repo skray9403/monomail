@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shrivatsav.monomail.core.data.settings.*
 import com.shrivatsav.monomail.ui.components.SlideSheet
+import com.shrivatsav.monomail.ui.components.DockMode
+import com.shrivatsav.monomail.ui.components.LocalFloatingDockController
 import com.shrivatsav.monomail.ui.theme.MonoOpacity
 import com.shrivatsav.monomail.ui.theme.MonoSpring
 
@@ -45,8 +47,10 @@ internal fun SettingsDetailTopBar(title: String, onNavigateBack: () -> Unit) {
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         },
         navigationIcon = {
-            IconButton(onClick = onNavigateBack) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
+            if (LocalFloatingDockController.current.mode != DockMode.SETTINGS) {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
+                }
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)

@@ -1,5 +1,8 @@
 package com.shrivatsav.monomail.feature.settings
 
+import com.shrivatsav.monomail.ui.components.LocalFloatingDockController
+import com.shrivatsav.monomail.ui.components.clickableOnPress
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.Spring
@@ -9,6 +12,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import com.shrivatsav.monomail.ui.theme.cornerShape
@@ -21,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -56,6 +61,13 @@ fun SettingsScreen(
 
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
+    val dockController = LocalFloatingDockController.current
+    SideEffect {
+        dockController.settingsTitle = currentSection?.title ?: "Settings"
+        dockController.onBackClick = {
+            if (currentSection != null) currentSection = null else onNavigateBack()
+        }
+    }
 
     val DetailScreen: @Composable (SettingsSection) -> Unit = { section ->
         when (section) {
@@ -227,9 +239,7 @@ private fun SettingsHubScreen(
 
             SettingsSection.entries.filter { it != SettingsSection.DEVELOPER || settings.isDeveloperMode }.forEach { section ->
                 CategoryCard(
-                    icon = section.icon,
-                    title = section.title,
-                    subtitle = section.subtitle,
+                    section = section,
                     onClick = { onSectionClick(section) }
                 )
             }
@@ -397,32 +407,39 @@ internal fun DeveloperSettingsScreen(
 }
 
 @Composable
+private fun sectionColors(section: SettingsSection): Pair<androidx.compose.ui.graphics.Color, androidx.compose.ui.graphics.Color> {
+    val scheme = MaterialTheme.colorScheme
+    return when (section) {
+        SettingsSection.ACCOUNTS,
+        SettingsSection.INBOX,
+        SettingsSection.NAVIGATION -> scheme.primaryContainer to scheme.onPrimaryContainer
+
+        SettingsSection.APPEARANCE,
+        SettingsSection.COMPOSE,
+        SettingsSection.PRIVACY -> scheme.secondaryContainer to scheme.onSecondaryContainer
+
+        SettingsSection.READING,
+        SettingsSection.NOTIFICATIONS,
+        SettingsSection.SUPPORT -> scheme.tertiaryContainer to scheme.onTertiaryContainer
+
+        SettingsSection.DEVELOPER -> scheme.surfaceContainerHighest to scheme.onSurfaceVariant
+    }
+}
+
+@Composable
 private fun CategoryCard(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
+    section: SettingsSection,
     onClick: () -> Unit
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val cardScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.97f else 1f,
-        animationSpec = MonoSpring.bouncy(),
-        label = "cardScale"
-    )
+    val (containerColor, iconColor) = sectionColors(section)
 
     Surface(
-        onClick = onClick,
-        interactionSource = interactionSource,
         shape = cornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
         tonalElevation = 0.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer(
-                scaleX = cardScale,
-                scaleY = cardScale
-            )
+            .clickableOnPress(onPressDown = onClick)
     ) {
         Row(
             modifier = Modifier
@@ -430,22 +447,30 @@ private fun CategoryCard(
                 .padding(horizontal = 16.dp, vertical = 18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(24.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .background(containerColor),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = section.icon,
+                    contentDescription = null,
+                    tint = iconColor,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = title,
+                    text = section.title,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = subtitle,
+                    text = section.subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
