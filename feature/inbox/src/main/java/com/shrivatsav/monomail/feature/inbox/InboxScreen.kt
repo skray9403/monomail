@@ -190,33 +190,8 @@ fun InboxScreen(
     )
     val stableDockTabAction = remember(dockController) { { id: String -> latestDockTabAction.value(id) } }
     val stableDockComposeAction = remember(dockController) { { latestDockComposeAction.value() } }
-    SideEffect {
-        val primaryIds = appSettings.dockConfig.primaryTabs
-        val allIds = DockTabId.entries.filter { it != DockTabId.UNIFIED }
-        dockController.primaryTabs = primaryIds.map { id ->
-            DockTabItem(id.name, id.label(unifiedInboxEnabled), id.icon(unifiedInboxEnabled))
-        }
-        dockController.overflowTabs = allIds
-            .filter { it !in primaryIds && it.toInboxTab() != immediateTab }
-            .map { id -> DockTabItem(id.name, id.label(unifiedInboxEnabled), id.icon(unifiedInboxEnabled)) }
-        dockController.selectedTabId = if (
-            immediateTab == InboxTab.UNIFIED && DockTabId.UNIFIED in primaryIds
-        ) DockTabId.UNIFIED.name else immediateTab.toDockTabId().name
-        dockController.continuousTabPosition = primaryIds.indexOf(
-            if (immediateTab == InboxTab.UNIFIED && DockTabId.UNIFIED in primaryIds) DockTabId.UNIFIED
-            else immediateTab.toDockTabId()
-        )
-            .takeIf { it >= 0 }?.toFloat() ?: 0f
-        dockController.isSearchActive = isSearchActive || isSearchFocused
-        dockController.isSuppressed = dockController.mode == DockMode.INBOX && (
-            longPressedThread != null || activeModal != null ||
-                showSnoozePicker || showMoveToTrashDialog || threadToDelete != null ||
-                showBackfillDialog || showPerformanceWarningDialog || showWelcomePrompt
-        )
-        dockController.isBulkMode = isBulkMode
-        dockController.bulkSelectionCount = selectedCount
-        dockController.onExitBulkMode = { viewModel.exitBulkSelectMode() }
-        dockController.bulkActions = when (immediateTab) {
+    val stableExitBulkAction = remember(viewModel) { { viewModel.exitBulkSelectMode() } }
+    val stableBulkActions = remember(immediateTab, viewModel) { when (immediateTab) {
             InboxTab.ARCHIVED -> listOf(
                 DockBulkAction("Unarchive", Icons.Rounded.Unarchive) { viewModel.bulkUnarchive() },
                 DockBulkAction("Delete", Icons.Rounded.Delete) { viewModel.bulkDelete() },
@@ -251,7 +226,35 @@ fun InboxScreen(
                 DockBulkAction("Unread", Icons.Rounded.MarkEmailUnread) { viewModel.bulkMarkUnread() },
                 DockBulkAction("Star", Icons.Rounded.Star) { viewModel.bulkToggleStar() }
             )
+        } }
+
+    SideEffect {
+        val primaryIds = appSettings.dockConfig.primaryTabs
+        val allIds = DockTabId.entries.filter { it != DockTabId.UNIFIED }
+        dockController.primaryTabs = primaryIds.map { id ->
+            DockTabItem(id.name, id.label(unifiedInboxEnabled), id.icon(unifiedInboxEnabled))
         }
+        dockController.overflowTabs = allIds
+            .filter { it !in primaryIds && it.toInboxTab() != immediateTab }
+            .map { id -> DockTabItem(id.name, id.label(unifiedInboxEnabled), id.icon(unifiedInboxEnabled)) }
+        dockController.selectedTabId = if (
+            immediateTab == InboxTab.UNIFIED && DockTabId.UNIFIED in primaryIds
+        ) DockTabId.UNIFIED.name else immediateTab.toDockTabId().name
+        dockController.continuousTabPosition = primaryIds.indexOf(
+            if (immediateTab == InboxTab.UNIFIED && DockTabId.UNIFIED in primaryIds) DockTabId.UNIFIED
+            else immediateTab.toDockTabId()
+        )
+            .takeIf { it >= 0 }?.toFloat() ?: 0f
+        dockController.isSearchActive = isSearchActive || isSearchFocused
+        dockController.isSuppressed = dockController.mode == DockMode.INBOX && (
+            longPressedThread != null || activeModal != null ||
+                showSnoozePicker || showMoveToTrashDialog || threadToDelete != null ||
+                showBackfillDialog || showPerformanceWarningDialog || showWelcomePrompt
+        )
+        dockController.isBulkMode = isBulkMode
+        dockController.bulkSelectionCount = selectedCount
+        dockController.onExitBulkMode = stableExitBulkAction
+        dockController.bulkActions = stableBulkActions
         dockController.isSpamTab = immediateTab == InboxTab.SPAM
         dockController.onTabSelected = stableDockTabAction
         dockController.onComposeAction = stableDockComposeAction
