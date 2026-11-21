@@ -182,8 +182,8 @@ fun EmailDetailScreen(
     val latestForwardAction = rememberUpdatedState<(() -> Unit)?>(latestEmail?.let { email ->
         { onForward(email.subject, latestBody, email.threadId, email.id) }
     })
-    val stableReplyAction = remember(dockController) { { latestReplyAction.value?.invoke() } }
-    val stableForwardAction = remember(dockController) { { latestForwardAction.value?.invoke() } }
+    val stableReplyAction = remember(dockController) { { latestReplyAction.value?.invoke(); Unit } }
+    val stableForwardAction = remember(dockController) { { latestForwardAction.value?.invoke(); Unit } }
     SideEffect {
         dockController.onReplyAction = if (latestReplyAction.value == null) null else stableReplyAction
         dockController.onForwardAction = if (latestForwardAction.value == null) null else stableForwardAction
