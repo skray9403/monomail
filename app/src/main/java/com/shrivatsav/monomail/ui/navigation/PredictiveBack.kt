@@ -159,37 +159,10 @@ internal fun AnimatedContentScope.BackCardSurface(
     navController: NavController,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val radius by transition.animateDp(
-        transitionSpec = { tween(BackMs, easing = BackEasing) },
-        label = "backCardRadius",
-    ) { state ->
-        when {
-            state == EnterExitState.PostExit -> CardRadius
-            state == EnterExitState.PreEnter && BackSwipe.isBackGestureActive -> CardRadius
-            else -> 0.dp
-        }
-    }
-    val elevation by transition.animateDp(
-        transitionSpec = { tween(BackMs, easing = BackEasing) },
-        label = "backCardElevation",
-    ) { state -> if (state == EnterExitState.PostExit) CardElevation else 0.dp }
-    val reveal = revealDimModifier(navController)
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer {
-                val r = radius
-                val elev = elevation
-                shape = RoundedCornerShape(r)
-                clip = r > 0.5.dp
-                shadowElevation = elev.toPx()
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    ambientShadowColor = Color.Black.copy(alpha = 0.12f)
-                    spotShadowColor = Color.Black.copy(alpha = 0.18f)
-                }
-            }
-            .background(MaterialTheme.colorScheme.background)
-            .then(reveal),
+            .background(MaterialTheme.colorScheme.background),
         content = content
     )
 }

@@ -228,12 +228,7 @@ private fun routeType(route: String?): String = when {
 private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.slideInForRoute(
     motionScheme: MotionScheme
 ): EnterTransition = when (routeType(targetState.destination.route)) {
-    "compose" ->
-        slideIntoContainer(
-            AnimatedContentTransitionScope.SlideDirection.Up,
-            animationSpec = motionScheme.defaultSpatialSpec(),
-        ) + fadeIn(animationSpec = motionScheme.fastEffectsSpec())
-    "drill" ->
+    "compose", "drill" ->
         slideIntoContainer(
             AnimatedContentTransitionScope.SlideDirection.Start,
             animationSpec = motionScheme.defaultSpatialSpec(),
@@ -314,17 +309,12 @@ fun NavGraph(
             // same motion continuously and can reverse it when the gesture is cancelled.
             // initialState is the screen being popped (the outgoing destination).
             popEnterTransition = {
-                when (routeType(initialState.destination.route)) {
-                    "drill", "compose" -> backRevealEnter()
-                    else -> fadeIn(animationSpec = motionScheme.fastEffectsSpec())
-                }
+                fadeIn(animationSpec = motionScheme.fastEffectsSpec()) +
+                androidx.compose.animation.scaleIn(initialScale = 0.96f, animationSpec = motionScheme.fastSpatialSpec())
             },
             popExitTransition = {
-                when (routeType(initialState.destination.route)) {
-                    "compose" -> backSheetExit()
-                    "drill" -> backCardExit(density)
-                    else -> fadeOut(animationSpec = motionScheme.fastEffectsSpec())
-                }
+                fadeOut(animationSpec = motionScheme.fastEffectsSpec()) +
+                androidx.compose.animation.scaleOut(targetScale = 0.96f, animationSpec = motionScheme.fastSpatialSpec())
             },
         ) {
             composable(Screen.Onboarding.route) {

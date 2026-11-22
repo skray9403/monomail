@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
@@ -48,8 +49,8 @@ import com.shrivatsav.monomail.ui.theme.ThemePreviews
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-private val ExpandedDockHeight = 80.dp
-private val CompactDockHeight = 64.dp
+private val ExpandedDockHeight = 64.dp
+private val CompactDockHeight = 56.dp
 
 @Composable
 internal fun MorphingInboxNavigationBar(
@@ -68,90 +69,96 @@ internal fun MorphingInboxNavigationBar(
         label = "inboxDockHeight",
     )
     val indicatorHeight = animateDpAsState(
-        targetValue = if (compact) 48.dp else 56.dp,
+        targetValue = if (compact) 44.dp else 48.dp,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "inboxDockIndicatorHeight",
     )
 
-    Row(
+    Box(
         modifier = modifier
-            .widthIn(max = 600.dp)
             .fillMaxWidth()
             .navigationBarsPadding()
             .imePadding()
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        contentAlignment = Alignment.BottomCenter,
     ) {
-        Surface(
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .layout { measurable, constraints ->
-                    val height = barHeight.value.roundToPx().coerceIn(0, constraints.maxHeight)
-                    val placeable = measurable.measure(
-                        constraints.copy(minHeight = height, maxHeight = height)
-                    )
-                    layout(placeable.width, height) { placeable.placeRelative(0, 0) }
-                },
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            shape = CircleShape,
-            tonalElevation = 0.dp,
+                .widthIn(min = 280.dp, max = 360.dp)
+                .wrapContentWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            BoxWithConstraints(
+            Surface(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .selectableGroup(),
+                    .weight(1f)
+                    .layout { measurable, constraints ->
+                        val height = barHeight.value.roundToPx().coerceIn(0, constraints.maxHeight)
+                        val placeable = measurable.measure(
+                            constraints.copy(minHeight = height, maxHeight = height)
+                        )
+                        layout(placeable.width, height) { placeable.placeRelative(0, 0) }
+                    },
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                shape = CircleShape,
+                tonalElevation = 0.dp,
             ) {
-                val itemWidth = maxWidth / tabs.size.coerceAtLeast(1)
-                val itemWidthPx = with(LocalDensity.current) { itemWidth.toPx() }
-                val expandedIndicatorWidth = (itemWidth - 8.dp).coerceAtLeast(48.dp).coerceAtMost(itemWidth)
-                val indicatorWidth = animateDpAsState(
-                    targetValue = if (compact) 48.dp else expandedIndicatorWidth,
-                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                    label = "inboxDockIndicatorWidth",
-                )
-
-                Box(
+                BoxWithConstraints(
                     modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .offset {
-                            val position = pagerPosition().coerceIn(0f, (tabs.size - 1).coerceAtLeast(0).toFloat())
-                            val widthPx = indicatorWidth.value.roundToPx()
-                            IntOffset(
-                                x = (position * itemWidthPx + (itemWidthPx - widthPx) / 2f).roundToInt(),
-                                y = 0,
+                        .fillMaxSize()
+                        .selectableGroup(),
+                ) {
+                    val itemWidth = maxWidth / tabs.size.coerceAtLeast(1)
+                    val itemWidthPx = with(LocalDensity.current) { itemWidth.toPx() }
+                    val expandedIndicatorWidth = (itemWidth - 8.dp).coerceAtLeast(48.dp).coerceAtMost(itemWidth)
+                    val indicatorWidth = animateDpAsState(
+                        targetValue = if (compact) 48.dp else expandedIndicatorWidth,
+                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                        label = "inboxDockIndicatorWidth",
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .offset {
+                                val position = pagerPosition().coerceIn(0f, (tabs.size - 1).coerceAtLeast(0).toFloat())
+                                val widthPx = indicatorWidth.value.roundToPx()
+                                IntOffset(
+                                    x = (position * itemWidthPx + (itemWidthPx - widthPx) / 2f).roundToInt(),
+                                    y = 0,
+                                )
+                            }
+                            .layout { measurable, constraints ->
+                                val width = indicatorWidth.value.roundToPx().coerceIn(0, constraints.maxWidth)
+                                val height = indicatorHeight.value.roundToPx().coerceIn(0, constraints.maxHeight)
+                                val placeable = measurable.measure(Constraints.fixed(width, height))
+                                layout(width, height) { placeable.placeRelative(0, 0) }
+                            }
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                    )
+
+                    Row(Modifier.fillMaxSize()) {
+                        tabs.forEachIndexed { index, tab ->
+                            MorphingNavigationItem(
+                                index = index,
+                                tab = tab,
+                                selected = selectedIndex == index,
+                                compact = dockCollapsed,
+                                pagerPosition = pagerPosition,
+                                onClick = { onTabSelected(index) },
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
                             )
                         }
-                        .layout { measurable, constraints ->
-                            val width = indicatorWidth.value.roundToPx().coerceIn(0, constraints.maxWidth)
-                            val height = indicatorHeight.value.roundToPx().coerceIn(0, constraints.maxHeight)
-                            val placeable = measurable.measure(Constraints.fixed(width, height))
-                            layout(width, height) { placeable.placeRelative(0, 0) }
-                        }
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                )
-
-                Row(Modifier.fillMaxSize()) {
-                    tabs.forEachIndexed { index, tab ->
-                        MorphingNavigationItem(
-                            index = index,
-                            tab = tab,
-                            selected = selectedIndex == index,
-                            compact = dockCollapsed,
-                            pagerPosition = pagerPosition,
-                            onClick = { onTabSelected(index) },
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                        )
                     }
                 }
             }
-        }
-        Spacer(Modifier.width(12.dp))
-        FloatingActionButton(
-            onClick = onCompose,
-            modifier = Modifier.padding(vertical = 4.dp),
-        ) {
-            Icon(Icons.Rounded.Edit, contentDescription = "Compose")
+            Spacer(Modifier.width(12.dp))
+            FloatingActionButton(
+                onClick = onCompose,
+                modifier = Modifier.padding(vertical = 4.dp),
+            ) {
+                Icon(Icons.Rounded.Edit, contentDescription = "Compose")
+            }
         }
     }
 }
