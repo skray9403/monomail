@@ -362,7 +362,7 @@ private fun TopBarActions(state: ComposeUiState, viewModel: ComposeViewModel) {
         Icon(
             imageVector = Icons.Rounded.Description,
             contentDescription = "Templates",
-            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
     if (showTemplates) {
@@ -380,9 +380,9 @@ private fun TopBarActions(state: ComposeUiState, viewModel: ComposeViewModel) {
             imageVector = Icons.Rounded.Schedule,
             contentDescription = "Schedule",
             tint = if (state.to.isNotBlank())
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                MaterialTheme.colorScheme.onSurfaceVariant
             else
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
         )
     }
     if (state.hasEncryptionKeys || state.hasSigningKeys) {
@@ -394,7 +394,7 @@ private fun TopBarActions(state: ComposeUiState, viewModel: ComposeViewModel) {
                 imageVector = Icons.Rounded.Lock,
                 contentDescription = "Encrypt",
                 tint = if (state.encryptEnabled) MaterialTheme.colorScheme.primary
-                       else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                       else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         IconButton(
@@ -405,7 +405,7 @@ private fun TopBarActions(state: ComposeUiState, viewModel: ComposeViewModel) {
                 imageVector = Icons.Rounded.Edit,
                 contentDescription = "Sign",
                 tint = if (state.signEnabled) MaterialTheme.colorScheme.primary
-                       else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                       else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -774,7 +774,7 @@ private fun FormattingToolbar(
     modifier: Modifier = Modifier
 ) {
     val activeTint = MaterialTheme.colorScheme.primary
-    val inactiveTint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+    val inactiveTint = MaterialTheme.colorScheme.onSurfaceVariant
     val btnModifier = Modifier.size(36.dp)
     fun tintedConfig(command: String, description: String, isActive: Boolean, value: String = "null") =
         FormatButtonConfig(command, description, isActive, activeTint, inactiveTint, value)
@@ -1186,6 +1186,11 @@ private fun ComposeBodyEditor(
 
 @Composable
 private fun QuotedBodySection(originalBody: String) {
+    var quotedReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(360L) // allow nav transition to settle before Chromium init
+        quotedReady = true
+    }
     val bodyTextColor = "#%06X".format(MaterialTheme.colorScheme.onBackground.toArgb() and 0xFFFFFF)
     Box(
         modifier = Modifier
@@ -1193,30 +1198,32 @@ private fun QuotedBodySection(originalBody: String) {
             .heightIn(max = 200.dp)
             .padding(horizontal = 4.dp)
     ) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                WebView(ctx).apply {
-                    setBackgroundColor(Color.TRANSPARENT)
-                    settings.javaScriptEnabled = false
-                    settings.cacheMode = WebSettings.LOAD_NO_CACHE
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    val quoted = buildString {
-                        append("""<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>
-                            body{font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;font-size:13px;line-height:1.4;margin:8px 16px;padding:0;color:$bodyTextColor;word-break:break-word;overflow-wrap:break-word;opacity:0.6;}
-                            img{max-width:100%;height:auto;}
-                            blockquote,.gmail_quote,.gmail_extra,.yahoo_quoted,.moz-cite-prefix,[name="quoted-content"]{display:none!important;}
-                        </style></head><body>""")
-                        append(originalBody)
-                        append("""</body></html>""")
+        if (quotedReady) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    WebView(ctx).apply {
+                        setBackgroundColor(Color.TRANSPARENT)
+                        settings.javaScriptEnabled = false
+                        settings.cacheMode = WebSettings.LOAD_NO_CACHE
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        val quoted = buildString {
+                            append("""<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>
+                                body{font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;font-size:13px;line-height:1.4;margin:8px 16px;padding:0;color:$bodyTextColor;word-break:break-word;overflow-wrap:break-word;opacity:0.6;}
+                                img{max-width:100%;height:auto;}
+                                blockquote,.gmail_quote,.gmail_extra,.yahoo_quoted,.moz-cite-prefix,[name="quoted-content"]{display:none!important;}
+                            </style></head><body>""")
+                            append(originalBody)
+                            append("""</body></html>""")
+                        }
+                        loadDataWithBaseURL(null, quoted.trimIndent(), "text/html", "UTF-8", null)
                     }
-                    loadDataWithBaseURL(null, quoted.trimIndent(), "text/html", "UTF-8", null)
                 }
-            }
-        )
+            )
+        }
     }
 }
 

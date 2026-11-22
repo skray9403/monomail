@@ -3,11 +3,13 @@ package com.shrivatsav.monomail.feature.inbox.components
 import com.shrivatsav.monomail.feature.inbox.*
 import com.shrivatsav.monomail.model.InboxTab
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.shrivatsav.monomail.data.model.EmailThread
 
@@ -49,13 +51,12 @@ internal fun SwipeableEmailItem(
     val topPad = if (groupPosition == GroupPosition.SOLO || groupPosition == GroupPosition.TOP) 2.dp else 0.dp
     val bottomPad = if (groupPosition == GroupPosition.SOLO || groupPosition == GroupPosition.BOTTOM) 4.dp else 0.dp
 
-    Card(
+    Box(
         modifier = modifier
             .padding(horizontal = 12.dp)
-            .padding(top = topPad, bottom = bottomPad),
-        shape = shape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            .padding(top = topPad, bottom = bottomPad)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainer),
     ) {
         EmailItem(
             thread = thread,

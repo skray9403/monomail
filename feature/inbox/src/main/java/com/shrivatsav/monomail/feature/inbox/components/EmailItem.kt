@@ -153,13 +153,26 @@ fun EmailItem(
             }
         },
         trailingContent = {
-            Text(
-                text = timestamp,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = if (isUnread) FontWeight.SemiBold else FontWeight.Normal,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = timestamp,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (isUnread) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isUnread) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+                if (isUnread) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary)
+                    )
+                }
+            }
         },
         colors = ListItemDefaults.colors(
             containerColor = if (isUnread) {
