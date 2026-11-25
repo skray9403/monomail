@@ -325,7 +325,7 @@ private fun Modifier.elasticVisualOnly(
                 }
                 pressed = true
                 try {
-                    waitForUpOrCancellation(requireUnconsumed = false)
+                    waitForUpOrCancellation()
                 } finally {
                     pressed = false
                     normX = 0f
@@ -466,7 +466,7 @@ private fun Modifier.dockTapAction(
                     0f
                 }
                 try {
-                    waitForUpOrCancellation(requireUnconsumed = false)
+                    waitForUpOrCancellation()
                 } finally {
                     normX = 0f
                     normY = 0f
