@@ -1,6 +1,9 @@
 package com.shrivatsav.monomail.dockdemo
 
+import android.animation.ValueAnimator
+import android.os.Build
 import android.os.Bundle
+import android.view.HapticFeedbackConstants
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -8,13 +11,23 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -69,6 +82,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -77,8 +91,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -90,8 +109,16 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.text.style.TextAlign
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 private const val CURRENT_USER_EMAIL = "me@monomail.demo"
+
+private enum class DockMotionMode(val label: String) {
+    SMOOTH("Smooth"),
+    ELASTIC("Elastic"),
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -234,10 +261,257 @@ private fun MonoMailDemoTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = colors, content = content)
 }
 
+
+@Composable
+private fun Modifier.elasticVisualOnly(
+    enabled: Boolean,
+    maxStretchPercent: Float = 0.04f,
+    maxTranslateDp: Dp = 1.5.dp,
+): Modifier {
+    if (!enabled) return this
+
+    val animatorsEnabled = remember { ValueAnimator.areAnimatorsEnabled() }
+    var pressed by remember { mutableStateOf(false) }
+    var normX by remember { mutableFloatStateOf(0f) }
+    var normY by remember { mutableFloatStateOf(0f) }
+
+    val dx by animateFloatAsState(
+        targetValue = if (pressed) normX else 0f,
+        animationSpec = if (pressed) {
+            spring(stiffness = 550f, dampingRatio = 0.82f)
+        } else {
+            spring(stiffness = 350f, dampingRatio = 0.52f)
+        },
+        label = "tabElasticDx",
+    )
+    val dy by animateFloatAsState(
+        targetValue = if (pressed) normY else 0f,
+        animationSpec = if (pressed) {
+            spring(stiffness = 550f, dampingRatio = 0.82f)
+        } else {
+            spring(stiffness = 350f, dampingRatio = 0.52f)
+        },
+        label = "tabElasticDy",
+    )
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.96f else 1f,
+        animationSpec = if (pressed) {
+            tween(durationMillis = 85, easing = FastOutSlowInEasing)
+        } else {
+            spring(stiffness = 440f, dampingRatio = 0.62f)
+        },
+        label = "tabElasticScale",
+    )
+
+    return this
+        .pointerInput(enabled, animatorsEnabled) {
+            if (!animatorsEnabled) return@pointerInput
+            awaitEachGesture {
+                val down = awaitFirstDown(
+                    requireUnconsumed = false,
+                    pass = PointerEventPass.Initial
+                )
+                val cx = size.width / 2f
+                val cy = size.height / 2f
+                normX = if (cx > 0f) {
+                    ((down.position.x - cx) / cx).coerceIn(-1f, 1f)
+                } else {
+                    0f
+                }
+                normY = if (cy > 0f) {
+                    ((down.position.y - cy) / cy).coerceIn(-1f, 1f)
+                } else {
+                    0f
+                }
+                pressed = true
+                try {
+                    waitForUpOrCancellation(requireUnconsumed = false)
+                } finally {
+                    pressed = false
+                    normX = 0f
+                    normY = 0f
+                }
+            }
+        }
+        .graphicsLayer {
+            if (!animatorsEnabled) return@graphicsLayer
+            val maxShiftPx = maxTranslateDp.toPx()
+            val stretchX = 1f + maxStretchPercent * abs(dx) - 0.02f * abs(dy)
+            val stretchY = 1f + maxStretchPercent * abs(dy) - 0.02f * abs(dx)
+
+            transformOrigin = TransformOrigin(
+                pivotFractionX = (0.5f - 0.25f * dx).coerceIn(0.2f, 0.8f),
+                pivotFractionY = (0.5f - 0.25f * dy).coerceIn(0.2f, 0.8f),
+            )
+            scaleX = pressScale * stretchX
+            scaleY = pressScale * stretchY
+            translationX = dx * maxShiftPx
+            translationY = dy * maxShiftPx
+        }
+}
+
+@Composable
+private fun Modifier.dockTapAction(
+    enabled: Boolean,
+    elastic: Boolean,
+    contentDescriptionText: String,
+    onClick: () -> Unit,
+    maxStretchPercent: Float = 0.055f,
+    maxTranslateDp: Dp = 2.dp,
+    haptics: Boolean = true,
+): Modifier {
+    if (!enabled) return this
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val view = LocalView.current
+    val animatorsEnabled = remember { ValueAnimator.areAnimatorsEnabled() }
+
+    var normX by remember { mutableFloatStateOf(0f) }
+    var normY by remember { mutableFloatStateOf(0f) }
+    val pulse = remember { Animatable(1f) }
+
+    LaunchedEffect(elastic) {
+        if (!elastic) {
+            normX = 0f
+            normY = 0f
+            pulse.snapTo(1f)
+            return@LaunchedEffect
+        }
+
+        interactionSource.interactions.collect { interaction ->
+            when (interaction) {
+                is PressInteraction.Press -> {
+                    if (haptics) {
+                        view.performHapticFeedback(
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                HapticFeedbackConstants.GESTURE_START
+                            } else {
+                                HapticFeedbackConstants.KEYBOARD_TAP
+                            }
+                        )
+                    }
+                }
+
+                is PressInteraction.Release -> {
+                    normX = 0f
+                    normY = 0f
+                    if (haptics && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        view.performHapticFeedback(HapticFeedbackConstants.GESTURE_END)
+                    }
+                    if (animatorsEnabled) {
+                        launch {
+                            pulse.snapTo(0.95f)
+                            pulse.animateTo(
+                                1f,
+                                spring(dampingRatio = 0.58f, stiffness = 380f)
+                            )
+                        }
+                    }
+                }
+
+                is PressInteraction.Cancel -> {
+                    normX = 0f
+                    normY = 0f
+                }
+            }
+        }
+    }
+
+    val dx by animateFloatAsState(
+        targetValue = if (elastic && isPressed) normX else 0f,
+        animationSpec = if (isPressed) {
+            spring(stiffness = 550f, dampingRatio = 0.82f)
+        } else {
+            spring(stiffness = 350f, dampingRatio = 0.52f)
+        },
+        label = "dockElasticDx",
+    )
+    val dy by animateFloatAsState(
+        targetValue = if (elastic && isPressed) normY else 0f,
+        animationSpec = if (isPressed) {
+            spring(stiffness = 550f, dampingRatio = 0.82f)
+        } else {
+            spring(stiffness = 350f, dampingRatio = 0.52f)
+        },
+        label = "dockElasticDy",
+    )
+    val pressScale by animateFloatAsState(
+        targetValue = if (elastic && isPressed) 0.96f else 1f,
+        animationSpec = if (isPressed) {
+            tween(durationMillis = 85, easing = FastOutSlowInEasing)
+        } else {
+            spring(stiffness = 440f, dampingRatio = 0.62f)
+        },
+        label = "dockElasticScale",
+    )
+
+    val directionTracker = if (elastic && animatorsEnabled) {
+        Modifier.pointerInput(enabled, elastic, animatorsEnabled) {
+            awaitEachGesture {
+                val down = awaitFirstDown(
+                    requireUnconsumed = false,
+                    pass = PointerEventPass.Initial
+                )
+                val cx = size.width / 2f
+                val cy = size.height / 2f
+                normX = if (cx > 0f) {
+                    ((down.position.x - cx) / cx).coerceIn(-1f, 1f)
+                } else {
+                    0f
+                }
+                normY = if (cy > 0f) {
+                    ((down.position.y - cy) / cy).coerceIn(-1f, 1f)
+                } else {
+                    0f
+                }
+                try {
+                    waitForUpOrCancellation(requireUnconsumed = false)
+                } finally {
+                    normX = 0f
+                    normY = 0f
+                }
+            }
+        }
+    } else {
+        Modifier
+    }
+
+    return this
+        .then(directionTracker)
+        .semantics {
+            contentDescription = contentDescriptionText
+        }
+        .clickable(
+            interactionSource = interactionSource,
+            indication = null,
+            role = Role.Button,
+            onClickLabel = contentDescriptionText,
+            onClick = onClick,
+        )
+        .graphicsLayer {
+            if (!elastic || !animatorsEnabled) return@graphicsLayer
+            val maxShiftPx = maxTranslateDp.toPx()
+            val stretchX = 1f + maxStretchPercent * abs(dx) - 0.02f * abs(dy)
+            val stretchY = 1f + maxStretchPercent * abs(dy) - 0.02f * abs(dx)
+            val combinedScale = pressScale * pulse.value
+
+            transformOrigin = TransformOrigin(
+                pivotFractionX = (0.5f - 0.25f * dx).coerceIn(0.2f, 0.8f),
+                pivotFractionY = (0.5f - 0.25f * dy).coerceIn(0.2f, 0.8f),
+            )
+            scaleX = combinedScale * stretchX
+            scaleY = combinedScale * stretchY
+            translationX = dx * maxShiftPx
+            translationY = dy * maxShiftPx
+        }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MonoMailImprovementsDemo() {
     var folder by rememberSaveable { mutableStateOf(DemoFolder.INBOX) }
+    var motionMode by rememberSaveable { mutableStateOf(DockMotionMode.ELASTIC) }
     var selectedThreadId by rememberSaveable { mutableStateOf<String?>(null) }
     var isComposing by rememberSaveable { mutableStateOf(false) }
     var composeTo by rememberSaveable { mutableStateOf("") }
@@ -374,6 +648,8 @@ private fun MonoMailImprovementsDemo() {
 
                 if (isComposing) {
                     DemoDock(
+                        motionMode = motionMode,
+                        onMotionModeChange = { motionMode = it },
                         composing = true,
                         onDrafts = { composeNotice = "Draft saved locally in this demo." },
                         onAttach = { attachmentAdded = !attachmentAdded },
@@ -384,6 +660,8 @@ private fun MonoMailImprovementsDemo() {
                     )
                 } else if (selectedThread != null) {
                     DemoDock(
+                        motionMode = motionMode,
+                        onMotionModeChange = { motionMode = it },
                         threadMode = true,
                         onReply = {
                             composeTo = resolveReplyTarget(selectedThread.messages, CURRENT_USER_EMAIL).orEmpty()
@@ -405,6 +683,8 @@ private fun MonoMailImprovementsDemo() {
                     )
                 } else {
                     DemoDock(
+                        motionMode = motionMode,
+                        onMotionModeChange = { motionMode = it },
                         selectedFolder = folder,
                         onFolderSelected = {
                             folder = it
@@ -437,7 +717,7 @@ private fun InboxScreen(
 ) {
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 112.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 140.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
@@ -550,7 +830,7 @@ private fun ThreadScreen(
     LazyColumn(
         state = listState,
         modifier = modifier,
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 116.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 144.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
@@ -668,7 +948,7 @@ private fun ComposerScreen(
                 Text(notice, modifier = Modifier.padding(14.dp), color = MaterialTheme.colorScheme.onSecondaryContainer)
             }
         }
-        Spacer(Modifier.height(90.dp))
+        Spacer(Modifier.height(118.dp))
     }
 }
 
@@ -697,6 +977,8 @@ private fun EmptyDetailPane() {
 
 @Composable
 private fun DemoDock(
+    motionMode: DockMotionMode,
+    onMotionModeChange: (DockMotionMode) -> Unit,
     modifier: Modifier = Modifier,
     selectedFolder: DemoFolder = DemoFolder.INBOX,
     threadMode: Boolean = false,
@@ -709,13 +991,29 @@ private fun DemoDock(
     onAttach: () -> Unit = {},
     onSend: () -> Unit = {}
 ) {
-    Box(
+    val elasticEnabled = motionMode == DockMotionMode.ELASTIC
+
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
-        contentAlignment = Alignment.BottomCenter
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        MotionModeChip(
+            mode = motionMode,
+            onToggle = {
+                onMotionModeChange(
+                    if (motionMode == DockMotionMode.SMOOTH) {
+                        DockMotionMode.ELASTIC
+                    } else {
+                        DockMotionMode.SMOOTH
+                    }
+                )
+            }
+        )
+
         AnimatedContent(
             targetState = when {
                 composing -> "compose"
@@ -727,24 +1025,45 @@ private fun DemoDock(
         ) { mode ->
             when (mode) {
                 "thread" -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ActionPill("Reply", Icons.AutoMirrored.Rounded.Reply, onReply)
-                    ActionPill("Forward", Icons.AutoMirrored.Rounded.Forward, onForward)
+                    ActionPill("Reply", Icons.AutoMirrored.Rounded.Reply, onReply, elasticEnabled = elasticEnabled)
+                    ActionPill("Forward", Icons.AutoMirrored.Rounded.Forward, onForward, elasticEnabled = elasticEnabled)
                 }
+
                 "compose" -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ActionPill("Drafts", Icons.Rounded.Drafts, onDrafts)
-                    ActionPill("Attach", Icons.Rounded.AttachFile, onAttach)
-                    ActionPill("Send", Icons.AutoMirrored.Rounded.Send, onSend, emphasized = true)
+                    ActionPill("Drafts", Icons.Rounded.Drafts, onDrafts, elasticEnabled = elasticEnabled)
+                    ActionPill("Attach", Icons.Rounded.AttachFile, onAttach, elasticEnabled = elasticEnabled)
+                    ActionPill("Send", Icons.AutoMirrored.Rounded.Send, onSend, emphasized = true, elasticEnabled = elasticEnabled)
                 }
-                else -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    FolderDock(selectedFolder = selectedFolder, onSelected = onFolderSelected)
+
+                else -> Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    FolderDock(
+                        selectedFolder = selectedFolder,
+                        onSelected = onFolderSelected,
+                        elasticEnabled = elasticEnabled
+                    )
                     Surface(
-                        modifier = Modifier.size(56.dp).clickable(onClick = onCompose),
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .dockTapAction(
+                                enabled = true,
+                                elastic = elasticEnabled,
+                                contentDescriptionText = "Compose email",
+                                onClick = onCompose,
+                            ),
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.primaryContainer,
                         shadowElevation = 6.dp
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Rounded.Edit, contentDescription = "Compose email", tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Icon(
+                                Icons.Rounded.Edit,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         }
                     }
                 }
@@ -754,11 +1073,43 @@ private fun DemoDock(
 }
 
 @Composable
-private fun FolderDock(selectedFolder: DemoFolder, onSelected: (DemoFolder) -> Unit) {
+private fun MotionModeChip(mode: DockMotionMode, onToggle: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .clip(CircleShape)
+            .clickable(onClick = onToggle),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Text(
+            text = "Dock: ${mode.label}",
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun FolderDock(
+    selectedFolder: DemoFolder,
+    onSelected: (DemoFolder) -> Unit,
+    elasticEnabled: Boolean,
+) {
     val itemWidth = 76.dp
+    val indicatorSpec: AnimationSpec<Dp> = if (elasticEnabled) {
+        spring(dampingRatio = 0.72f, stiffness = 520f)
+    } else {
+        spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        )
+    }
     val indicatorOffset by animateDpAsState(
         targetValue = itemWidth * selectedFolder.index + 4.dp,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = indicatorSpec,
         label = "dockSelectionOffset"
     )
     Surface(
@@ -768,33 +1119,65 @@ private fun FolderDock(selectedFolder: DemoFolder, onSelected: (DemoFolder) -> U
     ) {
         Box(Modifier.width(itemWidth * 3).height(56.dp)) {
             Surface(
-                modifier = Modifier.offset(x = indicatorOffset).padding(4.dp).width(itemWidth - 8.dp).height(48.dp),
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .padding(4.dp)
+                    .width(itemWidth - 8.dp)
+                    .height(48.dp),
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primaryContainer
             ) {}
             Row(Modifier.fillMaxSize()) {
-                DemoFolder.entries.forEach { item ->
+                DemoFolder.values().forEach { item ->
                     val selected = item == selectedFolder
                     Box(
                         modifier = Modifier
                             .width(itemWidth)
                             .fillMaxHeight()
-                            .selectable(selected = selected, onClick = { onSelected(item) }, role = Role.Tab)
-                            .semantics { contentDescription = "${item.title} tab" },
+                            .elasticVisualOnly(enabled = elasticEnabled)
+                            .selectable(
+                                selected = selected,
+                                onClick = { onSelected(item) },
+                                role = Role.Tab
+                            )
+                            .semantics {
+                                contentDescription = "${item.title} tab"
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         AnimatedContent(
                             targetState = selected,
-                            transitionSpec = { fadeIn(tween(130)).togetherWith(fadeOut(tween(90))) },
+                            transitionSpec = {
+                                fadeIn(tween(130)).togetherWith(fadeOut(tween(90)))
+                            },
                             label = "tabContent-${item.name}"
                         ) { isSelected ->
                             if (isSelected) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    Icon(item.icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                                    Text(item.title, style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer, maxLines = 1)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Icon(
+                                        item.icon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Text(
+                                        item.title,
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        maxLines = 1
+                                    )
                                 }
                             } else {
-                                Icon(item.icon, contentDescription = null, modifier = Modifier.size(21.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(
+                                    item.icon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(21.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }
@@ -809,15 +1192,25 @@ private fun ActionPill(
     label: String,
     icon: ImageVector,
     onClick: () -> Unit,
-    emphasized: Boolean = false
+    emphasized: Boolean = false,
+    elasticEnabled: Boolean = false,
 ) {
     Surface(
         modifier = Modifier
             .height(56.dp)
             .clip(CircleShape)
-            .clickable(onClick = onClick),
+            .dockTapAction(
+                enabled = true,
+                elastic = elasticEnabled,
+                contentDescriptionText = label,
+                onClick = onClick,
+            ),
         shape = CircleShape,
-        color = if (emphasized) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = if (emphasized) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        },
         shadowElevation = 6.dp
     ) {
         Row(
@@ -828,13 +1221,21 @@ private fun ActionPill(
             Icon(
                 icon,
                 contentDescription = null,
-                tint = if (emphasized) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                tint = if (emphasized) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                }
             )
             Text(
                 label,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = if (emphasized) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                color = if (emphasized) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                }
             )
         }
     }
