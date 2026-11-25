@@ -2,6 +2,8 @@
 
 An isolated, placeholder-data Android app for reviewing the proposed base MonoMail improvements. It has its own application ID and does not depend on the MonoMail app or feature modules.
 
+The bottom dock supports Smooth and Elastic motion modes. The Elastic mode adds a visual-only drag response to folder tabs while preserving the normal accessible click action.
+
 ## Build
 
 From the repository root:
